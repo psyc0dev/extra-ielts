@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
@@ -109,17 +109,19 @@ function AppShell({
   const { timerActive, setTimerActive } = useNav();
   const [timerWarning, setTimerWarning] = useState(true);
   const [activeTest, setActiveTest] = useState<ActiveTest | null>(null);
+  const timerActiveRef = useRef(timerActive);
+  useEffect(() => { timerActiveRef.current = timerActive; }, [timerActive]);
 
   useEffect(() => {
     const win = getCurrentWindow();
-    const unlisten = win.onCloseRequested(async (e) => {
-      if (timerActive) {
+    const promise = win.onCloseRequested(async (e) => {
+      if (timerActiveRef.current) {
         e.preventDefault();
         toast.warning("Test in progress", { description: "You can't close the app while a test timer is running." });
       }
     });
-    return () => { unlisten.then(fn => fn()); };
-  }, [timerActive]);
+    return () => { promise.then(fn => fn()); };
+  }, []);
 
   return (
     <>
