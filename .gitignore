@@ -1,0 +1,17 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+src-tauri/target/
+
+# bun
+bun.lock
+
+# env
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db

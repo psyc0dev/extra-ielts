@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "extra IELTS",
+  "version": "0.1.0",
+  "identifier": "com.psyc0dev.ielts",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "extra IELTS",
+        "width": 1100,
+        "height": 720,
+        "minWidth": 800,
+        "minHeight": 560,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "theme": "Dark"
+      }
+    ]
+  }
+}
