@@ -36,7 +36,7 @@ export function TimerWidget({ testName, durationSeconds, timerWarning, onStop }:
 
   return (
     <div className={cn(
-      "fixed bottom-4 right-4 z-50 flex items-center gap-2 px-3 py-2 rounded-xl border shadow-lg backdrop-blur-sm transition-colors",
+      "fixed bottom-4 right-4 z-50 flex items-center gap-2 px-3 py-2 rounded-md border shadow-lg backdrop-blur-sm transition-colors",
       urgent
         ? "border-amber-800 bg-neutral-950/90 text-amber-400"
         : "border-neutral-700 bg-neutral-950/90 text-white"

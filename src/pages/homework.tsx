@@ -1,223 +1,274 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+﻿import { useEffect, useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Notebook, ClockCountdown, CheckCircle, Warning } from "@phosphor-icons/react";
+import { BookOpen, ClockCountdown, Trophy, ArrowRight, Play, SpinnerGap, Headphones, PencilLine, MicrophoneStage } from "@phosphor-icons/react";
+import { ExamRunner } from "@/components/exam-runner";
+import { getAttempt, listAssignments, startAssignment, type AssignmentAttemptDetail, type AssignmentSummary } from "@/lib/api";
+import { useNav } from "@/hooks/use-nav";
+import { toast } from "sonner";
 import en from "@/locales/en";
 
-type Subject = "All" | "Writing" | "Reading" | "Listening" | "Speaking";
+type Status = "not-started" | "in-progress" | "completed";
 
-interface HomeworkItem {
-  id: string;
-  title: string;
-  subject: Exclude<Subject, "All">;
-  due: string;
-  daysLeft: number;
-  description: string;
-  steps: string[];
-  done: boolean;
-}
-
-const initial: HomeworkItem[] = [
-  {
-    id: "1",
-    title: "Writing Task 1 — Bar Chart",
-    subject: "Writing",
-    due: "Tomorrow",
-    daysLeft: 1,
-    description: "Describe the bar chart showing internet usage across age groups. Aim for 150+ words.",
-    steps: ["Analyse the chart", "Write an introduction", "Describe key trends", "Summarise"],
-    done: false,
-  },
-  {
-    id: "2",
-    title: "Reading Practice Set 4",
-    subject: "Reading",
-    due: "In 3 days",
-    daysLeft: 3,
-    description: "Complete passages 1–3 from Cambridge IELTS 17, timed at 60 minutes.",
-    steps: ["Skim all three passages", "Answer True/False/NG section", "Complete matching headings", "Review answers"],
-    done: false,
-  },
-  {
-    id: "3",
-    title: "Speaking Part 2 Recording",
-    subject: "Speaking",
-    due: "In 5 days",
-    daysLeft: 5,
-    description: "Record a 2-minute response to the cue card: 'Describe a place you enjoy visiting.'",
-    steps: ["Prepare notes (1 min)", "Record response", "Self-evaluate fluency & vocabulary", "Submit recording"],
-    done: false,
-  },
-  {
-    id: "4",
-    title: "Listening Section 3 & 4",
-    subject: "Listening",
-    due: "In 6 days",
-    daysLeft: 6,
-    description: "Complete sections 3 and 4 from the practice audio. Focus on note completion questions.",
-    steps: ["Listen to Section 3", "Answer questions 21–30", "Listen to Section 4", "Answer questions 31–40"],
-    done: true,
-  },
-  {
-    id: "5",
-    title: "Writing Task 2 — Opinion Essay",
-    subject: "Writing",
-    due: "In 7 days",
-    daysLeft: 7,
-    description: "Write a 250-word opinion essay on: 'Technology has made people less social. Do you agree?'",
-    steps: ["Plan argument structure", "Write introduction", "Write body paragraphs", "Write conclusion", "Proofread"],
-    done: true,
-  },
-];
-
-const subjectColor: Record<Exclude<Subject, "All">, string> = {
-  Writing: "border-amber-800 text-amber-400",
-  Reading: "border-emerald-800 text-emerald-400",
-  Listening: "border-blue-800 text-blue-400",
-  Speaking: "border-purple-800 text-purple-400",
+const statusConfig: Record<Status, { label: string; className: string }> = {
+  "not-started": { label: en.tests.status.notStarted, className: "border-neutral-700 text-muted-foreground" },
+  "in-progress": { label: en.tests.status.inProgress, className: "border-amber-800 text-amber-400" },
+  "completed": { label: en.tests.status.completed, className: "border-emerald-800 text-emerald-400" },
 };
 
+const sectionIcon: Record<string, React.ReactNode> = {
+  listening: <Headphones weight="bold" className="size-3" />,
+  reading: <BookOpen weight="bold" className="size-3" />,
+  writing: <PencilLine weight="bold" className="size-3" />,
+  speaking: <MicrophoneStage weight="bold" className="size-3" />,
+};
+
+function ScorePill({ score, label }: { score: number | null; label: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md flex items-center gap-1 ${score !== null ? "bg-neutral-800 text-white" : "bg-neutral-800/50 text-neutral-600"}`}>
+          {sectionIcon[label.toLowerCase()] ?? null}
+          {score ?? "—"}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top">
+        <span className="capitalize">{label}: {score ?? en.tests.dialog.notAttempted}</span>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function HomeworkCard({ assignment, status, onOpen }: { assignment: AssignmentSummary; status: Status; onOpen: (assignment: AssignmentSummary) => void }) {
+  const cfg = statusConfig[status];
+  const isPastDue = assignment.dueAt != null && new Date(assignment.dueAt) < new Date() && status !== "completed";
+  return (
+    <Card className="rounded-xl border-neutral-800 bg-neutral-900 hover:border-neutral-700 transition-colors">
+      <CardContent className="px-4 py-3 flex flex-col gap-2.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-semibold">{assignment.title}</span>
+            <div className="flex items-center gap-1.5">
+              <ClockCountdown weight="bold" className="size-3 text-muted-foreground" />
+              <span className="text-[10px] text-muted-foreground">
+                {assignment.durationMinutes} min
+                {assignment.dueAt ? ` · due ${new Date(assignment.dueAt).toLocaleDateString()}` : ""}
+              </span>
+            </div>
+            <div className="text-[10px] text-muted-foreground capitalize">
+              Sections: {assignment.sectionKinds.join(", ")}
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
+            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${cfg.className}`}>{cfg.label}</Badge>
+            {isPastDue && <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-red-800 text-red-400">Expired</Badge>}
+            {assignment.attempt?.band != null && (
+              <span className="flex items-center gap-1 text-xs font-bold">
+                <Trophy weight="bold" className="size-3 text-amber-400" />
+                {assignment.attempt.band}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {status === "completed" && assignment.attempt?.band != null && (
+          <Progress value={(assignment.attempt.band / 9) * 100} className="h-1" indicatorClassName="bg-emerald-500" />
+        )}
+
+        <div className="flex items-center justify-between">
+          <div className="flex gap-1.5 flex-wrap">
+            {assignment.sectionKinds.map(kind => (
+              <ScorePill key={kind} label={kind} score={assignment.attempt?.status === "completed" ? (assignment.attempt?.band ?? null) : null} />
+            ))}
+          </div>
+          <Button
+            size="xs"
+            variant={status === "not-started" ? "outline" : "ghost"}
+            className="shrink-0 gap-1"
+            disabled={isPastDue}
+            onClick={() => onOpen(assignment)}
+          >
+            {status === "not-started" ? (
+              <><Play weight="bold" className="size-3" /> {en.tests.actions.start}</>
+            ) : status === "in-progress" ? (
+              <><ArrowRight weight="bold" className="size-3" /> {en.tests.actions.continue}</>
+            ) : (
+              <><BookOpen weight="bold" className="size-3" /> {en.tests.actions.review}</>
+            )}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function HomeworkDialog({
+  assignment,
+  open,
+  onClose,
+  onStart,
+  onContinue,
+}: {
+  assignment: AssignmentSummary | null;
+  open: boolean;
+  onClose: () => void;
+  onStart: (assignment: AssignmentSummary) => void;
+  onContinue: (assignment: AssignmentSummary) => void;
+}) {
+  if (!assignment) return null;
+  const status = (assignment.attempt?.status ?? "not-started") as Status;
+  const cfg = statusConfig[status];
+  const isPastDue = assignment.dueAt != null && new Date(assignment.dueAt) < new Date() && status !== "completed";
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="max-w-sm border-neutral-800 bg-neutral-950 rounded-xl">
+        <DialogHeader>
+          <DialogTitle className="text-sm font-semibold flex items-center gap-2">
+            <BookOpen weight="bold" className="size-4 text-muted-foreground" />
+            {assignment.title}
+          </DialogTitle>
+          <DialogDescription className="flex items-center gap-2 pt-1">
+            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${cfg.className}`}>{cfg.label}</Badge>
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <ClockCountdown weight="bold" className="size-3.5" />
+            <span>{en.tests.dialog.minutesTotal(assignment.durationMinutes)}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <BookOpen weight="bold" className="size-3.5" />
+            <span>{assignment.sectionKinds.join(" + ")}</span>
+          </div>
+        </div>
+
+        {isPastDue && (
+          <p className="text-xs text-red-400">The due date for this assignment has passed. You can no longer start or continue it.</p>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" size="sm" className="border-neutral-700" onClick={onClose}>{en.tests.dialog.cancel}</Button>
+          <Button size="sm" className="gap-1.5" disabled={isPastDue} onClick={() => {
+            if (status === "not-started") onStart(assignment);
+            else onContinue(assignment);
+            onClose();
+          }}>
+            {status === "not-started" ? <><Play weight="bold" className="size-3" /> {en.tests.dialog.startTest}</> :
+             status === "in-progress" ? <><ArrowRight weight="bold" className="size-3" /> {en.tests.actions.continue}</> :
+             <><BookOpen weight="bold" className="size-3" /> {en.tests.actions.review}</>}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function Homework() {
-  const [items, setItems] = useState(initial);
-  const [subject, setSubject] = useState<Subject>("All");
+  const [loading, setLoading] = useState(true);
+  const [assignments, setAssignments] = useState<AssignmentSummary[]>([]);
+  const [activeAttempt, setActiveAttempt] = useState<AssignmentAttemptDetail | null>(null);
+  const [selected, setSelected] = useState<AssignmentSummary | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  const toggle = (id: string) =>
-    setItems(prev => prev.map(i => (i.id === id ? { ...i, done: !i.done } : i)));
+  const { pendingId, clearPendingId } = useNav();
 
-  const filtered = (tab: "all" | "pending" | "completed") =>
-    items
-      .filter(i => subject === "All" || i.subject === subject)
-      .filter(i => tab === "all" || (tab === "pending" ? !i.done : i.done));
+  useEffect(() => {
+    if (!pendingId || assignments.length === 0) return;
+    const match = assignments.find(a => a.id === pendingId);
+    if (match) { setSelected(match); setDialogOpen(true); clearPendingId(); }
+  }, [pendingId, assignments]);
 
-  const total = items.length;
-  const done = items.filter(i => i.done).length;
+  useEffect(() => {
+    const load = async () => {
+      const res = await listAssignments("homework");
+      setAssignments(res.assignments);
+      setLoading(false);
+    };
+    load().catch((err) => {
+      toast.error(err.message);
+      setLoading(false);
+    });
+  }, []);
+
+  const open = (assignment: AssignmentSummary) => { setSelected(assignment); setDialogOpen(true); };
+
+  const refresh = async () => {
+    const res = await listAssignments("homework");
+    setAssignments(res.assignments);
+  };
+
+  if (activeAttempt) {
+    return (
+      <ExamRunner
+        test={activeAttempt.test}
+        attemptId={activeAttempt.attempt.id}
+        initialResponses={activeAttempt.responses}
+        readOnly={activeAttempt.attempt.status === "completed"}
+        onExit={() => { setActiveAttempt(null); }}
+        onSubmitted={() => {
+          setActiveAttempt(null);
+          refresh().catch(() => undefined);
+          toast.success("Homework submitted");
+        }}
+      />
+    );
+  }
 
   return (
     <TooltipProvider>
       <div className="p-5 flex flex-col gap-4">
-        {/* Header row */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Notebook weight="bold" className="size-4 text-muted-foreground" />
-            <span className="text-sm font-semibold">{en.homework.title}</span>
-          </div>
-          <Select value={subject} onValueChange={v => setSubject(v as Subject)}>
-            <SelectTrigger className="h-8 w-36 text-xs border-neutral-800 bg-neutral-900">
-              <SelectValue placeholder={en.homework.filter.placeholder} />
-            </SelectTrigger>
-            <SelectContent>
-              {(["All", "Writing", "Reading", "Listening", "Speaking"] as Subject[]).map(s => (
-                <SelectItem key={s} value={s} className="text-xs">{en.homework.filter[s.toLowerCase() as keyof typeof en.homework.filter]}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex items-center gap-2">
+          <BookOpen weight="bold" className="size-4 text-muted-foreground" />
+          <span className="text-sm font-semibold">{en.homework.title}</span>
         </div>
 
-        {/* Progress summary */}
-        <Card className="rounded-xl border-neutral-800 bg-neutral-900">
-          <CardContent className="px-4 py-3 flex flex-col gap-2">
-            <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground flex items-center gap-1.5">
-                <CheckCircle weight="bold" className="size-3.5" /> {en.homework.completion.label}
-              </span>
-              <span className="font-medium">{en.homework.completion.tasks(done, total)}</span>
-            </div>
-            <Progress value={(done / total) * 100} className="h-1.5" indicatorClassName="bg-emerald-500" />
-          </CardContent>
-        </Card>
-
-        {/* Tabs */}
-        <Tabs defaultValue="all">
-          <TabsList className="bg-neutral-900 border border-neutral-800 h-8 p-0.5 gap-0.5">
-            {(["all", "pending", "completed"] as const).map(tab => (
-              <TabsTrigger
-                key={tab}
-                value={tab}
-                className="text-xs h-7 px-3 capitalize data-[state=active]:bg-neutral-800 data-[state=active]:text-white"
-              >
-                {en.homework.tabs[tab]}
-                <span className="ml-1.5 text-[10px] text-muted-foreground">
-                  {filtered(tab).length}
-                </span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          {(["all", "pending", "completed"] as const).map(tab => (
-            <TabsContent key={tab} value={tab} className="mt-3">
-              {filtered(tab).length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
-                  <CheckCircle weight="bold" className="size-8 text-emerald-500" />
-                  <span className="text-sm">{en.homework.empty}</span>
-                </div>
-              ) : (
-                <Accordion type="multiple" className="flex flex-col gap-2">
-                  {filtered(tab).map(item => (
-                    <Card key={item.id} className={`rounded-xl border-neutral-800 bg-neutral-900 transition-opacity ${item.done ? "opacity-60" : ""}`}>
-                      <AccordionItem value={item.id} className="border-0">
-                        <CardHeader className="px-4 pt-3 pb-0">
-                          <AccordionTrigger className="hover:no-underline py-0 pb-3 [&>svg]:text-muted-foreground">
-                            <div className="flex items-start gap-3 flex-1 min-w-0">
-                              <Checkbox
-                                checked={item.done}
-                                onCheckedChange={() => toggle(item.id)}
-                                onClick={e => e.stopPropagation()}
-                                className="mt-0.5 shrink-0 border-neutral-600 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
-                              />
-                              <div className="flex flex-col gap-1 min-w-0 text-left">
-                                <CardTitle className={`text-xs font-medium leading-snug ${item.done ? "line-through text-muted-foreground" : ""}`}>
-                                  {item.title}
-                                </CardTitle>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${subjectColor[item.subject]}`}>
-                                    {item.subject}
-                                  </Badge>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className={`flex items-center gap-1 text-[10px] ${item.daysLeft <= 1 ? "text-red-400" : "text-muted-foreground"}`}>
-                                        {item.daysLeft <= 1 && <Warning weight="bold" className="size-3" />}
-                                        <ClockCountdown weight="bold" className="size-3" />
-                                        {item.due}
-                                      </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="bottom">
-                                      <span>{item.daysLeft === 1 ? en.homework.due.tomorrow : en.homework.due.daysLeft(item.daysLeft)}</span>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </div>
-                              </div>
-                            </div>
-                          </AccordionTrigger>
-                        </CardHeader>
-                        <AccordionContent>
-                          <CardContent className="px-4 pb-4 pt-0 flex flex-col gap-3">
-                            <p className="text-xs text-muted-foreground leading-relaxed">{item.description}</p>
-                            <div className="flex flex-col gap-1.5">
-                              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{en.homework.steps}</span>
-                              {item.steps.map((step, i) => (
-                                <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <span className="size-4 rounded-full bg-neutral-800 flex items-center justify-center text-[10px] font-medium shrink-0">{i + 1}</span>
-                                  {step}
-                                </div>
-                              ))}
-                            </div>
-                          </CardContent>
-                        </AccordionContent>
-                      </AccordionItem>
-                    </Card>
-                  ))}
-                </Accordion>
-              )}
-            </TabsContent>
-          ))}
-        </Tabs>
+        <ScrollArea className="w-full" type="scroll">
+          <div className="grid gap-3">
+            {loading ? (
+              <Card className="rounded-xl border-neutral-800 bg-neutral-900">
+                <CardContent className="px-4 py-6 flex items-center gap-2 text-xs text-muted-foreground">
+                  <SpinnerGap className="size-4 animate-spin" /> Loading homework...
+                </CardContent>
+              </Card>
+            ) : assignments.length === 0 ? (
+              <div className="flex items-center justify-center py-10 text-xs text-muted-foreground">
+                {en.homework.empty}
+              </div>
+            ) : (
+              assignments.map((assignment) => (
+                <HomeworkCard
+                  key={assignment.id}
+                  assignment={assignment}
+                  status={(assignment.attempt?.status ?? "not-started") as Status}
+                  onOpen={open}
+                />
+              ))
+            )}
+          </div>
+        </ScrollArea>
       </div>
+
+      <HomeworkDialog
+        assignment={selected}
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onStart={async (assignment) => {
+          const attemptRes = await startAssignment(assignment.id);
+          const detail = await getAttempt(attemptRes.attempt.id);
+          setActiveAttempt(detail);
+        }}
+        onContinue={async (assignment) => {
+          if (!assignment.attempt) return;
+          const detail = await getAttempt(assignment.attempt.id);
+          setActiveAttempt(detail);
+        }}
+      />
     </TooltipProvider>
   );
 }

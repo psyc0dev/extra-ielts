@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
@@ -38,9 +38,10 @@ function Row({ label, description, checked, onChange }: {
   );
 }
 
-export function Settings({ onSignOut, username, timerWarning, onTimerWarningChange }: {
+export function Settings({ onSignOut, username, role, timerWarning, onTimerWarningChange }: {
   onSignOut: () => void;
   username: string;
+  role: string;
   timerWarning: boolean;
   onTimerWarningChange: (v: boolean) => void;
 }) {
@@ -63,7 +64,7 @@ export function Settings({ onSignOut, username, timerWarning, onTimerWarningChan
               </div>
               <div className="flex flex-col gap-0.5">
                 <span className="text-sm font-medium">{username}</span>
-                <span className="text-xs text-muted-foreground">{s.account.role}</span>
+                <span className="text-xs text-muted-foreground">{role}</span>
               </div>
               <div className="ml-auto">
                 <DropdownMenu>

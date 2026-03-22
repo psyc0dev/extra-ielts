@@ -1,4 +1,4 @@
-import { House, BookOpen, Notebook, Gear } from "@phosphor-icons/react";
+import { House, BookOpen, Notebook, Gear, ShieldCheck } from "@phosphor-icons/react";
 import {
   Sidebar,
   SidebarContent,
@@ -12,18 +12,24 @@ import {
 } from "@/components/ui/sidebar";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useNav } from "@/hooks/use-nav";
+import { useAuth } from "@/hooks/use-auth";
 import logo from "../../src-tauri/icons/icon.ico";
 import en from "@/locales/en";
-
-const items = [
-  { title: en.nav.dashboard, icon: House },
-  { title: en.nav.tests, icon: BookOpen },
-  { title: en.nav.homework, icon: Notebook },
-] as const;
 
 export default function Navbar() {
   const { state } = useSidebar();
   const { page, setPage } = useNav();
+  const { user } = useAuth();
+
+  const items = [
+    { id: "Dashboard", title: en.nav.dashboard, icon: House },
+    { id: "Tests", title: en.nav.tests, icon: BookOpen },
+    { id: "Homework", title: en.nav.homework, icon: Notebook },
+  ] as const;
+
+  const adminItems = user?.role === "admin"
+    ? [{ id: "Admin", title: en.nav.admin, icon: ShieldCheck } as const]
+    : [];
 
   return (
     <Sidebar collapsible="icon" className="h-full">
@@ -39,11 +45,23 @@ export default function Navbar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
-                <SidebarMenuItem key={item.title}>
+                <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton
                     tooltip={item.title}
-                    isActive={page === item.title}
-                    onClick={() => setPage(item.title)}
+                    isActive={page === item.id}
+                    onClick={() => setPage(item.id)}
+                  >
+                    <item.icon weight="bold" />
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+              {adminItems.map((item) => (
+                <SidebarMenuItem key={item.id}>
+                  <SidebarMenuButton
+                    tooltip={item.title}
+                    isActive={page === item.id}
+                    onClick={() => setPage(item.id)}
                   >
                     <item.icon weight="bold" />
                     <span>{item.title}</span>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import WindowControls from "./components/WindowControls";
 import { NavProvider, useNav } from "./hooks/use-nav";
-import { Dashboard, Tests, Homework, Settings } from "./pages/index";
+import { Dashboard, Tests, Homework, Settings, Admin } from "./pages/index";
 import { LoginForm } from "@/components/login-form";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
@@ -19,6 +19,7 @@ import Navbar from "./components/Navbar";
 import { TimerWidget } from "./components/TimerWidget";
 import en from "./locales/en";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
 
 interface ActiveTest {
   name: string;
@@ -28,34 +29,42 @@ interface ActiveTest {
 function PageContent({
   onSignOut,
   username,
+  role,
   timerWarning,
   onTimerWarningChange,
   onStartTest,
+  onStopTest,
   onFullscreen,
   timerActive,
+  isAdmin,
 }: {
   onSignOut: () => void;
   username: string;
+  role: string;
   timerWarning: boolean;
   onTimerWarningChange: (v: boolean) => void;
   onStartTest: (name: string, seconds: number) => void;
+  onStopTest: () => void;
   onFullscreen: (v: boolean) => void;
   timerActive: boolean;
+  isAdmin: boolean;
 }) {
   const { page } = useNav();
 
   const pages: Record<string, React.ReactNode> = {
     Dashboard: <Dashboard />,
-    Tests: <Tests onStartTest={onStartTest} timerActive={timerActive} />,
+    Tests: <Tests onStartTest={onStartTest} onStopTest={onStopTest} timerActive={timerActive} />,
     Homework: <Homework />,
     Settings: (
       <Settings
         onSignOut={onSignOut}
         username={username}
+        role={role}
         timerWarning={timerWarning}
         onTimerWarningChange={onTimerWarningChange}
       />
     ),
+    Admin: isAdmin ? <Admin /> : <Dashboard />,
   };
 
   return (
@@ -100,28 +109,25 @@ function AppShell({
   username,
   isFullscreen,
   setIsFullscreen,
+  isAdmin,
+  role,
 }: {
   onSignOut: () => void;
   username: string;
   isFullscreen: boolean;
   setIsFullscreen: (v: boolean) => void;
+  isAdmin: boolean;
+  role: string;
 }) {
   const { timerActive, setTimerActive } = useNav();
   const [timerWarning, setTimerWarning] = useState(true);
   const [activeTest, setActiveTest] = useState<ActiveTest | null>(null);
-  const timerActiveRef = useRef(timerActive);
-  useEffect(() => { timerActiveRef.current = timerActive; }, [timerActive]);
 
   useEffect(() => {
-    const win = getCurrentWindow();
-    const promise = win.onCloseRequested(async (e) => {
-      if (timerActiveRef.current) {
-        e.preventDefault();
-        toast.warning("Test in progress", { description: "You can't close the app while a test timer is running." });
-      }
-    });
-    return () => { promise.then(fn => fn()); };
-  }, []);
+    if (!activeTest && timerActive) {
+      setTimerActive(false);
+    }
+  }, [activeTest, timerActive, setTimerActive]);
 
   return (
     <>
@@ -133,14 +139,20 @@ function AppShell({
               <PageContent
                 onSignOut={onSignOut}
                 username={username}
+                role={role}
                 timerWarning={timerWarning}
                 onTimerWarningChange={setTimerWarning}
                 onStartTest={(name, seconds) => {
                   setActiveTest({ name, seconds });
                   setTimerActive(true);
                 }}
+                onStopTest={() => {
+                  setActiveTest(null);
+                  setTimerActive(false);
+                }}
                 onFullscreen={setIsFullscreen}
                 timerActive={timerActive}
+                isAdmin={isAdmin}
               />
             </SidebarInset>
           </div>
@@ -158,10 +170,17 @@ function AppShell({
   );
 }
 
-export default function App() {
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [username, setUsername] = useState("");
+function AppBody() {
+  const { user, loading, loginUser, logoutUser, bootstrap, needsBootstrap } = useAuth();
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  if (loading) {
+    return (
+      <div className="dark flex h-screen items-center justify-center bg-neutral-900 text-white">
+        <div className="text-xs text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -169,14 +188,25 @@ export default function App() {
       style={{ borderRadius: isFullscreen ? 0 : 10, transition: "border-radius 0.3s ease" }}
     >
       <Toaster />
-      {!loggedIn ? (
+      {!user ? (
         <div className="flex flex-col flex-1">
           <div data-tauri-drag-region className="flex h-9 items-center justify-end px-4 select-none border-b border-neutral-800">
             <WindowControls onFullscreen={setIsFullscreen} />
           </div>
           <div className="flex flex-1 items-center justify-center bg-background">
             <div className="w-full max-w-sm">
-              <LoginForm onLogin={(u) => { setUsername(u); setLoggedIn(true); toast.success(en.login.successToast(u)); }} />
+              <LoginForm
+                onLogin={async (identifier, password) => {
+                  await loginUser(identifier, password);
+                  toast.success(en.login.successToast(identifier));
+                }}
+                onBootstrap={async (payload) => {
+                  await bootstrap(payload);
+                  toast.success(en.login.bootstrapSuccess);
+                }}
+                needsBootstrap={needsBootstrap}
+                loading={loading}
+              />
             </div>
           </div>
         </div>
@@ -184,14 +214,24 @@ export default function App() {
         <NavProvider>
           <TooltipProvider>
             <AppShell
-              onSignOut={() => setLoggedIn(false)}
-              username={username}
+              onSignOut={logoutUser}
+              username={user.username}
               isFullscreen={isFullscreen}
               setIsFullscreen={setIsFullscreen}
+              isAdmin={user.role === "admin"}
+              role={user.role}
             />
           </TooltipProvider>
         </NavProvider>
       )}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppBody />
+    </AuthProvider>
   );
 }

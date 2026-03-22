@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "dev:api": "bun run server/bun.ts"
   },
   "packageManager": "bun",
   "dependencies": {
@@ -45,6 +46,7 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
+    "hono": "^4.8.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.577.0",
     "motion": "^12.38.0",

@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "ielts-delivery-system-api",
+  "main": "server/worker.ts",
+  "compatibility_date": "2026-03-01",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ielts-delivery-system",
+      "database_id": "<add-your-d1-id>",
+      "migrations_dir": "./server/migrations"
+    }
+  ],
+  "vars": {
+    "CORS_ORIGIN": "*"
+  }
+}
