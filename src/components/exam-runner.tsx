@@ -12,7 +12,8 @@ import { Separator } from "@/components/ui/separator";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Slider } from "@/components/ui/slider";
 import { BookOpen, CheckCircle, Play, SpeakerHigh, SpeakerLow, SpeakerNone, SpeakerSlash, TextAlignLeft, XCircle } from "@phosphor-icons/react";
-import { saveAnswer, submitAttempt, type TestDetail } from "@/lib/api";
+import { saveAnswer, startSection, submitAttempt, forceSubmitAttempt, type TestDetail } from "@/lib/api";
+import { useNav } from "@/hooks/use-nav";
 
 type ListeningPhase = "idle" | "prep" | "playing" | "done" | "error";
 type ReadingPhase = "idle" | "reading";
@@ -23,14 +24,19 @@ function formatLabel(kind: string, index: number) {
 }
 
 export function ExamRunner({
-  test, attemptId, initialResponses, onExit, onSubmitted, onListeningStart, readOnly = false,
+  test, attemptId, initialResponses, listeningStartedAt, readingStartedAt, onExit, onSubmitted, onListeningStart, onReadingStart, onSectionFinish, onTimerFinish, readOnly = false,
 }: {
   test: TestDetail;
   attemptId: string;
-  initialResponses: Record<string, unknown>;
+  initialResponses: Record<string, string | null>;
+  listeningStartedAt?: string | null;
+  readingStartedAt?: string | null;
   onExit: () => void;
   onSubmitted: (scoreTotal: number, band: number | null) => void;
-  onListeningStart?: () => void;
+  onListeningStart?: (durationMinutes: number) => void;
+  onReadingStart?: (durationMinutes: number) => void;
+  onSectionFinish?: () => void;
+  onTimerFinish?: (submit: () => void) => void;
   readOnly?: boolean;
 }) {
   const sections = useMemo(() => [...test.sections], [test.sections]);
@@ -38,8 +44,14 @@ export function ExamRunner({
   const [listeningPhase, setListeningPhase] = useState<ListeningPhase>("idle");
   const [readingPhase, setReadingPhase] = useState<ReadingPhase>("idle");
   const [submittedSections, setSubmittedSections] = useState<Set<string>>(new Set());
-  const [answers, setAnswers] = useState<Record<string, unknown>>(initialResponses ?? {});
+  const [answers, setAnswers] = useState<Record<string, string | null>>(initialResponses ?? {});
   const [submitting, startSubmit] = useTransition();
+  const { setActiveAttemptId } = useNav();
+
+  useEffect(() => {
+    setActiveAttemptId(attemptId);
+    return () => setActiveAttemptId(null);
+  }, [attemptId, setActiveAttemptId]);
   const saveTimers = useRef<Record<string, number>>({});
 
   const activeSection = sections.find((s) => s.id === activeSectionId) ?? sections[0];
@@ -54,14 +66,57 @@ export function ExamRunner({
     [test.sections]
   );
 
-  const onAnswerChange = useCallback((questionId: string, value: unknown) => {
+  const isAttemptInProgress = !readOnly && !!activeSection;
+
+  // Fire-and-forget on unload — do NOT call e.preventDefault() in Tauri, it blocks the window from closing
+  useEffect(() => {
+    if (!isAttemptInProgress) return;
+    const handler = () => forceSubmitAttempt(attemptId);
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isAttemptInProgress, attemptId]);
+
+  const onAnswerChange = useCallback((questionId: string, value: string | null) => {
     if (readOnly) return;
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
     if (saveTimers.current[questionId]) window.clearTimeout(saveTimers.current[questionId]);
     saveTimers.current[questionId] = window.setTimeout(() => {
-      saveAnswer(attemptId, questionId, value ?? null).catch(() => undefined);
+      saveAnswer(attemptId, questionId, value).catch(() => undefined);
     }, 400);
   }, [attemptId, readOnly]);
+
+  useEffect(() => {
+    if (readOnly) return;
+    
+    // Auto-resume listening
+    if (activeSection?.kind === "listening" && listeningStartedAt && listeningPhase === "idle") {
+      const start = new Date(listeningStartedAt).getTime();
+      const elapsed = (Date.now() - start) / 1000;
+      const total = (activeSection.durationMinutes ?? test.durationMinutes) * 60;
+      const remaining = total - elapsed;
+      if (remaining > 0) {
+        setListeningPhase("playing");
+        onListeningStart?.(remaining / 60);
+      } else {
+        setListeningPhase("done");
+        // We might want to auto-submit here, but let's keep it simple
+      }
+    }
+    
+    // Auto-resume reading
+    if (activeSection?.kind === "reading" && readingStartedAt && readingPhase === "idle") {
+      const start = new Date(readingStartedAt).getTime();
+      const elapsed = (Date.now() - start) / 1000;
+      const total = (activeSection.durationMinutes ?? test.durationMinutes) * 60;
+      const remaining = total - elapsed;
+      if (remaining > 0) {
+        setReadingPhase("reading");
+        onReadingStart?.(remaining / 60);
+      } else {
+        // Handle timeout
+      }
+    }
+  }, [activeSection, listeningStartedAt, readingStartedAt, listeningPhase, readingPhase, readOnly, test.durationMinutes, onListeningStart, onReadingStart]);
 
   const activeSectionQuestions = questions;
   const activeSectionAnsweredCount = activeSectionQuestions.filter(
@@ -70,27 +125,64 @@ export function ExamRunner({
   const activeSectionFullyAnswered = activeSectionAnsweredCount === activeSectionQuestions.length && activeSectionQuestions.length > 0;
   const isLastSection = sections[sections.length - 1]?.id === activeSectionId;
 
+  const flushPending = useCallback(async (questionIds?: string[]) => {
+    const ids = questionIds ?? Object.keys(saveTimers.current);
+    for (const qId of ids) {
+      if (saveTimers.current[qId]) { window.clearTimeout(saveTimers.current[qId]); delete saveTimers.current[qId]; }
+    }
+    if (ids.length) await Promise.all(ids.map((qId) => saveAnswer(attemptId, qId, answers[qId] ?? null)));
+  }, [attemptId, answers]);
+
   const submitSection = useCallback(() => {
     startSubmit(async () => {
       try {
-        await Promise.all(activeSectionQuestions.map((q) => saveAnswer(attemptId, q.id, answers[q.id] ?? null)));
+        await flushPending();
         setSubmittedSections((prev) => new Set([...prev, activeSectionId]));
         const nextIdx = sections.findIndex((s) => s.id === activeSectionId) + 1;
         if (sections[nextIdx]) setActiveSectionId(sections[nextIdx].id);
       } finally {}
     });
-  }, [activeSectionId, activeSectionQuestions, answers, attemptId, sections]);
+  }, [activeSectionId, flushPending, sections]);
+
+  const submitListeningPart = useCallback(() => {
+    startSubmit(async () => {
+      try {
+        await flushPending();
+        const listeningSections = sections.filter(s => s.kind === "listening");
+        setSubmittedSections((prev) => {
+          const next = new Set(prev);
+          listeningSections.forEach(s => next.add(s.id));
+          return next;
+        });
+        const firstReading = sections.find(s => s.kind === "reading");
+        if (firstReading) setActiveSectionId(firstReading.id);
+        onSectionFinish?.();
+      } finally {}
+    });
+  }, [flushPending, sections, onSectionFinish]);
+
+  const flushPendingAnswers = useCallback(() => flushPending(), [flushPending]);
 
   const submitTest = useCallback(() => {
     startSubmit(async () => {
       try {
-        const allQuestions = test.sections.flatMap((s) => s.questions);
-        await Promise.all(allQuestions.map((q) => saveAnswer(attemptId, q.id, answers[q.id] ?? null)));
+        await flushPendingAnswers();
         const res = await submitAttempt(attemptId);
         onSubmitted(res.attempt.scoreTotal, res.attempt.band);
       } finally {}
     });
-  }, [attemptId, onSubmitted, answers, test.sections]);
+  }, [attemptId, onSubmitted, flushPendingAnswers]);
+
+  useEffect(() => {
+    if (!onTimerFinish || readOnly) return;
+    // If we're in any listening section, the timer finish should submit all listening parts
+    if (activeSection?.kind === "listening") {
+      onTimerFinish(submitListeningPart);
+    } else {
+      // Otherwise (reading), it submits the whole test
+      onTimerFinish(submitTest);
+    }
+  }, [onTimerFinish, submitListeningPart, submitTest, activeSection?.kind, readOnly]);
 
   return (
     <div className="flex h-full gap-4 p-4 overflow-hidden">
@@ -130,9 +222,33 @@ export function ExamRunner({
             </TabsList>
           </Tabs>
           <Separator className="bg-neutral-800" />
-          <Button variant="outline" size="sm" className="border-neutral-700" onClick={onExit}>
-            <XCircle weight="bold" className="size-3" /> Exit
-          </Button>
+          {isAttemptInProgress ? (
+             <AlertDialog>
+               <AlertDialogTrigger asChild>
+                 <Button variant="outline" size="sm" className="border-neutral-700 hover:bg-neutral-800">
+                   <XCircle weight="bold" className="size-3" /> Exit
+                 </Button>
+               </AlertDialogTrigger>
+               <AlertDialogContent className="border-neutral-800 bg-neutral-950">
+                 <AlertDialogHeader>
+                   <AlertDialogTitle className="text-sm">Submit and Exit?</AlertDialogTitle>
+                   <AlertDialogDescription className="text-xs">
+                     Exiting while in an active listening or reading part will automatically submit your entire test. All progress will be locked and your band score will be calculated based on your answers so far.
+                   </AlertDialogDescription>
+                 </AlertDialogHeader>
+                 <AlertDialogFooter>
+                   <AlertDialogCancel className="text-xs">Cancel</AlertDialogCancel>
+                   <AlertDialogAction className="text-xs bg-red-600 hover:bg-red-700" onClick={async (e) => { e.preventDefault(); await flushPendingAnswers(); submitTest(); }}>
+                     Submit & Exit
+                   </AlertDialogAction>
+                 </AlertDialogFooter>
+               </AlertDialogContent>
+             </AlertDialog>
+          ) : (
+            <Button variant="outline" size="sm" className="border-neutral-700" onClick={onExit}>
+              <XCircle weight="bold" className="size-3" /> Exit
+            </Button>
+          )}
         </CardContent>
       </Card>
 
@@ -168,7 +284,7 @@ export function ExamRunner({
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button size="sm" disabled={submitting || !activeSectionFullyAnswered}>
-                      <CheckCircle weight="bold" className="size-3" /> Submit Section
+                      <CheckCircle weight="bold" className="size-3" /> Submit Listening
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent className="border-neutral-800 bg-neutral-950">
@@ -180,7 +296,7 @@ export function ExamRunner({
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel className="border-neutral-700 text-xs">Go back</AlertDialogCancel>
-                      <AlertDialogAction className="text-xs" onClick={submitSection}>Continue</AlertDialogAction>
+                      <AlertDialogAction className="text-xs" onClick={submitListeningPart}>Continue</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
@@ -201,8 +317,12 @@ export function ExamRunner({
               onAnswerChange={onAnswerChange}
               readOnly={readOnly}
               phase={listeningPhase}
-              onPhaseChange={(p) => {
-                if (p === "prep") onListeningStart?.();
+              onPhaseChange={async (p) => {
+                const duration = activeSection?.durationMinutes ?? test.durationMinutes;
+                if (p === "prep") {
+                  try { await startSection(attemptId, "listening"); } catch(e){}
+                  onListeningStart?.(duration); 
+                }
                 setListeningPhase(p);
               }}
             />
@@ -215,6 +335,11 @@ export function ExamRunner({
               readOnly={readOnly}
               phase={readingPhase}
               onPhaseChange={setReadingPhase}
+              onReadingStart={async () => {
+                const duration = activeSection?.durationMinutes ?? test.durationMinutes;
+                try { await startSection(attemptId, "reading"); } catch(e){}
+                onReadingStart?.(duration);
+              }}
             />
           ) : (
             <ScrollArea className="h-full px-4 pb-4">
@@ -230,15 +355,16 @@ export function ExamRunner({
 }
 
 function ReadingSection({
-  passage, questions, answers, onAnswerChange, readOnly, phase, onPhaseChange,
+  passage, questions, answers, onAnswerChange, readOnly, phase, onPhaseChange, onReadingStart,
 }: {
   passage: string;
   questions: TestDetail["sections"][number]["questions"];
-  answers: Record<string, unknown>;
-  onAnswerChange: (id: string, value: unknown) => void;
+  answers: Record<string, string | null>;
+  onAnswerChange: (id: string, value: string | null) => void;
   readOnly: boolean;
   phase: ReadingPhase;
   onPhaseChange: (phase: ReadingPhase) => void;
+  onReadingStart?: () => void;
 }) {
   const [fontSize, setFontSize] = useState(12);
 
@@ -259,7 +385,7 @@ function ReadingSection({
               <span className="text-sm font-semibold">Reading Section</span>
               <span className="text-xs text-muted-foreground">Read the passage and answer the questions.</span>
             </div>
-            <Button variant="outline" className="gap-2 border-neutral-700" onClick={() => onPhaseChange("reading")}>
+            <Button variant="outline" className="gap-2 border-neutral-700" onClick={() => { onPhaseChange("reading"); onReadingStart?.(); }}>
               <Play weight="bold" className="size-4" /> Start Reading
             </Button>
           </motion.div>
@@ -301,8 +427,8 @@ function ListeningSection({
 }: {
   audioUrl: string | null;
   questions: TestDetail["sections"][number]["questions"];
-  answers: Record<string, unknown>;
-  onAnswerChange: (id: string, value: unknown) => void;
+  answers: Record<string, string | null>;
+  onAnswerChange: (id: string, value: string | null) => void;
   readOnly: boolean;
   phase: ListeningPhase;
   onPhaseChange: (phase: ListeningPhase) => void;
@@ -491,8 +617,8 @@ const typeLabels: Record<string, string> = {
 function QuestionCard({ question, idx, answers, onAnswerChange, readOnly }: {
   question: TestDetail["sections"][number]["questions"][number];
   idx: number;
-  answers: Record<string, unknown>;
-  onAnswerChange: (id: string, value: unknown) => void;
+  answers: Record<string, string | null>;
+  onAnswerChange: (id: string, value: string | null) => void;
   readOnly: boolean;
 }) {
   const correct = question.correctAnswer != null
@@ -544,8 +670,8 @@ function QuestionCard({ question, idx, answers, onAnswerChange, readOnly }: {
 
 function QuestionInput({ question, value, onChange, readOnly }: {
   question: TestDetail["sections"][number]["questions"][number];
-  value: unknown;
-  onChange: (value: unknown) => void;
+  value: string | null;
+  onChange: (value: string | null) => void;
   readOnly: boolean;
 }) {
   const isChoice = question.type === "mcq" || question.type === "true-false-notgiven" || question.type === "yes-no-notgiven" || question.type === "match-headings" || question.type === "matching";
@@ -566,8 +692,18 @@ function QuestionInput({ question, value, onChange, readOnly }: {
   }
   if (question.type === "note-completion" || question.type === "table-completion") {
     const expected = Array.isArray(question.correctAnswer) ? question.correctAnswer : [question.correctAnswer ?? ""];
-    const stored = (() => { try { return JSON.parse(String(value ?? "[]")); } catch { return []; } })();
-    const parts = Array.isArray(stored) ? stored : [];
+    const stored = (() => { 
+      const s = String(value ?? "");
+      if (!s || s === "null" || s === "") return [];
+      try { 
+        const parsed = JSON.parse(s);
+        return Array.isArray(parsed) ? parsed : [String(parsed)];
+      } catch { 
+        // If it's not JSON, it might be a raw string from a previous version
+        return [s]; 
+      } 
+    })();
+    const parts = stored;
     return (
       <div className="flex flex-col gap-2">
         {expected.map((_, i) => (
@@ -577,6 +713,8 @@ function QuestionInput({ question, value, onChange, readOnly }: {
               value={String(parts[i] ?? "")}
               onChange={(e) => {
                 const next = [...parts];
+                // Fill gaps with empty strings up to current index
+                for (let j = 0; j < i; j++) if (next[j] === undefined) next[j] = "";
                 next[i] = e.target.value;
                 onChange(JSON.stringify(next));
               }}

@@ -3,18 +3,21 @@ import { toast } from "sonner";
 
 type Page = "Dashboard" | "Tests" | "Homework" | "Settings" | "Admin";
 
-const NavContext = createContext<{
+export const NavContext = createContext<{
   page: Page;
   setPage: (p: Page, pendingId?: string) => void;
   pendingId: string | null;
   clearPendingId: () => void;
   timerActive: boolean;
   setTimerActive: (v: boolean) => void;
+  activeAttemptId: string | null;
+  setActiveAttemptId: (id: string | null) => void;
 } | null>(null);
 
 export function NavProvider({ children }: { children: React.ReactNode }) {
   const [page, setPageRaw] = useState<Page>("Dashboard");
   const [timerActive, setTimerActive] = useState(false);
+  const [activeAttemptId, setActiveAttemptId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
 
   const setPage = (p: Page, id?: string) => {
@@ -27,7 +30,7 @@ export function NavProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <NavContext.Provider value={{ page, setPage, pendingId, clearPendingId: () => setPendingId(null), timerActive, setTimerActive }}>
+    <NavContext.Provider value={{ page, setPage, pendingId, clearPendingId: () => setPendingId(null), timerActive, setTimerActive, activeAttemptId, setActiveAttemptId }}>
       {children}
     </NavContext.Provider>
   );

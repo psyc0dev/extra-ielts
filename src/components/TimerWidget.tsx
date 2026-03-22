@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useTimer } from "@/hooks/use-timer";
 import { notify } from "@/lib/notify";
+import { playSound } from "@/lib/sound";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import en from "@/locales/en";
@@ -10,23 +11,26 @@ interface TimerWidgetProps {
   testName: string;
   durationSeconds: number;
   timerWarning: boolean;
-  onStop: () => void;
+  sound: boolean;
+  onFinish?: () => void;
 }
 
-export function TimerWidget({ testName, durationSeconds, timerWarning, onStop }: TimerWidgetProps) {
+export function TimerWidget({ testName, durationSeconds, timerWarning, sound, onFinish }: TimerWidgetProps) {
   const timer = useTimer({
     durationSeconds,
     warningSeconds: 300,
     onWarning: () => {
+      if (sound && testName !== "Listening") playSound();
       if (timerWarning) {
         toast.warning(en.timer.warning, { description: testName });
         notify(en.timer.warning, en.timer.warningBody(testName));
       }
     },
     onFinish: () => {
+      if (sound) playSound();
       toast.error(en.timer.finished, { description: testName });
       notify(en.timer.finished, en.timer.finishedBody(testName));
-      onStop();
+      onFinish?.();
     },
   });
 

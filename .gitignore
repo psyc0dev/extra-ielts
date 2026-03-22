@@ -15,3 +15,8 @@ bun.lock
 # OS
 .DS_Store
 Thumbs.db
+
+# local db
+server/*.db
+server/*.db-wal
+server/*.db-shm

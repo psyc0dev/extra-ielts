@@ -23,37 +23,47 @@ export function useTimer({
   onWarning,
   onFinish,
 }: UseTimerOptions): TimerState {
-  const [remaining, setRemaining] = useState(durationSeconds);
+  const initial = Math.floor(durationSeconds);
+  const [remaining, setRemaining] = useState(initial);
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
   const warnedRef = useRef(false);
+  const hasStartedRef = useRef(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const onFinishRef = useRef(onFinish);
+  const onWarningRef = useRef(onWarning);
 
-  const clear = () => {
+  useEffect(() => { onFinishRef.current = onFinish; }, [onFinish]);
+  useEffect(() => { onWarningRef.current = onWarning; }, [onWarning]);
+
+  const clear = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-  };
+  }, []);
 
   useEffect(() => {
     if (!running) return;
+    hasStartedRef.current = true;
     intervalRef.current = setInterval(() => {
       setRemaining(prev => {
-        if (prev <= 1) {
-          clear();
-          setRunning(false);
-          setFinished(true);
-          onFinish?.();
-          return 0;
-        }
+        if (prev <= 1) return 0;
         const next = prev - 1;
         if (!warnedRef.current && next <= warningSeconds) {
           warnedRef.current = true;
-          onWarning?.();
+          setTimeout(() => onWarningRef.current?.(), 0);
         }
         return next;
       });
     }, 1000);
     return clear;
-  }, [running]);
+  }, [running, warningSeconds, clear]);
+
+  useEffect(() => {
+    if (!hasStartedRef.current || remaining !== 0 || finished) return;
+    clear();
+    setRunning(false);
+    setFinished(true);
+    onFinishRef.current?.();
+  }, [remaining, finished, clear]);
 
   const start = useCallback(() => {
     if (finished) return;
@@ -66,9 +76,10 @@ export function useTimer({
     clear();
     setRunning(false);
     setFinished(false);
-    setRemaining(durationSeconds);
+    setRemaining(initial);
     warnedRef.current = false;
-  }, [durationSeconds]);
+    hasStartedRef.current = false;
+  }, [initial, clear]);
 
   const h = Math.floor(remaining / 3600);
   const m = Math.floor((remaining % 3600) / 60);

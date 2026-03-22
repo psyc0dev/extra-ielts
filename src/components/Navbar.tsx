@@ -18,7 +18,7 @@ import en from "@/locales/en";
 
 export default function Navbar() {
   const { state } = useSidebar();
-  const { page, setPage } = useNav();
+  const { page, setPage, timerActive } = useNav();
   const { user } = useAuth();
 
   const items = [
@@ -50,6 +50,7 @@ export default function Navbar() {
                     tooltip={item.title}
                     isActive={page === item.id}
                     onClick={() => setPage(item.id)}
+                    disabled={timerActive && page !== item.id}
                   >
                     <item.icon weight="bold" />
                     <span>{item.title}</span>
@@ -62,6 +63,7 @@ export default function Navbar() {
                     tooltip={item.title}
                     isActive={page === item.id}
                     onClick={() => setPage(item.id)}
+                    disabled={timerActive && page !== item.id}
                   >
                     <item.icon weight="bold" />
                     <span>{item.title}</span>
@@ -80,6 +82,7 @@ export default function Navbar() {
               tooltip={en.nav.settings}
               isActive={page === "Settings"}
               onClick={() => setPage("Settings")}
+              disabled={timerActive}
             >
               <Gear weight="bold" />
               <span>{en.nav.settings}</span>

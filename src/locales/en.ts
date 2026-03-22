@@ -111,7 +111,6 @@ const en = {
     sections: {
       account: "Account",
       notifications: "Notifications",
-      tests: "Tests",
       dangerZone: "Danger Zone",
     },
     account: {
@@ -147,10 +146,6 @@ const en = {
       soundSub: "Play sounds for alerts and timers",
       timerWarning: "Timer Warning",
       timerWarningSub: "Alert when 5 minutes remain in a test",
-    },
-    testsSection: {
-      autoSubmit: "Auto Submit",
-      autoSubmitSub: "Automatically submit when time runs out",
     },
     danger: {
       deleteAccount: "Delete account",

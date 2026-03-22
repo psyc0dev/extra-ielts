@@ -65,6 +65,9 @@ const ChartContainer = React.forwardRef<
 })
 ChartContainer.displayName = "Chart"
 
+const sanitizeCssValue = (value: string) => value.replace(/[^a-zA-Z0-9#(),%. -]/g, '')
+const sanitizeCssKey = (key: string) => key.replace(/[^a-zA-Z0-9-_]/g, '')
+
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   const colorConfig = Object.entries(config).filter(
     ([, config]) => config.theme || config.color
@@ -86,7 +89,7 @@ ${colorConfig
     const color =
       itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
       itemConfig.color
-    return color ? `  --color-${key}: ${color};` : null
+    return color ? `  --color-${sanitizeCssKey(key)}: ${sanitizeCssValue(color)};` : null
   })
   .join("\n")}
 }

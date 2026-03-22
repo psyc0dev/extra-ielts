@@ -1,4 +1,5 @@
 ﻿import { useState } from "react";
+import type { UserSettings } from "@/lib/api";
 import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
@@ -38,17 +39,17 @@ function Row({ label, description, checked, onChange }: {
   );
 }
 
-export function Settings({ onSignOut, username, role, timerWarning, onTimerWarningChange }: {
+export function Settings({ onSignOut, username, role, settings, onSettingsChange }: {
   onSignOut: () => void;
   username: string;
   role: string;
-  timerWarning: boolean;
-  onTimerWarningChange: (v: boolean) => void;
+  settings: UserSettings;
+  onSettingsChange: (patch: Partial<UserSettings>) => void;
 }) {
-  const [notifications, setNotifications] = useState(true);
-  const [sound, setSound] = useState(true);
-  const [autoSubmit, setAutoSubmit] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
+  const handleToggle = (key: keyof UserSettings) => (value: boolean) => {
+    onSettingsChange({ [key]: value } as Partial<UserSettings>);
+  };
 
   const s = en.settings;
 
@@ -132,22 +133,15 @@ export function Settings({ onSignOut, username, role, timerWarning, onTimerWarni
             </div>
           </div>
         </div>
-
-        <div>
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">{s.sections.tests}</h2>
-          <div className="rounded-xl border border-neutral-800 px-4">
-            <Row label={s.testsSection.autoSubmit} description={s.testsSection.autoSubmitSub} checked={autoSubmit} onChange={setAutoSubmit} />
-          </div>
-        </div>
       </div>
 
       <div className="flex flex-col gap-6">
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">{s.sections.notifications}</h2>
           <div className="rounded-xl border border-neutral-800 px-4">
-            <Row label={s.notifications.push} description={s.notifications.pushSub} checked={notifications} onChange={setNotifications} />
-            <Row label={s.notifications.sound} description={s.notifications.soundSub} checked={sound} onChange={setSound} />
-            <Row label={s.notifications.timerWarning} description={s.notifications.timerWarningSub} checked={timerWarning} onChange={onTimerWarningChange} />
+            <Row label={s.notifications.push} description={s.notifications.pushSub} checked={settings.notifications} onChange={handleToggle("notifications")} />
+            <Row label={s.notifications.sound} description={s.notifications.soundSub} checked={settings.sound} onChange={handleToggle("sound")} />
+            <Row label={s.notifications.timerWarning} description={s.notifications.timerWarningSub} checked={settings.timerWarning} onChange={handleToggle("timerWarning")} />
           </div>
         </div>
 

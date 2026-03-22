@@ -1,0 +1,56 @@
+import { Hono } from 'hono'
+import { cors } from 'hono/cors'
+import { csrf } from 'hono/csrf'
+import type { AppEnv, StoreSnapshot, TestDetail } from './lib/types'
+import { loadTestsFromDisk } from './lib/tests'
+import { loadSnapshot, setPersist, setTests } from './lib/store'
+import { registerAdminRoutes } from './routes/admin'
+import { registerAssignmentRoutes } from './routes/assignments'
+import { registerAuthRoutes } from './routes/auth'
+import { registerHealthRoutes } from './routes/health'
+import { registerSettingsRoutes } from './routes/settings'
+import { registerTestRoutes } from './routes/tests'
+
+export const createApp = (options?: {
+  snapshot?: StoreSnapshot
+  persist?: (snapshot: StoreSnapshot) => void
+  tests?: TestDetail[]
+}) => {
+  const app = new Hono<AppEnv>()
+  const api = new Hono<AppEnv>()
+
+  const tests = options?.tests ?? loadTestsFromDisk()
+  setTests(tests)
+  loadSnapshot(options?.snapshot)
+  setPersist(options?.persist)
+
+  api.use(
+    '*',
+    cors({
+      origin: (_origin, c) => c.env?.CORS_ORIGIN ?? '*',
+      allowMethods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    }),
+    csrf({
+      origin: (origin, c) => {
+        const allowed = c.env?.CORS_ORIGIN ?? '*'
+        return allowed === '*' || origin === allowed
+      },
+    })
+  )
+
+  registerHealthRoutes(api)
+  registerAuthRoutes(api)
+  registerSettingsRoutes(api)
+  registerTestRoutes(api)
+  registerAssignmentRoutes(api)
+  registerAdminRoutes(api)
+
+  api.notFound((c) => {
+    return c.json({ error: 'API route not found.' }, 404)
+  })
+
+  app.route('/api', api)
+  app.route('/', api)
+
+  return app
+}

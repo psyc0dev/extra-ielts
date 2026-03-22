@@ -18,8 +18,14 @@ import { toast } from "sonner";
 import Navbar from "./components/Navbar";
 import { TimerWidget } from "./components/TimerWidget";
 import en from "./locales/en";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import { getSettings, updateSettings, type UserSettings } from "@/lib/api";
+
+const defaultSettings: UserSettings = {
+  notifications: true,
+  sound: true,
+  timerWarning: true,
+};
 
 interface ActiveTest {
   name: string;
@@ -30,8 +36,8 @@ function PageContent({
   onSignOut,
   username,
   role,
-  timerWarning,
-  onTimerWarningChange,
+  settings,
+  onSettingsChange,
   onStartTest,
   onStopTest,
   onFullscreen,
@@ -41,8 +47,8 @@ function PageContent({
   onSignOut: () => void;
   username: string;
   role: string;
-  timerWarning: boolean;
-  onTimerWarningChange: (v: boolean) => void;
+  settings: UserSettings;
+  onSettingsChange: (patch: Partial<UserSettings>) => void;
   onStartTest: (name: string, seconds: number) => void;
   onStopTest: () => void;
   onFullscreen: (v: boolean) => void;
@@ -60,8 +66,8 @@ function PageContent({
         onSignOut={onSignOut}
         username={username}
         role={role}
-        timerWarning={timerWarning}
-        onTimerWarningChange={onTimerWarningChange}
+        settings={settings}
+        onSettingsChange={onSettingsChange}
       />
     ),
     Admin: isAdmin ? <Admin /> : <Dashboard />,
@@ -120,14 +126,38 @@ function AppShell({
   role: string;
 }) {
   const { timerActive, setTimerActive } = useNav();
-  const [timerWarning, setTimerWarning] = useState(true);
+  const [settings, setSettings] = useState<UserSettings>(defaultSettings);
   const [activeTest, setActiveTest] = useState<ActiveTest | null>(null);
+
 
   useEffect(() => {
     if (!activeTest && timerActive) {
       setTimerActive(false);
     }
   }, [activeTest, timerActive, setTimerActive]);
+
+  useEffect(() => {
+    let mounted = true;
+    getSettings()
+      .then((res) => {
+        if (mounted) setSettings({ ...defaultSettings, ...res.settings });
+      })
+      .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleSettingsChange = async (patch: Partial<UserSettings>) => {
+    setSettings((prev) => ({ ...prev, ...patch }));
+    try {
+      const res = await updateSettings(patch);
+      setSettings(res.settings);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to save settings";
+      toast.error(message);
+    }
+  };
 
   return (
     <>
@@ -140,8 +170,8 @@ function AppShell({
                 onSignOut={onSignOut}
                 username={username}
                 role={role}
-                timerWarning={timerWarning}
-                onTimerWarningChange={setTimerWarning}
+                settings={settings}
+                onSettingsChange={handleSettingsChange}
                 onStartTest={(name, seconds) => {
                   setActiveTest({ name, seconds });
                   setTimerActive(true);
@@ -162,8 +192,9 @@ function AppShell({
         <TimerWidget
           testName={activeTest.name}
           durationSeconds={activeTest.seconds}
-          timerWarning={timerWarning}
-          onStop={() => { setActiveTest(null); setTimerActive(false); }}
+          timerWarning={settings.timerWarning}
+          sound={settings.sound}
+          onFinish={() => { setActiveTest(null); setTimerActive(false); }}
         />
       )}
     </>

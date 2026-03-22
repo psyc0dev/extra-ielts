@@ -1,8 +1,13 @@
-﻿export type ApiUser = {
+export type ApiUser = {
   id: string;
   username: string;
   email: string | null;
   role: "admin" | "student";
+};
+export type UserSettings = {
+  notifications: boolean;
+  sound: boolean;
+  timerWarning: boolean;
 };
 
 export type TestSummary = {
@@ -32,6 +37,7 @@ export type TestDetail = {
     id: string;
     kind: "listening" | "reading";
     title: string;
+    durationMinutes?: number;
     audioUrl?: string | null;
     passage?: string | null;
     questions: {
@@ -85,9 +91,11 @@ export type AssignmentAttemptDetail = {
     listeningBand: number | null;
     startedAt: string;
     completedAt: string | null;
+    listeningStartedAt?: string | null;
+    readingStartedAt?: string | null;
   };
   test: TestDetail;
-  responses: Record<string, unknown>;
+  responses: Record<string, string | null>;
 };
 
 export type AdminAssignment = {
@@ -119,16 +127,21 @@ export type StudentStats = {
   recentAttempts: { testId: string; band: number | null; readingBand: number | null; listeningBand: number | null; completedAt: string | null }[];
 };
 
+import Cookies from "js-cookie";
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8787";
-const TOKEN_KEY = "ielts_auth_token";
+const TOKEN_KEY = "accessToken";
 
 function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
+  return Cookies.get(TOKEN_KEY);
 }
 
 export function setToken(token: string | null) {
-  if (token) localStorage.setItem(TOKEN_KEY, token);
-  else localStorage.removeItem(TOKEN_KEY);
+  if (token) {
+    Cookies.set(TOKEN_KEY, token, { expires: 7, path: "/" });
+  } else {
+    Cookies.remove(TOKEN_KEY, { path: "/" });
+  }
 }
 
 async function apiFetch<T>(path: string, options: RequestInit = {}) {
@@ -176,6 +189,17 @@ export async function getMe() {
   return apiFetch<{ user: ApiUser }>("/auth/me");
 }
 
+export async function getSettings() {
+  return apiFetch<{ settings: UserSettings }>("/settings");
+}
+
+export async function updateSettings(payload: Partial<UserSettings>) {
+  return apiFetch<{ settings: UserSettings }>("/settings", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function listTests() {
   return apiFetch<{ tests: TestSummary[] }>("/tests");
 }
@@ -198,11 +222,21 @@ export async function getAttempt(attemptId: string) {
   return apiFetch<AssignmentAttemptDetail>(`/assignments/attempts/${attemptId}`);
 }
 
-export async function saveAnswer(attemptId: string, questionId: string, response: unknown) {
+export async function saveAnswer(attemptId: string, questionId: string, response: string | null) {
   return apiFetch<{ ok: boolean }>(`/assignments/attempts/${attemptId}/answers`, {
     method: "POST",
     body: JSON.stringify({ questionId, response }),
   });
+}
+
+export async function startSection(attemptId: string, kind: "listening" | "reading") {
+  return apiFetch<{ ok: boolean; listeningStartedAt?: string; readingStartedAt?: string }>(
+    `/assignments/attempts/${attemptId}/start-section`,
+    {
+      method: "POST",
+      body: JSON.stringify({ kind }),
+    }
+  );
 }
 
 export async function submitAttempt(attemptId: string) {
@@ -210,6 +244,24 @@ export async function submitAttempt(attemptId: string) {
     `/assignments/attempts/${attemptId}/submit`,
     { method: "POST" }
   );
+}
+
+/**
+ * Fire-and-forget submission for unload events
+ */
+export function forceSubmitAttempt(attemptId: string) {
+  const token = getToken();
+  const url = `${API_BASE}/assignments/attempts/${attemptId}/submit`;
+  
+  // Use fetch with keepalive if supported, otherwise just a regular fire-and-forget fetch
+  fetch(url, {
+    method: "POST",
+    keepalive: true,
+    headers: {
+      "Authorization": token ? `Bearer ${token}` : "",
+      "Content-Type": "application/json"
+    }
+  }).catch(() => { /* ignore */ });
 }
 
 export async function adminListUsers() {
@@ -293,3 +345,4 @@ export async function startTest(testId: string) {
     method: "POST",
   });
 }
+
