@@ -5,32 +5,24 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Slider } from "@/components/ui/slider";
 import { BookOpen, CheckCircle, Play, SpeakerHigh, SpeakerLow, SpeakerNone, SpeakerSlash, TextAlignLeft, XCircle } from "@phosphor-icons/react";
-import { saveAnswer, startSection, submitAttempt, forceSubmitAttempt, type TestDetail } from "@/lib/api";
+import { saveAnswer, submitAttempt, forceSubmitAttempt, type TestDetail } from "@/lib/api";
+import { QuestionInputWrapper } from "./question-inputs";
 import { useNav } from "@/hooks/use-nav";
+import en from "@/locales/en";
 
 type ListeningPhase = "idle" | "prep" | "playing" | "done" | "error";
 type ReadingPhase = "idle" | "reading";
 
-const kindLabels: Record<string, string> = { listening: "Listening", reading: "Reading" };
-function formatLabel(kind: string, index: number) {
-  return `${kindLabels[kind] ?? kind} ${index + 1}`;
-}
-
 export function ExamRunner({
-  test, attemptId, initialResponses, listeningStartedAt, readingStartedAt, onExit, onSubmitted, onListeningStart, onReadingStart, onSectionFinish, onTimerFinish, readOnly = false,
+  test, attemptId, initialResponses, onExit, onSubmitted, onListeningStart, onReadingStart, onSectionFinish, onTimerFinish, readOnly = false,
 }: {
   test: TestDetail;
   attemptId: string;
   initialResponses: Record<string, string | null>;
-  listeningStartedAt?: string | null;
-  readingStartedAt?: string | null;
   onExit: () => void;
   onSubmitted: (scoreTotal: number, band: number | null) => void;
   onListeningStart?: (durationMinutes: number) => void;
@@ -68,7 +60,7 @@ export function ExamRunner({
 
   const isAttemptInProgress = !readOnly && !!activeSection;
 
-  // Fire-and-forget on unload — do NOT call e.preventDefault() in Tauri, it blocks the window from closing
+  // Fire-and-forget on unload -- do NOT call e.preventDefault() in Tauri, it blocks the window from closing
   useEffect(() => {
     if (!isAttemptInProgress) return;
     const handler = () => forceSubmitAttempt(attemptId);
@@ -85,45 +77,16 @@ export function ExamRunner({
     }, 400);
   }, [attemptId, readOnly]);
 
-  useEffect(() => {
-    if (readOnly) return;
-    
-    // Auto-resume listening
-    if (activeSection?.kind === "listening" && listeningStartedAt && listeningPhase === "idle") {
-      const start = new Date(listeningStartedAt).getTime();
-      const elapsed = (Date.now() - start) / 1000;
-      const total = (activeSection.durationMinutes ?? test.durationMinutes) * 60;
-      const remaining = total - elapsed;
-      if (remaining > 0) {
-        setListeningPhase("playing");
-        onListeningStart?.(remaining / 60);
-      } else {
-        setListeningPhase("done");
-        // We might want to auto-submit here, but let's keep it simple
-      }
-    }
-    
-    // Auto-resume reading
-    if (activeSection?.kind === "reading" && readingStartedAt && readingPhase === "idle") {
-      const start = new Date(readingStartedAt).getTime();
-      const elapsed = (Date.now() - start) / 1000;
-      const total = (activeSection.durationMinutes ?? test.durationMinutes) * 60;
-      const remaining = total - elapsed;
-      if (remaining > 0) {
-        setReadingPhase("reading");
-        onReadingStart?.(remaining / 60);
-      } else {
-        // Handle timeout
-      }
-    }
-  }, [activeSection, listeningStartedAt, readingStartedAt, listeningPhase, readingPhase, readOnly, test.durationMinutes, onListeningStart, onReadingStart]);
-
   const activeSectionQuestions = questions;
   const activeSectionAnsweredCount = activeSectionQuestions.filter(
     (q) => answers[q.id] !== null && answers[q.id] !== "" && answers[q.id] !== undefined
   ).length;
   const activeSectionFullyAnswered = activeSectionAnsweredCount === activeSectionQuestions.length && activeSectionQuestions.length > 0;
   const isLastSection = sections[sections.length - 1]?.id === activeSectionId;
+  const listeningSections = sections.filter((s) => s.kind === "listening");
+  const readingSections = sections.filter((s) => s.kind === "reading");
+  const isLastListeningSection = listeningSections[listeningSections.length - 1]?.id === activeSectionId;
+  const listeningSubmitted = listeningSections.length === 0 || listeningSections.every((s) => submittedSections.has(s.id));
 
   const flushPending = useCallback(async (questionIds?: string[]) => {
     const ids = questionIds ?? Object.keys(saveTimers.current);
@@ -139,27 +102,16 @@ export function ExamRunner({
         await flushPending();
         setSubmittedSections((prev) => new Set([...prev, activeSectionId]));
         const nextIdx = sections.findIndex((s) => s.id === activeSectionId) + 1;
-        if (sections[nextIdx]) setActiveSectionId(sections[nextIdx].id);
+        if (sections[nextIdx]) {
+          setActiveSectionId(sections[nextIdx].id);
+          onSectionFinish?.();
+          return;
+        }
+        const res = await submitAttempt(attemptId);
+        onSubmitted(res.attempt.scoreTotal, res.attempt.band);
       } finally {}
     });
-  }, [activeSectionId, flushPending, sections]);
-
-  const submitListeningPart = useCallback(() => {
-    startSubmit(async () => {
-      try {
-        await flushPending();
-        const listeningSections = sections.filter(s => s.kind === "listening");
-        setSubmittedSections((prev) => {
-          const next = new Set(prev);
-          listeningSections.forEach(s => next.add(s.id));
-          return next;
-        });
-        const firstReading = sections.find(s => s.kind === "reading");
-        if (firstReading) setActiveSectionId(firstReading.id);
-        onSectionFinish?.();
-      } finally {}
-    });
-  }, [flushPending, sections, onSectionFinish]);
+  }, [activeSectionId, flushPending, sections, onSectionFinish, attemptId, onSubmitted]);
 
   const flushPendingAnswers = useCallback(() => flushPending(), [flushPending]);
 
@@ -175,14 +127,11 @@ export function ExamRunner({
 
   useEffect(() => {
     if (!onTimerFinish || readOnly) return;
-    // If we're in any listening section, the timer finish should submit all listening parts
-    if (activeSection?.kind === "listening") {
-      onTimerFinish(submitListeningPart);
-    } else {
-      // Otherwise (reading), it submits the whole test
-      onTimerFinish(submitTest);
+    // Timer should finish only the current part, not the entire section group
+    if (activeSection) {
+      onTimerFinish(submitSection);
     }
-  }, [onTimerFinish, submitListeningPart, submitTest, activeSection?.kind, readOnly]);
+  }, [onTimerFinish, submitSection, activeSection, readOnly]);
 
   return (
     <div className="flex h-full gap-4 p-4 overflow-hidden">
@@ -195,9 +144,9 @@ export function ExamRunner({
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
-            <span className="text-[10px] text-muted-foreground">Progress</span>
+            <span className="text-[10px] text-muted-foreground">{en.examRunner.progress}</span>
             <Progress value={(answeredCount / Math.max(1, totalQuestions)) * 100} className="h-1" indicatorClassName="bg-emerald-500" />
-            <span className="text-[10px] text-muted-foreground">{answeredCount}/{totalQuestions} answered</span>
+            <span className="text-[10px] text-muted-foreground">{en.examRunner.answered(answeredCount, totalQuestions)}</span>
           </div>
           <Separator className="bg-neutral-800" />
           <Tabs value={activeSectionId} onValueChange={(id) => {
@@ -206,19 +155,57 @@ export function ExamRunner({
               if (submittedSections.has(activeSectionId) || readOnly) { setActiveSectionId(id); return; }
               return;
             }}>
-            <TabsList className="flex flex-col h-auto bg-transparent p-0 gap-2">
-              {sections.map((section, idx) => {
-                const listeningLocked = !readOnly && section.kind !== "listening" && listeningPhase !== "done" && listeningPhase !== "error";
-                const isSubmitted = submittedSections.has(section.id);
-                const isActive = section.id === activeSectionId;
-                const isAccessible = readOnly || isSubmitted || isActive;
-                return (
-                  <TabsTrigger key={section.id} value={section.id} disabled={listeningLocked || (!isAccessible)} className="w-full justify-start text-xs data-[state=active]:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed">
-                    <span className="flex-1 text-left">{formatLabel(section.kind, idx)}</span>
-                    {isSubmitted && <CheckCircle weight="bold" className="size-3 text-emerald-500 shrink-0" />}
-                  </TabsTrigger>
-                );
-              })}
+            <TabsList className="flex flex-col h-auto bg-transparent p-0 gap-3">
+              {listeningSections.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{en.examRunner.kinds.listening}</span>
+                  {listeningSections.map((section, idx) => {
+                    const isSubmitted = submittedSections.has(section.id);
+                    const isActive = section.id === activeSectionId;
+                    const isAccessible = readOnly || isSubmitted || isActive;
+                    const listeningLocked = !readOnly && activeSection?.kind === "listening" && listeningPhase !== "done" && listeningPhase !== "error";
+                    return (
+                      <TabsTrigger
+                        key={section.id}
+                        value={section.id}
+                        disabled={(!isActive && listeningLocked) || !isAccessible}
+                        className="w-full justify-between text-xs data-[state=active]:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <div className="flex flex-col items-start">
+                          <span className="text-left">{en.examRunner.tabs.part(idx + 1)}</span>
+                          <span className="text-[10px] text-muted-foreground truncate max-w-[160px]">{section.title}</span>
+                        </div>
+                        {isSubmitted && <CheckCircle weight="bold" className="size-3 text-emerald-500 shrink-0" />}
+                      </TabsTrigger>
+                    );
+                  })}
+                </div>
+              )}
+              {readingSections.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{en.examRunner.kinds.reading}</span>
+                  {readingSections.map((section, idx) => {
+                    const isSubmitted = submittedSections.has(section.id);
+                    const isActive = section.id === activeSectionId;
+                    let isAccessible = readOnly || isSubmitted || isActive;
+                    if (!readOnly && !listeningSubmitted) isAccessible = false;
+                    return (
+                      <TabsTrigger
+                        key={section.id}
+                        value={section.id}
+                        disabled={!isAccessible}
+                        className="w-full justify-between text-xs data-[state=active]:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <div className="flex flex-col items-start">
+                          <span className="text-left">{en.examRunner.tabs.passage(idx + 1)}</span>
+                          <span className="text-[10px] text-muted-foreground truncate max-w-[160px]">{section.title}</span>
+                        </div>
+                        {isSubmitted && <CheckCircle weight="bold" className="size-3 text-emerald-500 shrink-0" />}
+                      </TabsTrigger>
+                    );
+                  })}
+                </div>
+              )}
             </TabsList>
           </Tabs>
           <Separator className="bg-neutral-800" />
@@ -226,27 +213,27 @@ export function ExamRunner({
              <AlertDialog>
                <AlertDialogTrigger asChild>
                  <Button variant="outline" size="sm" className="border-neutral-700 hover:bg-neutral-800">
-                   <XCircle weight="bold" className="size-3" /> Exit
+                  <XCircle weight="bold" className="size-3" /> {en.examRunner.exit}
                  </Button>
                </AlertDialogTrigger>
                <AlertDialogContent className="border-neutral-800 bg-neutral-950">
                  <AlertDialogHeader>
-                   <AlertDialogTitle className="text-sm">Submit and Exit?</AlertDialogTitle>
+                  <AlertDialogTitle className="text-sm">{en.examRunner.submitExitTitle}</AlertDialogTitle>
                    <AlertDialogDescription className="text-xs">
-                     Exiting while in an active listening or reading part will automatically submit your entire test. All progress will be locked and your band score will be calculated based on your answers so far.
+                    {en.examRunner.submitExitDesc}
                    </AlertDialogDescription>
                  </AlertDialogHeader>
                  <AlertDialogFooter>
-                   <AlertDialogCancel className="text-xs">Cancel</AlertDialogCancel>
-                   <AlertDialogAction className="text-xs bg-red-600 hover:bg-red-700" onClick={async (e) => { e.preventDefault(); await flushPendingAnswers(); submitTest(); }}>
-                     Submit & Exit
-                   </AlertDialogAction>
-                 </AlertDialogFooter>
-               </AlertDialogContent>
-             </AlertDialog>
+                  <AlertDialogCancel className="text-xs">{en.examRunner.cancel}</AlertDialogCancel>
+                  <AlertDialogAction className="text-xs bg-red-600 hover:bg-red-700" onClick={async (e) => { e.preventDefault(); await flushPendingAnswers(); submitTest(); }}>
+                    {en.examRunner.submitExitAction}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           ) : (
             <Button variant="outline" size="sm" className="border-neutral-700" onClick={onExit}>
-              <XCircle weight="bold" className="size-3" /> Exit
+              <XCircle weight="bold" className="size-3" /> {en.examRunner.exit}
             </Button>
           )}
         </CardContent>
@@ -264,45 +251,51 @@ export function ExamRunner({
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button size="sm" disabled={submitting || !activeSectionFullyAnswered}>
-                      <CheckCircle weight="bold" className="size-3" /> Submit Test
+                      <CheckCircle weight="bold" className="size-3" /> {en.examRunner.submitTest}
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent className="border-neutral-800 bg-neutral-950">
                     <AlertDialogHeader>
-                      <AlertDialogTitle className="text-sm">Submit test?</AlertDialogTitle>
+                      <AlertDialogTitle className="text-sm">{en.examRunner.submitTestTitle}</AlertDialogTitle>
                       <AlertDialogDescription className="text-xs">
-                        You cannot go back or change your answers after submitting. This action is final.
+                        {en.examRunner.submitTestDesc}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel className="border-neutral-700 text-xs">Cancel</AlertDialogCancel>
-                      <AlertDialogAction className="text-xs" onClick={submitTest}>Submit</AlertDialogAction>
+                      <AlertDialogCancel className="border-neutral-700 text-xs">{en.examRunner.cancel}</AlertDialogCancel>
+                      <AlertDialogAction className="text-xs" onClick={submitTest}>{en.examRunner.submit}</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
               ) : activeSection?.kind === "listening" ? (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button size="sm" disabled={submitting || !activeSectionFullyAnswered}>
-                      <CheckCircle weight="bold" className="size-3" /> Submit Listening
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent className="border-neutral-800 bg-neutral-950">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle className="text-sm">Done with listening?</AlertDialogTitle>
-                      <AlertDialogDescription className="text-xs">
-                        You cannot return to the listening section once you continue. Make sure all your answers are final.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel className="border-neutral-700 text-xs">Go back</AlertDialogCancel>
-                      <AlertDialogAction className="text-xs" onClick={submitListeningPart}>Continue</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                isLastListeningSection ? (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="sm" disabled={submitting || !activeSectionFullyAnswered}>
+                        <CheckCircle weight="bold" className="size-3" /> {en.examRunner.finishListening}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="border-neutral-800 bg-neutral-950">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-sm">{en.examRunner.listeningDoneTitle}</AlertDialogTitle>
+                        <AlertDialogDescription className="text-xs">
+                          {en.examRunner.listeningDoneDesc}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="border-neutral-700 text-xs">{en.examRunner.goBack}</AlertDialogCancel>
+                        <AlertDialogAction className="text-xs" onClick={submitSection}>{en.examRunner.continue}</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                ) : (
+                  <Button size="sm" disabled={submitting || !activeSectionFullyAnswered} onClick={submitSection}>
+                    <CheckCircle weight="bold" className="size-3" /> {en.examRunner.nextPart}
+                  </Button>
+                )
               ) : (
                 <Button size="sm" disabled={submitting || !activeSectionFullyAnswered} onClick={submitSection}>
-                  <CheckCircle weight="bold" className="size-3" /> Submit Section
+                  <CheckCircle weight="bold" className="size-3" /> {activeSection?.kind === "reading" ? en.examRunner.nextPassage : en.examRunner.nextSection}
                 </Button>
               )
             )}
@@ -320,7 +313,6 @@ export function ExamRunner({
               onPhaseChange={async (p) => {
                 const duration = activeSection?.durationMinutes ?? test.durationMinutes;
                 if (p === "prep") {
-                  try { await startSection(attemptId, "listening"); } catch(e){}
                   onListeningStart?.(duration); 
                 }
                 setListeningPhase(p);
@@ -329,15 +321,15 @@ export function ExamRunner({
           ) : activeSection?.kind === "reading" && activeSection.passage ? (
             <ReadingSection
               passage={activeSection.passage}
+              passageTitle={activeSection.passageTitle ?? undefined}
               questions={questions}
               answers={answers}
               onAnswerChange={onAnswerChange}
               readOnly={readOnly}
               phase={readingPhase}
               onPhaseChange={setReadingPhase}
-              onReadingStart={async () => {
+              onReadingStart={() => {
                 const duration = activeSection?.durationMinutes ?? test.durationMinutes;
-                try { await startSection(attemptId, "reading"); } catch(e){}
                 onReadingStart?.(duration);
               }}
             />
@@ -355,9 +347,10 @@ export function ExamRunner({
 }
 
 function ReadingSection({
-  passage, questions, answers, onAnswerChange, readOnly, phase, onPhaseChange, onReadingStart,
+  passage, passageTitle, questions, answers, onAnswerChange, readOnly, phase, onPhaseChange, onReadingStart,
 }: {
   passage: string;
+  passageTitle?: string;
   questions: TestDetail["sections"][number]["questions"];
   answers: Record<string, string | null>;
   onAnswerChange: (id: string, value: string | null) => void;
@@ -382,11 +375,11 @@ function ReadingSection({
           >
             <TextAlignLeft weight="bold" className="size-8 text-muted-foreground" />
             <div className="flex flex-col items-center gap-1">
-              <span className="text-sm font-semibold">Reading Section</span>
-              <span className="text-xs text-muted-foreground">Read the passage and answer the questions.</span>
+              <span className="text-sm font-semibold">{en.examRunner.reading.title}</span>
+              <span className="text-xs text-muted-foreground">{en.examRunner.reading.subtitle}</span>
             </div>
             <Button variant="outline" className="gap-2 border-neutral-700" onClick={() => { onPhaseChange("reading"); onReadingStart?.(); }}>
-              <Play weight="bold" className="size-4" /> Start Reading
+              <Play weight="bold" className="size-4" /> {en.examRunner.reading.start}
             </Button>
           </motion.div>
         ) : (
@@ -401,10 +394,10 @@ function ReadingSection({
             <ScrollArea className="w-1/2 h-full border-r border-neutral-800">
               <div className="p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Reading Passage</p>
+                  <p className="text-sm font-semibold text-white">{passageTitle ?? en.examRunner.reading.passageLabel}</p>
                   <div className="flex items-center gap-1.5">
-                    <button onClick={() => setFontSize(s => Math.max(10, s - 1))} className="size-5 flex items-center justify-center rounded text-muted-foreground hover:text-white hover:bg-neutral-800 transition-colors text-xs font-bold">A−</button>
-                    <button onClick={() => setFontSize(s => Math.min(20, s + 1))} className="size-5 flex items-center justify-center rounded text-muted-foreground hover:text-white hover:bg-neutral-800 transition-colors text-sm font-bold">A+</button>
+                    <button onClick={() => setFontSize(s => Math.max(10, s - 1))} className="size-5 flex items-center justify-center rounded text-muted-foreground hover:text-white hover:bg-neutral-800 transition-colors text-xs font-bold">{en.examRunner.reading.fontDecrease}</button>
+                    <button onClick={() => setFontSize(s => Math.min(20, s + 1))} className="size-5 flex items-center justify-center rounded text-muted-foreground hover:text-white hover:bg-neutral-800 transition-colors text-sm font-bold">{en.examRunner.reading.fontIncrease}</button>
                   </div>
                 </div>
                 <div className="text-neutral-300 leading-relaxed whitespace-pre-wrap" style={{ fontSize }}>{passage}</div>
@@ -463,7 +456,7 @@ function ListeningSection({
             transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
             className="flex-1 flex items-center justify-center text-xs text-muted-foreground"
           >
-            Questions will appear once the audio starts playing.
+            {en.examRunner.listening.questionsWait}
           </motion.div>
         )}
       </AnimatePresence>
@@ -540,11 +533,11 @@ function ListeningPlayer({ audioUrl, phase, onPhaseChange }: {
           >
             <SpeakerHigh weight="bold" className="size-8 text-muted-foreground" />
             <div className="flex flex-col items-center gap-1">
-              <span className="text-sm font-semibold">Listening Section</span>
-              <span className="text-xs text-muted-foreground">You will have 10 seconds to prepare before the audio begins.</span>
+              <span className="text-sm font-semibold">{en.examRunner.listening.title}</span>
+              <span className="text-xs text-muted-foreground">{en.examRunner.listening.prep}</span>
             </div>
             <Button variant="outline" className="gap-2 border-neutral-700" onClick={handleStart}>
-              <Play weight="bold" className="size-4" /> Start Listening
+              <Play weight="bold" className="size-4" /> {en.examRunner.listening.start}
             </Button>
           </motion.div>
         ) : (
@@ -557,10 +550,10 @@ function ListeningPlayer({ audioUrl, phase, onPhaseChange }: {
             className="flex items-center gap-3 px-4 py-3 border-b border-neutral-800 shrink-0"
           >
             <Button size="xs" variant="outline" className="gap-1.5 border-neutral-700 shrink-0 min-w-32" disabled>
-              {phase === "prep" && <><SpeakerHigh weight="bold" className="size-3" /> Starting in {countdown}s</>}
-              {phase === "playing" && <><SpeakerHigh weight="bold" className="size-3 animate-pulse" /> Playing...</>}
-              {phase === "done" && <><SpeakerHigh weight="bold" className="size-3" /> Done</>}
-              {phase === "error" && <><XCircle weight="bold" className="size-3" /> Audio unavailable</>}
+              {phase === "prep" && <><SpeakerHigh weight="bold" className="size-3" /> {en.examRunner.listening.startingIn(countdown)}</>}
+              {phase === "playing" && <><SpeakerHigh weight="bold" className="size-3 animate-pulse" /> {en.examRunner.listening.playing}</>}
+              {phase === "done" && <><SpeakerHigh weight="bold" className="size-3" /> {en.examRunner.listening.done}</>}
+              {phase === "error" && <><XCircle weight="bold" className="size-3" /> {en.examRunner.listening.audioUnavailable}</>}
             </Button>
             <div className="flex-1 flex flex-col gap-1">
               <Progress
@@ -569,10 +562,10 @@ function ListeningPlayer({ audioUrl, phase, onPhaseChange }: {
                 indicatorClassName={phase === "prep" ? "bg-amber-500" : phase === "error" ? "bg-red-500" : "bg-blue-500"}
               />
               <span className="text-[10px] text-muted-foreground">
-                {phase === "prep" && `Preparation time: ${countdown}s remaining`}
-                {phase === "playing" && "Listening in progress — answer the questions"}
-                {phase === "done" && "Audio finished"}
-                {phase === "error" && "Could not load audio file"}
+                {phase === "prep" && en.examRunner.listening.prepTime(countdown)}
+                {phase === "playing" && en.examRunner.listening.inProgress}
+                {phase === "done" && en.examRunner.listening.finished}
+                {phase === "error" && en.examRunner.listening.loadError}
               </span>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
@@ -590,7 +583,7 @@ function ListeningPlayer({ audioUrl, phase, onPhaseChange }: {
                 onValueChange={([v]) => { setVolume(v); setMuted(v === 0); }}
                 className="w-20 [&_.bg-secondary]:bg-neutral-700 [&_.bg-primary]:bg-blue-500 [&_[role=slider]]:h-3 [&_[role=slider]]:w-3 [&_[role=slider]]:border-blue-500"
               />
-              <span className="text-[10px] text-muted-foreground w-6 text-right">{Math.round(effectiveVolume * 100)}%</span>
+              <span className="text-[10px] text-muted-foreground w-6 text-right">{en.examRunner.listening.volumePercent(Math.round(effectiveVolume * 100))}</span>
             </div>
           </motion.div>
         )}
@@ -599,20 +592,7 @@ function ListeningPlayer({ audioUrl, phase, onPhaseChange }: {
   );
 }
 
-const typeLabels: Record<string, string> = {
-  mcq: "Multiple Choice",
-  short: "Short Answer",
-  essay: "Essay",
-  "fill-blank": "Fill in the Blank",
-  "true-false-notgiven": "True / False / Not Given",
-  "yes-no-notgiven": "Yes / No / Not Given",
-  "match-headings": "Match Headings",
-  matching: "Matching",
-  "sentence-completion": "Sentence Completion",
-  "note-completion": "Note Completion",
-  "table-completion": "Table Completion",
-  "diagram-labelling": "Diagram Labelling",
-};
+const typeLabels: Record<string, string> = en.examRunner.typeLabels;
 
 function QuestionCard({ question, idx, answers, onAnswerChange, readOnly }: {
   question: TestDetail["sections"][number]["questions"][number];
@@ -628,9 +608,16 @@ function QuestionCard({ question, idx, answers, onAnswerChange, readOnly }: {
     : null;
   const rawValue = answers[question.id];
   const isMultiBlank = Array.isArray(question.correctAnswer) && typeof rawValue === "string" && (rawValue as string).startsWith("[");
+  const isMultiSelect = question.type === "multiple-choice-multiple";
   let isCorrect: boolean | null = null;
   if (correct !== null) {
-    if (isMultiBlank) {
+    if (isMultiSelect) {
+      try {
+        const given: string[] = JSON.parse(rawValue as string);
+        const correctSet = new Set(correct);
+        isCorrect = given.length === correctSet.size && given.every(g => correctSet.has(g.toLowerCase().trim()));
+      } catch { isCorrect = false; }
+    } else if (isMultiBlank) {
       try {
         const given: string[] = JSON.parse(rawValue as string);
         isCorrect = Array.isArray(question.correctAnswer) && question.correctAnswer.every((c, i) => c.toLowerCase() === (given[i] ?? "").toLowerCase().trim());
@@ -645,20 +632,20 @@ function QuestionCard({ question, idx, answers, onAnswerChange, readOnly }: {
     <Card className="border-neutral-800 bg-neutral-950">
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-xs font-semibold">Q{idx + 1}. {question.prompt}</CardTitle>
+          <CardTitle className="text-xs font-semibold">{en.examRunner.question.label(idx + 1)} {question.prompt}</CardTitle>
           <span className="text-[10px] text-muted-foreground bg-neutral-800 px-1.5 py-0.5 rounded shrink-0">{typeLabels[question.type] ?? question.type}</span>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <QuestionInput question={question} value={answers[question.id] ?? ""} onChange={(v) => onAnswerChange(question.id, v)} readOnly={readOnly} />
+        <QuestionInputWrapper question={question} value={answers[question.id] ?? ""} onChange={(v) => onAnswerChange(question.id, v)} readOnly={readOnly} />
         {readOnly && isCorrect !== null && (
           <div className="flex flex-col gap-1 pt-1 border-t border-neutral-800">
             <span className={`text-[10px] font-semibold flex items-center gap-1 ${isCorrect ? "text-emerald-400" : "text-red-400"}`}>
-              {isCorrect ? <><CheckCircle weight="bold" className="size-3" /> Correct</> : <><XCircle weight="bold" className="size-3" /> Incorrect</>}
+              {isCorrect ? <><CheckCircle weight="bold" className="size-3" /> {en.examRunner.question.correct}</> : <><XCircle weight="bold" className="size-3" /> {en.examRunner.question.incorrect}</>}
             </span>
             {!isCorrect && (
               <span className="text-[10px] text-muted-foreground">
-                Correct answer: <span className="text-white">{Array.isArray(question.correctAnswer) && isMultiBlank ? question.correctAnswer.join(" / ") : Array.isArray(question.correctAnswer) ? question.correctAnswer.join(" or ") : question.correctAnswer}</span>
+                {en.examRunner.question.correctAnswer} <span className="text-white">{Array.isArray(question.correctAnswer) && isMultiBlank ? question.correctAnswer.join(" / ") : Array.isArray(question.correctAnswer) ? question.correctAnswer.join(" or ") : question.correctAnswer}</span>
               </span>
             )}
           </div>
@@ -668,64 +655,3 @@ function QuestionCard({ question, idx, answers, onAnswerChange, readOnly }: {
   );
 }
 
-function QuestionInput({ question, value, onChange, readOnly }: {
-  question: TestDetail["sections"][number]["questions"][number];
-  value: string | null;
-  onChange: (value: string | null) => void;
-  readOnly: boolean;
-}) {
-  const isChoice = question.type === "mcq" || question.type === "true-false-notgiven" || question.type === "yes-no-notgiven" || question.type === "match-headings" || question.type === "matching";
-  if (isChoice) {
-    return (
-      <RadioGroup value={String(value ?? "")} onValueChange={onChange} className="flex flex-col gap-2" disabled={readOnly}>
-        {(question.options ?? []).map((option) => (
-          <label key={option} className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-            <RadioGroupItem value={option} />
-            {option}
-          </label>
-        ))}
-      </RadioGroup>
-    );
-  }
-  if (question.type === "fill-blank" || question.type === "short" || question.type === "sentence-completion" || question.type === "diagram-labelling") {
-    return <Input value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} placeholder="Type your answer" className="text-xs" readOnly={readOnly} />;
-  }
-  if (question.type === "note-completion" || question.type === "table-completion") {
-    const expected = Array.isArray(question.correctAnswer) ? question.correctAnswer : [question.correctAnswer ?? ""];
-    const stored = (() => { 
-      const s = String(value ?? "");
-      if (!s || s === "null" || s === "") return [];
-      try { 
-        const parsed = JSON.parse(s);
-        return Array.isArray(parsed) ? parsed : [String(parsed)];
-      } catch { 
-        // If it's not JSON, it might be a raw string from a previous version
-        return [s]; 
-      } 
-    })();
-    const parts = stored;
-    return (
-      <div className="flex flex-col gap-2">
-        {expected.map((_, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <span className="text-[10px] text-muted-foreground w-4 shrink-0">{i + 1}.</span>
-            <Input
-              value={String(parts[i] ?? "")}
-              onChange={(e) => {
-                const next = [...parts];
-                // Fill gaps with empty strings up to current index
-                for (let j = 0; j < i; j++) if (next[j] === undefined) next[j] = "";
-                next[i] = e.target.value;
-                onChange(JSON.stringify(next));
-              }}
-              placeholder={`Answer ${i + 1}`}
-              className="text-xs"
-              readOnly={readOnly}
-            />
-          </div>
-        ))}
-      </div>
-    );
-  }
-  return <Textarea value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} rows={6} className="text-xs" placeholder="Write your response" readOnly={readOnly} />;
-}

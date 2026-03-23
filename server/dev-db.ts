@@ -97,7 +97,7 @@ const loadSnapshot = (db: Database): StoreSnapshot => {
 
   const attempts = (db
     .query(
-      'SELECT id, assignment_id, test_id, user_id, status, score_total, band, reading_band, listening_band, started_at, completed_at, responses_json, listening_started_at, reading_started_at FROM attempts ORDER BY started_at'
+      'SELECT id, assignment_id, test_id, user_id, status, score_total, band, reading_band, listening_band, started_at, completed_at, responses_json FROM attempts ORDER BY started_at'
     )
     .all() as Array<{
     id: string
@@ -112,8 +112,6 @@ const loadSnapshot = (db: Database): StoreSnapshot => {
     started_at: string
     completed_at: string | null
     responses_json: string
-    listening_started_at: string | null
-    reading_started_at: string | null
   }>)
     .map((row) => ({
       id: row.id,
@@ -127,8 +125,6 @@ const loadSnapshot = (db: Database): StoreSnapshot => {
       listeningBand: row.listening_band ?? null,
       startedAt: row.started_at,
       completedAt: row.completed_at ?? null,
-      listeningStartedAt: row.listening_started_at ?? null,
-      readingStartedAt: row.reading_started_at ?? null,
       responses: row.responses_json ? (JSON.parse(row.responses_json) as Record<string, unknown>) : {},
     }))
 
@@ -186,7 +182,7 @@ const saveSnapshot = (db: Database, snapshot: StoreSnapshot) => {
     'INSERT INTO assignments (id, type, test_id, section_kinds_json, assigned_to, assigned_by, due_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   )
   const insertAttempt = db.query(
-    'INSERT INTO attempts (id, assignment_id, test_id, user_id, status, score_total, band, reading_band, listening_band, started_at, completed_at, responses_json, listening_started_at, reading_started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO attempts (id, assignment_id, test_id, user_id, status, score_total, band, reading_band, listening_band, started_at, completed_at, responses_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
   )
   const insertGroup = db.query('INSERT INTO groups (id, name, created_at) VALUES (?, ?, ?)')
   const insertGroupMember = db.query('INSERT INTO group_members (group_id, user_id) VALUES (?, ?)')
@@ -234,9 +230,7 @@ const saveSnapshot = (db: Database, snapshot: StoreSnapshot) => {
         attempt.listeningBand,
         attempt.startedAt,
         attempt.completedAt,
-        JSON.stringify(attempt.responses ?? {}),
-        attempt.listeningStartedAt ?? null,
-        attempt.readingStartedAt ?? null
+        JSON.stringify(attempt.responses ?? {})
       )
     }
 

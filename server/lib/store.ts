@@ -18,7 +18,6 @@ import type {
 
 let store: Store = {
   users: [],
-  tests: [],
   assignments: [],
   attempts: [],
   groups: [],
@@ -35,10 +34,6 @@ export const setPersist = (persist?: (snapshot: StoreSnapshot) => void) => {
   persistStore = persist ?? null
 }
 
-export const setTests = (tests: TestDetail[]) => {
-  store.tests = tests
-  commit()
-}
 
 export const defaultSettings: UserSettings = {
   notifications: true,
@@ -121,11 +116,13 @@ export const verifyPassword = async (password: string, stored: string) => {
   const [salt, hash] = stored.split(':')
   if (!salt || !hash) return false
   const candidate = await hashPassword(password, salt)
-  const a = new TextEncoder().encode(candidate)
-  const b = new TextEncoder().encode(hash)
-  // amazonq-ignore-next-line
-  if (a.length !== b.length) return false
-  return crypto.subtle.timingSafeEqual(a, b)
+  // Constant-time comparison
+  let diff = candidate.length ^ hash.length
+  const len = Math.min(candidate.length, hash.length)
+  for (let i = 0; i < len; i++) {
+    diff |= candidate.charCodeAt(i) ^ hash.charCodeAt(i)
+  }
+  return diff === 0
 }
 
 export const getLatestAttemptForTest = (userId: string, testId: string) => {
@@ -153,8 +150,6 @@ const toAttemptSummary = (attempt: Attempt | null) => {
     listeningBand: attempt.listeningBand,
     startedAt: attempt.startedAt,
     completedAt: attempt.completedAt,
-    listeningStartedAt: attempt.listeningStartedAt,
-    readingStartedAt: attempt.readingStartedAt,
   }
 }
 
@@ -206,7 +201,8 @@ const isCorrect = (correct: string | string[] | null | undefined, response: unkn
 
   if (Array.isArray(correct)) {
     if (!Array.isArray(normalized)) return false
-    if (normalized.length < correct.length) return false // Allow partial if needed, but IELTS usually exact
+    if (normalized.length < correct.length) return false
+    // For matching-sentence-endings and list-selection: order matters for sentence endings, set match for list
     return correct.every((value, index) => {
       const answer = normalized[index]
       if (typeof answer === 'string') {
@@ -233,47 +229,81 @@ const isCorrect = (correct: string | string[] | null | undefined, response: unkn
   return false
 }
 
-const calculateBand = (score: number, total: number) => {
-  if (total <= 0) return null
-  const value = (score / total) * 9
-  return Math.round(value * 10) / 10
+// Official IELTS raw score to band conversion tables (40 questions each)
+const LISTENING_BAND: Record<number, number> = {
+  39: 9, 40: 9,
+  37: 8.5, 38: 8.5,
+  35: 8, 36: 8,
+  32: 7.5, 33: 7.5, 34: 7.5,
+  30: 7, 31: 7,
+  26: 6.5, 27: 6.5, 28: 6.5, 29: 6.5,
+  23: 6, 24: 6, 25: 6,
+  18: 5.5, 19: 5.5, 20: 5.5, 21: 5.5, 22: 5.5,
+  16: 5, 17: 5,
+  13: 4.5, 14: 4.5, 15: 4.5,
+  10: 4, 11: 4, 12: 4,
+  8: 3.5, 9: 3.5,
+  6: 3, 7: 3,
+  4: 2.5, 5: 2.5,
+}
+
+const READING_ACADEMIC_BAND: Record<number, number> = {
+  39: 9, 40: 9,
+  37: 8.5, 38: 8.5,
+  35: 8, 36: 8,
+  33: 7.5, 34: 7.5,
+  30: 7, 31: 7, 32: 7,
+  27: 6.5, 28: 6.5, 29: 6.5,
+  23: 6, 24: 6, 25: 6, 26: 6,
+  19: 5.5, 20: 5.5, 21: 5.5, 22: 5.5,
+  15: 5, 16: 5, 17: 5, 18: 5,
+  13: 4.5, 14: 4.5,
+  10: 4, 11: 4, 12: 4,
+  8: 3.5, 9: 3.5,
+  6: 3, 7: 3,
+  4: 2.5, 5: 2.5,
+}
+
+const lookupBand = (score: number, table: Record<number, number>): number | null => {
+  if (score <= 0) return null
+  // Find the highest threshold <= score
+  const thresholds = Object.keys(table).map(Number).sort((a, b) => b - a)
+  for (const t of thresholds) {
+    if (score >= t) return table[t]
+  }
+  return 1
 }
 
 export const scoreAttempt = (attempt: Attempt, test: TestDetail) => {
   let score = 0
-  let total = 0
   let readingScore = 0
-  let readingTotal = 0
   let listeningScore = 0
-  let listeningTotal = 0
 
   for (const section of test.sections) {
     for (const question of section.questions) {
       if (question.correctAnswer == null) continue
       const correct = isCorrect(question.correctAnswer, attempt.responses[question.id])
-      total += question.points
-      if (section.kind === 'reading') {
-        readingTotal += question.points
-      } else if (section.kind === 'listening') {
-        listeningTotal += question.points
-      }
       if (correct) {
         score += question.points
-        if (section.kind === 'reading') {
-          readingScore += question.points
-        } else if (section.kind === 'listening') {
-          listeningScore += question.points
-        }
+        if (section.kind === 'reading') readingScore += question.points
+        else if (section.kind === 'listening') listeningScore += question.points
       }
     }
   }
 
-  return {
-    scoreTotal: score,
-    band: calculateBand(score, total),
-    readingBand: calculateBand(readingScore, readingTotal),
-    listeningBand: calculateBand(listeningScore, listeningTotal),
+  const listeningBand = lookupBand(listeningScore, LISTENING_BAND)
+  const readingBand = lookupBand(readingScore, READING_ACADEMIC_BAND)
+
+  let band: number | null = null
+  if (listeningBand != null && readingBand != null) {
+    band = Math.round(((listeningBand + readingBand) / 2) * 2) / 2
+  } else if (listeningBand != null) {
+    band = listeningBand
+  } else if (readingBand != null) {
+    band = readingBand
   }
+
+  return { scoreTotal: score, band, readingBand, listeningBand }
 }
 
 const getAuthToken = (authorization: string | null) => {

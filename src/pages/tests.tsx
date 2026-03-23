@@ -87,11 +87,11 @@ function TestCard({
                 className="size-3 text-muted-foreground"
               />
               <span className="text-[10px] text-muted-foreground">
-                {test.durationMinutes} min
+                {test.durationMinutes} {en.tests.minutesSuffix}
               </span>
             </div>
             <div className="text-[10px] text-muted-foreground">
-              {test.sectionsCount} sections · {test.questionsCount} questions
+              {en.tests.details.sectionsQuestions(test.sectionsCount, test.questionsCount)}
             </div>
           </div>
           <div className="flex flex-col items-end gap-1.5 shrink-0">
@@ -131,7 +131,7 @@ function TestCard({
                       </span>
                     </TooltipTrigger>
                     <TooltipContent className="text-xs">
-                      Listening band
+                      {en.tests.details.listeningBand}
                     </TooltipContent>
                   </Tooltip>
                 )}
@@ -144,14 +144,14 @@ function TestCard({
                       </span>
                     </TooltipTrigger>
                     <TooltipContent className="text-xs">
-                      Reading band
+                      {en.tests.details.readingBand}
                     </TooltipContent>
                   </Tooltip>
                 )}
               </>
             ) : (
               <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-neutral-800/50 text-neutral-600">
-                No score yet
+                {en.tests.details.noScore}
               </span>
             )}
           </div>
@@ -183,10 +183,10 @@ function TestCard({
             </TooltipTrigger>
             <TooltipContent side="left" className="text-xs">
               {status === "not-started"
-                ? "Start this test"
+                ? en.tests.details.tooltip.start
                 : status === "in-progress"
-                  ? "Continue where you left off"
-                  : "Review your answers and score"}
+                  ? en.tests.details.tooltip.continue
+                  : en.tests.details.tooltip.review}
             </TooltipContent>
           </Tooltip>
         </div>
@@ -228,8 +228,8 @@ function TestDialog({
             </Badge>
             {test.attempt?.band != null && (
               <span className="flex items-center gap-1 text-xs font-semibold text-white">
-                <Trophy weight="bold" className="size-3 text-amber-400" /> Band{" "}
-                {test.attempt.band}
+                <Trophy weight="bold" className="size-3 text-amber-400" />
+                {en.tests.dialog.band(test.attempt.band)}
               </span>
             )}
             {test.attempt?.listeningBand != null && (
@@ -241,7 +241,7 @@ function TestDialog({
                   </span>
                 </TooltipTrigger>
                 <TooltipContent className="text-xs">
-                  Listening band
+                  {en.tests.details.listeningBand}
                 </TooltipContent>
               </Tooltip>
             )}
@@ -254,7 +254,7 @@ function TestDialog({
                   </span>
                 </TooltipTrigger>
                 <TooltipContent className="text-xs">
-                  Reading band
+                  {en.tests.details.readingBand}
                 </TooltipContent>
               </Tooltip>
             )}
@@ -268,14 +268,13 @@ function TestDialog({
           </div>
           <div className="flex items-center gap-1.5">
             <BookOpen weight="bold" className="size-3.5" />
-            <span>{test.sectionsCount} sections</span>
+            <span>{`${test.sectionsCount} ${en.tests.dialog.sections.toLowerCase()}`}</span>
           </div>
         </div>
 
         {status === "completed" && (
           <p className="text-xs text-muted-foreground">
-            This test is completed. You can review your answers but cannot
-            retake it.
+            {en.tests.details.completedNotice}
           </p>
         )}
 
@@ -323,7 +322,7 @@ function TestDialog({
             </TooltipTrigger>
             {timerActive && status !== "completed" && (
               <TooltipContent side="top" className="text-xs">
-                A test is already in progress
+                {en.tests.details.timerActive}
               </TooltipContent>
             )}
           </Tooltip>
@@ -351,19 +350,22 @@ export function Tests({
     useState<AssignmentAttemptDetail | null>(null);
   const submitRef = useRef<(() => void) | null>(null);
   const wasTimerActive = useRef(false);
+  const sectionFinishRef = useRef(false);
   const registerSubmit = useCallback((submit: () => void) => {
     submitRef.current = submit;
   }, []);
 
   useEffect(() => {
-    // only auto-submit if the timer transitioned from active to inactive
     if (
       wasTimerActive.current &&
       !timerActive &&
       activeAttempt &&
       activeAttempt.attempt.status === "in-progress"
     ) {
-      submitRef.current?.();
+      if (!sectionFinishRef.current) {
+        submitRef.current?.();
+      }
+      sectionFinishRef.current = false;
     }
     wasTimerActive.current = timerActive;
   }, [timerActive, activeAttempt]);
@@ -410,7 +412,7 @@ export function Tests({
       setActiveAttempt(detail);
       // timer starts only when user clicks Start Listening — see onListeningStart below
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to start test");
+      toast.error(err instanceof Error ? err.message : en.tests.errors.startFailed);
     }
   };
 
@@ -429,22 +431,20 @@ export function Tests({
             test={activeAttempt.test}
             attemptId={activeAttempt.attempt.id}
             initialResponses={activeAttempt.responses ?? {}}
-            listeningStartedAt={activeAttempt.attempt.listeningStartedAt}
-            readingStartedAt={activeAttempt.attempt.readingStartedAt}
             readOnly={activeAttempt.attempt.status === "completed"}
             onListeningStart={(sectionDurationMinutes) =>
               onStartTest(
-                "Listening",
+                en.examRunner.kinds.listening,
                 sectionDurationMinutes * 60,
               )
             }
             onReadingStart={(sectionDurationMinutes) =>
               onStartTest(
-                "Reading",
+                en.examRunner.kinds.reading,
                 sectionDurationMinutes * 60,
               )
             }
-            onSectionFinish={onStopTest}
+            onSectionFinish={() => { sectionFinishRef.current = true; onStopTest(); }}
             onTimerFinish={registerSubmit}
             onExit={() => {
               setActiveAttempt(null);
@@ -454,7 +454,7 @@ export function Tests({
               await refresh().catch(() => undefined);
               setActiveAttempt(null);
               onStopTest();
-              toast.success("Test submitted");
+              toast.success(en.tests.submitted);
             }}
           />
         </motion.div>
@@ -551,8 +551,7 @@ export function Tests({
                 {loading ? (
                   <Card className="rounded-xl border-neutral-800 bg-neutral-900">
                     <CardContent className="px-4 py-6 flex items-center gap-2 text-xs text-muted-foreground">
-                      <SpinnerGap className="size-4 animate-spin" /> Loading
-                      tests...
+                      <SpinnerGap className="size-4 animate-spin" /> {en.tests.loading}
                     </CardContent>
                   </Card>
                 ) : filtered.length === 0 ? (

@@ -5,8 +5,6 @@ export type AttemptStatus = 'in-progress' | 'completed'
 export type QuestionType =
   | 'mcq'
   | 'short'
-  | 'essay'
-  | 'fill-blank'
   | 'true-false-notgiven'
   | 'yes-no-notgiven'
   | 'match-headings'
@@ -15,6 +13,15 @@ export type QuestionType =
   | 'note-completion'
   | 'table-completion'
   | 'diagram-labelling'
+  | 'form-completion'
+  | 'flowchart-completion'
+  | 'map-labelling'
+  | 'multiple-choice-multiple'
+  | 'summary-completion'
+  | 'matching-paragraph-information'
+  | 'matching-features'
+  | 'matching-sentence-endings'
+  | 'choose-title'
 
 export type ApiUser = {
   id: string
@@ -46,8 +53,6 @@ export type TestSummary = {
     listeningBand: number | null
     startedAt: string
     completedAt: string | null
-    listeningStartedAt?: string | null
-    readingStartedAt?: string | null
   } | null
 }
 
@@ -62,6 +67,7 @@ export type TestDetail = {
     title: string
     audioUrl?: string | null
     passage?: string | null
+    passageTitle?: string | null
     questions: {
       id: string
       type: QuestionType
@@ -92,8 +98,6 @@ export type AssignmentSummary = {
     listeningBand: number | null
     startedAt: string
     completedAt: string | null
-    listeningStartedAt?: string | null
-    readingStartedAt?: string | null
   } | null
 }
 
@@ -115,8 +119,6 @@ export type AssignmentAttemptDetail = {
     listeningBand: number | null
     startedAt: string
     completedAt: string | null
-    listeningStartedAt?: string | null
-    readingStartedAt?: string | null
   }
   test: TestDetail
   responses: Record<string, unknown>
@@ -184,8 +186,6 @@ export type Attempt = {
   listeningBand: number | null
   startedAt: string
   completedAt: string | null
-  listeningStartedAt?: string | null
-  readingStartedAt?: string | null
   responses: Record<string, unknown>
 }
 
@@ -198,7 +198,6 @@ export type StoredGroup = {
 
 export type Store = {
   users: User[]
-  tests: TestDetail[]
   assignments: Assignment[]
   attempts: Attempt[]
   groups: StoredGroup[]

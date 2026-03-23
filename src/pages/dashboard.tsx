@@ -147,7 +147,7 @@ export function Dashboard() {
           </CardHeader>
           <CardContent className="px-4 pb-4 flex flex-col">
             {upcomingHomework.length === 0 ? (
-              <div className="text-xs text-muted-foreground py-6">No upcoming homework.</div>
+              <div className="text-xs text-muted-foreground py-6">{en.dashboard.upcomingHomework.empty}</div>
             ) : (
               upcomingHomework.map((hw, i) => (
                 <div key={i} className="flex items-center justify-between py-2.5 border-b border-neutral-800 last:border-0 cursor-pointer hover:bg-neutral-800/40 rounded px-1 -mx-1 transition-colors" onClick={() => setPage("Homework", hw.id)}>
@@ -176,7 +176,7 @@ export function Dashboard() {
         </CardHeader>
         <CardContent className="px-4 pb-4 flex flex-col">
           {recentTests.length === 0 ? (
-            <div className="text-xs text-muted-foreground py-6">No completed tests yet.</div>
+            <div className="text-xs text-muted-foreground py-6">{en.dashboard.recentTests.empty}</div>
           ) : (
             recentTests.map((test, i) => (
               <div key={i} className="flex items-center justify-between py-3 border-b border-neutral-800 last:border-0 cursor-pointer hover:bg-neutral-800/40 rounded px-1 -mx-1 transition-colors" onClick={() => setPage("Tests")}>

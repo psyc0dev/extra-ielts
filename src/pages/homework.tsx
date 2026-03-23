@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,7 @@ function ScorePill({ score, label }: { score: number | null; label: string }) {
       <TooltipTrigger asChild>
         <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md flex items-center gap-1 ${score !== null ? "bg-neutral-800 text-white" : "bg-neutral-800/50 text-neutral-600"}`}>
           {sectionIcon[label.toLowerCase()] ?? null}
-          {score ?? "—"}
+          {score ?? en.homework.scoreEmpty}
         </span>
       </TooltipTrigger>
       <TooltipContent side="top">
@@ -47,6 +47,7 @@ function ScorePill({ score, label }: { score: number | null; label: string }) {
 function HomeworkCard({ assignment, status, onOpen }: { assignment: AssignmentSummary; status: Status; onOpen: (assignment: AssignmentSummary) => void }) {
   const cfg = statusConfig[status];
   const isPastDue = assignment.dueAt != null && new Date(assignment.dueAt) < new Date() && status !== "completed";
+  
   return (
     <Card className="rounded-xl border-neutral-800 bg-neutral-900 hover:border-neutral-700 transition-colors">
       <CardContent className="px-4 py-3 flex flex-col gap-2.5">
@@ -56,17 +57,17 @@ function HomeworkCard({ assignment, status, onOpen }: { assignment: AssignmentSu
             <div className="flex items-center gap-1.5">
               <ClockCountdown weight="bold" className="size-3 text-muted-foreground" />
               <span className="text-[10px] text-muted-foreground">
-                {assignment.durationMinutes} min
-                {assignment.dueAt ? ` · due ${new Date(assignment.dueAt).toLocaleDateString()}` : ""}
+                {assignment.durationMinutes} {en.homework.minutesSuffix}
+                {assignment.dueAt ? ` · ${en.homework.dueLabel} ${new Date(assignment.dueAt).toLocaleDateString()}` : ""}
               </span>
             </div>
             <div className="text-[10px] text-muted-foreground capitalize">
-              Sections: {assignment.sectionKinds.join(", ")}
+              {en.homework.sectionsLabel}: {assignment.sectionKinds.join(", ")}
             </div>
           </div>
           <div className="flex flex-col items-end gap-1.5 shrink-0">
             <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${cfg.className}`}>{cfg.label}</Badge>
-            {isPastDue && <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-red-800 text-red-400">Expired</Badge>}
+            {isPastDue && <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-red-800 text-red-400">{en.homework.expired}</Badge>}
             {assignment.attempt?.band != null && (
               <span className="flex items-center gap-1 text-xs font-bold">
                 <Trophy weight="bold" className="size-3 text-amber-400" />
@@ -113,12 +114,14 @@ function HomeworkDialog({
   onClose,
   onStart,
   onContinue,
+  timerActive,
 }: {
   assignment: AssignmentSummary | null;
   open: boolean;
   onClose: () => void;
   onStart: (assignment: AssignmentSummary) => void;
   onContinue: (assignment: AssignmentSummary) => void;
+  timerActive: boolean;
 }) {
   if (!assignment) return null;
   const status = (assignment.attempt?.status ?? "not-started") as Status;
@@ -149,34 +152,79 @@ function HomeworkDialog({
         </div>
 
         {isPastDue && (
-          <p className="text-xs text-red-400">The due date for this assignment has passed. You can no longer start or continue it.</p>
+          <p className="text-xs text-red-400">{en.homework.pastDueMessage}</p>
         )}
 
         <DialogFooter>
           <Button variant="outline" size="sm" className="border-neutral-700" onClick={onClose}>{en.tests.dialog.cancel}</Button>
-          <Button size="sm" className="gap-1.5" disabled={isPastDue} onClick={() => {
-            if (status === "not-started") onStart(assignment);
-            else onContinue(assignment);
-            onClose();
-          }}>
-            {status === "not-started" ? <><Play weight="bold" className="size-3" /> {en.tests.dialog.startTest}</> :
-             status === "in-progress" ? <><ArrowRight weight="bold" className="size-3" /> {en.tests.actions.continue}</> :
-             <><BookOpen weight="bold" className="size-3" /> {en.tests.actions.review}</>}
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span tabIndex={timerActive && status !== "completed" ? 0 : undefined}>
+                <Button
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={isPastDue || (timerActive && status !== "completed")}
+                  onClick={() => {
+                    if (status === "not-started") onStart(assignment);
+                    else onContinue(assignment);
+                    onClose();
+                  }}
+                >
+                  {status === "not-started" ? <><Play weight="bold" className="size-3" /> {en.tests.dialog.startTest}</> :
+                   status === "in-progress" ? <><ArrowRight weight="bold" className="size-3" /> {en.tests.actions.continue}</> :
+                   <><BookOpen weight="bold" className="size-3" /> {en.tests.actions.review}</>}
+                </Button>
+              </span>
+            </TooltipTrigger>
+            {timerActive && status !== "completed" && (
+              <TooltipContent side="top" className="text-xs">
+                {en.tests.details.timerActive}
+              </TooltipContent>
+            )}
+          </Tooltip>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-export function Homework() {
+export function Homework({
+  onStartTest,
+  onStopTest,
+  timerActive,
+}: {
+  onStartTest: (name: string, seconds: number) => void;
+  onStopTest: () => void;
+  timerActive: boolean;
+}) {
   const [loading, setLoading] = useState(true);
   const [assignments, setAssignments] = useState<AssignmentSummary[]>([]);
   const [activeAttempt, setActiveAttempt] = useState<AssignmentAttemptDetail | null>(null);
   const [selected, setSelected] = useState<AssignmentSummary | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const submitRef = useRef<(() => void) | null>(null);
+  const wasTimerActive = useRef(false);
+  const sectionFinishRef = useRef(false);
+  const registerSubmit = useCallback((submit: () => void) => {
+    submitRef.current = submit;
+  }, []);
 
   const { pendingId, clearPendingId } = useNav();
+
+  useEffect(() => {
+    if (
+      wasTimerActive.current &&
+      !timerActive &&
+      activeAttempt &&
+      activeAttempt.attempt.status === "in-progress"
+    ) {
+      if (!sectionFinishRef.current) {
+        submitRef.current?.();
+      }
+      sectionFinishRef.current = false;
+    }
+    wasTimerActive.current = timerActive;
+  }, [timerActive, activeAttempt]);
 
   useEffect(() => {
     if (!pendingId || assignments.length === 0) return;
@@ -210,13 +258,25 @@ export function Homework() {
         attemptId={activeAttempt.attempt.id}
         initialResponses={activeAttempt.responses}
         readOnly={activeAttempt.attempt.status === "completed"}
-        onExit={() => { setActiveAttempt(null); }}
+        onListeningStart={(sectionDurationMinutes) =>
+          onStartTest(en.examRunner.kinds.listening, sectionDurationMinutes * 60)
+        }
+        onReadingStart={(sectionDurationMinutes) =>
+          onStartTest(en.examRunner.kinds.reading, sectionDurationMinutes * 60)
+        }
+        onSectionFinish={() => { sectionFinishRef.current = true; onStopTest(); }}
+        onTimerFinish={registerSubmit}
+        onExit={() => {
+          setActiveAttempt(null);
+          if (activeAttempt.attempt.status !== "completed") onStopTest();
+        }}
         onSubmitted={() => {
           setActiveAttempt(null);
           refresh().catch(() => undefined);
-          toast.success("Homework submitted");
+          onStopTest();
+          toast.success(en.homework.submitted);
         }}
-      />
+        />
     );
   }
 
@@ -233,7 +293,7 @@ export function Homework() {
             {loading ? (
               <Card className="rounded-xl border-neutral-800 bg-neutral-900">
                 <CardContent className="px-4 py-6 flex items-center gap-2 text-xs text-muted-foreground">
-                  <SpinnerGap className="size-4 animate-spin" /> Loading homework...
+                  <SpinnerGap className="size-4 animate-spin" /> {en.homework.loading}
                 </CardContent>
               </Card>
             ) : assignments.length === 0 ? (
@@ -258,6 +318,7 @@ export function Homework() {
         assignment={selected}
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
+        timerActive={timerActive}
         onStart={async (assignment) => {
           const attemptRes = await startAssignment(assignment.id);
           const detail = await getAttempt(attemptRes.attempt.id);

@@ -60,7 +60,7 @@ function PageContent({
   const pages: Record<string, React.ReactNode> = {
     Dashboard: <Dashboard />,
     Tests: <Tests onStartTest={onStartTest} onStopTest={onStopTest} timerActive={timerActive} />,
-    Homework: <Homework />,
+    Homework: <Homework onStartTest={onStartTest} onStopTest={onStopTest} timerActive={timerActive} />,
     Settings: (
       <Settings
         onSignOut={onSignOut}
@@ -88,9 +88,7 @@ function PageContent({
           </Breadcrumb>
         </div>
         <div data-tauri-drag-region className="flex-1 h-full" />
-        <div className="px-4">
-          <WindowControls onFullscreen={onFullscreen} />
-        </div>
+        <WindowControls onFullscreen={onFullscreen} />
       </header>
       <div className="relative flex flex-1 flex-col overflow-hidden">
         <AnimatePresence mode="wait">
@@ -208,7 +206,7 @@ function AppBody() {
   if (loading) {
     return (
       <div className="dark flex h-screen items-center justify-center bg-neutral-900 text-white">
-        <div className="text-xs text-muted-foreground">Loading...</div>
+        <div className="text-xs text-muted-foreground">{en.app.loading}</div>
       </div>
     );
   }
@@ -216,12 +214,12 @@ function AppBody() {
   return (
     <div
       className="dark flex flex-col h-screen font-sans bg-neutral-900 text-white overflow-hidden"
-      style={{ borderRadius: isFullscreen ? 0 : 10, transition: "border-radius 0.3s ease" }}
+      style={{ clipPath: isFullscreen ? "none" : "inset(0 round 6px)", transition: "clip-path 0.3s ease" }}
     >
       <Toaster />
       {!user ? (
         <div className="flex flex-col flex-1">
-          <div data-tauri-drag-region className="flex h-9 items-center justify-end px-4 select-none border-b border-neutral-800">
+          <div data-tauri-drag-region className="flex h-9 items-center justify-end select-none border-b border-neutral-800">
             <WindowControls onFullscreen={setIsFullscreen} />
           </div>
           <div className="flex flex-1 items-center justify-center bg-background">

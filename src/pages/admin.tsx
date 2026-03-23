@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Calendar } from "@/components/ui/calendar";
 import {
   adminCreateAssignment,
   adminCreateUser,
@@ -31,8 +32,21 @@ import {
   type Group,
   type StudentStats,
 } from "@/lib/api";
-import { toast } from "sonner";
-import { Plus, Trash, UserMinus, Users, Trophy, Headphones, BookOpen as BookOpenIcon, CaretDown, CaretUp } from "@phosphor-icons/react";
+import {
+  toast
+} from "sonner";
+import {
+  Plus,
+  Trash,
+  UserMinus,
+  Users,
+  Trophy,
+  Headphones,
+  BookOpen as BookOpenIcon,
+  CaretDown,
+  CaretUp
+} from "@phosphor-icons/react";
+import en from "@/locales/en";
 
 export function Admin() {
   const [users, setUsers] = useState<ApiUser[]>([]);
@@ -75,23 +89,23 @@ export function Admin() {
     <div className="p-6 flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-semibold">Admin Dashboard</h2>
-          <p className="text-xs text-muted-foreground">Manage tests and homework.</p>
+          <h2 className="text-sm font-semibold">{en.admin.title}</h2>
+          <p className="text-xs text-muted-foreground">{en.admin.subtitle}</p>
         </div>
       </div>
 
       <Tabs defaultValue="users">
         <TabsList>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="tests">Tests</TabsTrigger>
-          <TabsTrigger value="homework">Homework</TabsTrigger>
-          <TabsTrigger value="groups">Groups</TabsTrigger>
+          <TabsTrigger value="users">{en.admin.tabs.users}</TabsTrigger>
+          <TabsTrigger value="tests">{en.admin.tabs.tests}</TabsTrigger>
+          <TabsTrigger value="homework">{en.admin.tabs.homework}</TabsTrigger>
+          <TabsTrigger value="groups">{en.admin.tabs.groups}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users">
           <Card className="border-neutral-800 bg-neutral-900">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-xs font-semibold">Users</CardTitle>
+              <CardTitle className="text-xs font-semibold">{en.admin.users.title}</CardTitle>
               <CreateUserDialog
                 onCreate={async (payload) => {
                   const res = await adminCreateUser(payload);
@@ -103,9 +117,9 @@ export function Admin() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Username</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
+                    <TableHead>{en.admin.users.table.username}</TableHead>
+                    <TableHead>{en.admin.users.table.email}</TableHead>
+                    <TableHead>{en.admin.users.table.role}</TableHead>
                     <TableHead />
                   </TableRow>
                 </TableHeader>
@@ -122,24 +136,24 @@ export function Admin() {
         <TabsContent value="tests">
           <Card className="border-neutral-800 bg-neutral-900">
             <CardHeader>
-              <CardTitle className="text-xs font-semibold">Tests</CardTitle>
+              <CardTitle className="text-xs font-semibold">{en.admin.tests.title}</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Sections</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Published</TableHead>
+                    <TableHead>{en.admin.tests.table.title}</TableHead>
+                    <TableHead>{en.admin.tests.table.duration}</TableHead>
+                    <TableHead>{en.admin.tests.table.sections}</TableHead>
+                    <TableHead>{en.admin.tests.table.status}</TableHead>
+                    <TableHead>{en.admin.tests.table.published}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {tests.map((test) => (
                     <TableRow key={test.id}>
                       <TableCell className="font-medium">{test.title}</TableCell>
-                      <TableCell className="text-muted-foreground">{test.durationMinutes} min</TableCell>
+                      <TableCell className="text-muted-foreground">{test.durationMinutes} {en.admin.tests.minutesSuffix}</TableCell>
                       <TableCell className="text-muted-foreground">{test.sectionsCount}</TableCell>
                       <TableCell>
                         <Badge
@@ -148,7 +162,7 @@ export function Admin() {
                             ? "border-emerald-800 text-emerald-400"
                             : "border-neutral-700 text-muted-foreground"}
                         >
-                          {test.published ? "Published" : "Draft"}
+                          {test.published ? en.admin.tests.status.published : en.admin.tests.status.draft}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -167,10 +181,11 @@ export function Admin() {
 
         <TabsContent value="homework">
           <AssignmentPanel
-            title="Homework Assignments"
+            title={en.admin.assignments.title}
             assignments={homeworkAssignments}
             tests={tests}
             users={users}
+            groups={groups}
             testMap={testMap}
             type="homework"
             onCreated={(assignment) => setHomeworkAssignments((prev) => [assignment, ...prev])}
@@ -227,18 +242,18 @@ function UserRow({ user, testMap }: { user: ApiUser; testMap: Map<string, string
         <TableRow>
           <TableCell colSpan={4} className="bg-neutral-950 p-4">
             {loading ? (
-              <span className="text-xs text-muted-foreground">Loading…</span>
+              <span className="text-xs text-muted-foreground">{en.admin.stats.loading}</span>
             ) : stats ? (
               <div className="flex flex-col gap-3">
                 <div className="grid grid-cols-4 gap-3">
-                  <StatChip label="Tests Done" value={`${stats.testsCompleted}/${stats.testsTotal}`} />
-                  <StatChip label="Avg Band" value={stats.avgBand ?? "-"} icon={<Trophy weight="bold" className="size-3 text-amber-400" />} />
-                  <StatChip label="Listening" value={stats.avgListeningBand ?? "-"} icon={<Headphones weight="bold" className="size-3 text-sky-400" />} />
-                  <StatChip label="Reading" value={stats.avgReadingBand ?? "-"} icon={<BookOpenIcon weight="bold" className="size-3 text-violet-400" />} />
+                  <StatChip label={en.admin.stats.testsDone} value={`${stats.testsCompleted}/${stats.testsTotal}`} />
+                  <StatChip label={en.admin.stats.avgBand} value={stats.avgBand ?? "-"} icon={<Trophy weight="bold" className="size-3 text-amber-400" />} />
+                  <StatChip label={en.admin.stats.listening} value={stats.avgListeningBand ?? "-"} icon={<Headphones weight="bold" className="size-3 text-sky-400" />} />
+                  <StatChip label={en.admin.stats.reading} value={stats.avgReadingBand ?? "-"} icon={<BookOpenIcon weight="bold" className="size-3 text-violet-400" />} />
                 </div>
                 {stats.recentAttempts.length > 0 && (
                   <div className="flex flex-col gap-1">
-                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Recent</span>
+                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">{en.admin.stats.recent}</span>
                     {stats.recentAttempts.map((a, i) => (
                       <div key={i} className="flex items-center justify-between text-xs px-2 py-1 rounded-md bg-neutral-900">
                         <span className="text-muted-foreground">{testMap.get(a.testId) ?? a.testId}</span>
@@ -254,7 +269,7 @@ function UserRow({ user, testMap }: { user: ApiUser; testMap: Map<string, string
                 )}
               </div>
             ) : (
-              <span className="text-xs text-muted-foreground">No data</span>
+              <span className="text-xs text-muted-foreground">{en.admin.stats.noData}</span>
             )}
           </TableCell>
         </TableRow>
@@ -272,11 +287,25 @@ function StatChip({ label, value, icon }: { label: string; value: string | numbe
   );
 }
 
+function buildDueAt(dueDate?: Date, dueTime?: string) {
+  if (!dueDate || !dueTime) return null;
+  const yyyy = dueDate.getFullYear();
+  const mm = String(dueDate.getMonth() + 1).padStart(2, "0");
+  const dd = String(dueDate.getDate()).padStart(2, "0");
+  const local = `${yyyy}-${mm}-${dd}T${dueTime}:00`;
+  return new Date(local).toISOString();
+}
+
+function formatDateLabel(date?: Date) {
+  return date ? date.toLocaleDateString() : en.admin.assignments.pickDate;
+}
+
 function AssignmentPanel({
   title,
   assignments,
   tests,
   users,
+  groups,
   testMap,
   type,
   onCreated,
@@ -285,6 +314,7 @@ function AssignmentPanel({
   assignments: AdminAssignment[];
   tests: TestSummary[];
   users: ApiUser[];
+  groups: Group[];
   testMap: Map<string, string>;
   type: "task" | "homework";
   onCreated: (assignment: AdminAssignment) => void;
@@ -296,13 +326,14 @@ function AssignmentPanel({
         <CreateAssignmentDialog
           tests={tests}
           users={users}
+          groups={groups}
           type={type}
           onCreate={async (payload) => {
             const res = await adminCreateAssignment({
               ...payload,
               dueAt: payload.dueAt ? new Date(payload.dueAt).toISOString() : null,
             });
-            toast.success("Assignment created");
+            toast.success(en.admin.toasts.assignmentCreated);
             onCreated({
               id: res.assignment.id,
               type,
@@ -322,10 +353,10 @@ function AssignmentPanel({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Test</TableHead>
-              <TableHead>Sections</TableHead>
-              <TableHead>Assigned To</TableHead>
-              <TableHead>Due</TableHead>
+              <TableHead>{en.admin.assignments.table.test}</TableHead>
+              <TableHead>{en.admin.assignments.table.sections}</TableHead>
+              <TableHead>{en.admin.assignments.table.assignedTo}</TableHead>
+              <TableHead>{en.admin.assignments.table.due}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -355,35 +386,35 @@ function CreateUserDialog({ onCreate }: { onCreate: (payload: { username: string
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm" className="gap-1">
-          <Plus weight="bold" className="size-3" /> New User
+          <Plus weight="bold" className="size-3" /> {en.admin.users.new}
         </Button>
       </DialogTrigger>
       <DialogContent className="border-neutral-800 bg-neutral-950">
         <DialogHeader>
-          <DialogTitle className="text-sm">Create User</DialogTitle>
+          <DialogTitle className="text-sm">{en.admin.users.dialog.title}</DialogTitle>
         </DialogHeader>
         <FieldGroup>
           <Field>
-            <FieldLabel>Username</FieldLabel>
-            <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="username" />
+            <FieldLabel>{en.admin.users.dialog.username}</FieldLabel>
+            <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder={en.login.placeholders.username} />
           </Field>
           <Field>
-            <FieldLabel>Email</FieldLabel>
-            <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email" />
+            <FieldLabel>{en.admin.users.dialog.email}</FieldLabel>
+            <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder={en.admin.users.dialog.emailPlaceholder} />
           </Field>
           <Field>
-            <FieldLabel>Password</FieldLabel>
-            <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="********" />
+            <FieldLabel>{en.admin.users.dialog.password}</FieldLabel>
+            <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder={en.login.placeholders.password} />
           </Field>
           <Field>
-            <FieldLabel>Role</FieldLabel>
+            <FieldLabel>{en.admin.users.dialog.role}</FieldLabel>
             <Select value={role} onValueChange={(value) => setRole(value as "admin" | "student")}>
               <SelectTrigger>
-                <SelectValue placeholder="Role" />
+                <SelectValue placeholder={en.admin.users.dialog.role} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="student">Student</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="student">{en.admin.users.dialog.roleStudent}</SelectItem>
+                <SelectItem value="admin">{en.admin.users.dialog.roleAdmin}</SelectItem>
               </SelectContent>
             </Select>
           </Field>
@@ -392,11 +423,11 @@ function CreateUserDialog({ onCreate }: { onCreate: (payload: { username: string
           <Button
             onClick={async () => {
               await onCreate({ username, email: email || undefined, password, role });
-              toast.success("User created");
+              toast.success(en.admin.toasts.userCreated);
               setOpen(false);
             }}
           >
-            Create
+            {en.admin.users.dialog.create}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -407,37 +438,54 @@ function CreateUserDialog({ onCreate }: { onCreate: (payload: { username: string
 function CreateAssignmentDialog({
   tests,
   users,
+  groups,
   type,
   onCreate,
 }: {
   tests: TestSummary[];
   users: ApiUser[];
+  groups: Group[];
   type: "task" | "homework";
   onCreate: (payload: { type: "task" | "homework"; testId: string; sectionKinds: ("listening" | "reading")[]; assignedTo: string; dueAt?: string | null }) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [testId, setTestId] = useState("");
+  const [assignMode, setAssignMode] = useState<"student" | "group">("student");
   const [assignedTo, setAssignedTo] = useState("");
   const [sectionKinds, setSectionKinds] = useState<("listening" | "reading")[]>(["listening", "reading"]);
-  const [dueAt, setDueAt] = useState("");
+  const [dueDate, setDueDate] = useState<Date>();
+  const [dueTime, setDueTime] = useState("23:59");
+  const students = users.filter((user) => user.role === "student");
+
+  const handleCreate = async () => {
+    const dueAt = buildDueAt(dueDate, dueTime);
+    if (assignMode === "group") {
+      const res = await adminAssignToGroup(assignedTo, { type, testId, sectionKinds, dueAt: dueAt ? new Date(dueAt).toISOString() : null });
+      toast.success(en.admin.toasts.assignedToCount(res.count));
+      setOpen(false);
+    } else {
+      await onCreate({ type, testId, sectionKinds, assignedTo, dueAt: dueAt ? new Date(dueAt).toISOString() : null });
+      setOpen(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm" className="gap-1">
-          <Plus weight="bold" className="size-3" /> New Homework
+          <Plus weight="bold" className="size-3" /> {en.admin.assignments.new}
         </Button>
       </DialogTrigger>
       <DialogContent className="border-neutral-800 bg-neutral-950">
         <DialogHeader>
-          <DialogTitle className="text-sm">Create Homework</DialogTitle>
+          <DialogTitle className="text-sm">{en.admin.assignments.createTitle}</DialogTitle>
         </DialogHeader>
         <FieldGroup>
           <Field>
-            <FieldLabel>Test</FieldLabel>
+            <FieldLabel>{en.admin.assignments.test}</FieldLabel>
             <Select value={testId} onValueChange={setTestId}>
               <SelectTrigger>
-                <SelectValue placeholder="Select test" />
+                <SelectValue placeholder={en.admin.assignments.selectTest} />
               </SelectTrigger>
               <SelectContent>
                 {tests.map((test) => (
@@ -447,52 +495,132 @@ function CreateAssignmentDialog({
             </Select>
           </Field>
           <Field>
-            <FieldLabel>Sections</FieldLabel>
+            <FieldLabel>{en.admin.assignments.sections}</FieldLabel>
             <Select
               value={sectionKinds.join(",")}
               onValueChange={(value) => setSectionKinds(value.split(",") as ("listening" | "reading")[])}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select sections" />
+                <SelectValue placeholder={en.admin.assignments.selectSections} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="listening">Listening</SelectItem>
-                <SelectItem value="reading">Reading</SelectItem>
-                <SelectItem value="listening,reading">Listening + Reading</SelectItem>
+                <SelectItem value="listening">{en.admin.assignments.listening}</SelectItem>
+                <SelectItem value="reading">{en.admin.assignments.reading}</SelectItem>
+                <SelectItem value="listening,reading">{en.admin.assignments.listeningReading}</SelectItem>
               </SelectContent>
             </Select>
           </Field>
           <Field>
-            <FieldLabel>Assign To</FieldLabel>
-            <Select value={assignedTo} onValueChange={setAssignedTo}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select student" />
-              </SelectTrigger>
-              <SelectContent>
-                {users.filter((user) => user.role === "student").map((user) => (
-                  <SelectItem key={user.id} value={user.id}>{user.username}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <FieldLabel>{en.admin.assignments.assignTo}</FieldLabel>
+            <Tabs value={assignMode} onValueChange={(v) => { setAssignMode(v as "student" | "group"); setAssignedTo(""); }} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-2">
+                <TabsTrigger value="student">{en.admin.assignTo.student}</TabsTrigger>
+                <TabsTrigger value="group">{en.admin.assignTo.group}</TabsTrigger>
+              </TabsList>
+              <TabsContent value="student" className="mt-0">
+                <AssignToSelect students={students} value={assignedTo} onChange={setAssignedTo} />
+              </TabsContent>
+              <TabsContent value="group" className="mt-0">
+                <AssignToGroupSelect groups={groups} value={assignedTo} onChange={setAssignedTo} />
+              </TabsContent>
+            </Tabs>
           </Field>
           <Field>
-            <FieldLabel>Due Date (optional)</FieldLabel>
-            <Input value={dueAt} onChange={(e) => setDueAt(e.target.value)} type="date" />
+            <FieldLabel>{en.admin.assignments.due}</FieldLabel>
+            <div className="flex flex-col gap-2 md:flex-row md:items-start">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-40 justify-between border-neutral-700 bg-neutral-900 font-normal text-xs">
+                    {formatDateLabel(dueDate)}
+                    <CaretDown className="size-3 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0 border-neutral-700 bg-neutral-900" align="start">
+                  <div className="w-full">
+                    <Calendar mode="single" selected={dueDate} onSelect={setDueDate} captionLayout="label" className="w-full [--cell-size:1.5rem]" />
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <Input
+                type="time"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+                className="w-28"
+              />
+            </div>
           </Field>
         </FieldGroup>
         <DialogFooter>
           <Button
-            onClick={async () => {
-              await onCreate({ type, testId, sectionKinds, assignedTo, dueAt: dueAt || null });
-              setOpen(false);
-            }}
+            onClick={handleCreate}
             disabled={!testId || !assignedTo || sectionKinds.length === 0}
           >
-            Create
+            {en.admin.assignments.create}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function AssignToGroupSelect({ groups, value, onChange }: { groups: Group[]; value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const selected = groups.find((g) => g.id === value);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" className="w-full justify-between font-normal border-neutral-700 bg-neutral-900">
+          {selected ? selected.name : en.admin.assignTo.selectGroup}
+          <CaretDown className="size-3 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-full p-0 border-neutral-700 bg-neutral-900" align="start">
+        <Command className="bg-neutral-900">
+          <CommandInput placeholder={en.admin.assignTo.searchGroup} className="h-8 text-xs" />
+          <CommandList className="max-h-60">
+            <CommandEmpty className="text-xs py-3 text-center px-2">{en.admin.assignTo.noGroup}</CommandEmpty>
+            <CommandGroup>
+              {groups.map((g) => (
+                <CommandItem key={g.id} value={g.name} className="text-xs flex items-center justify-between" onSelect={() => { onChange(g.id); setOpen(false); }}>
+                  <span>{g.name}</span>
+                  <span className="text-muted-foreground">({g.members.length})</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function AssignToSelect({ students, value, onChange }: { students: ApiUser[]; value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const selected = students.find((s) => s.id === value);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" className="w-full justify-between font-normal border-neutral-700 bg-neutral-900">
+          {selected ? selected.username : en.admin.assignTo.selectStudent}
+          <CaretDown className="size-3 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-full p-0 border-neutral-700 bg-neutral-900" align="start">
+        <Command className="bg-neutral-900">
+          <CommandInput placeholder={en.admin.assignTo.searchStudent} className="h-8 text-xs" />
+          <CommandList className="max-h-60">
+            <CommandEmpty className="text-xs py-3 text-center px-2">{en.admin.assignTo.noStudent}</CommandEmpty>
+            <CommandGroup>
+              {students.map((s) => (
+                <CommandItem key={s.id} value={s.username} className="text-xs" onSelect={() => { onChange(s.id); setOpen(false); }}>
+                  {s.username}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -516,12 +644,12 @@ function GroupsPanel({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">{groups.length} group{groups.length !== 1 ? "s" : ""}</span>
+        <span className="text-xs text-muted-foreground">{en.admin.groups.members(groups.length)}</span>
         <CreateGroupDialog
           onCreate={async (name) => {
             const res = await adminCreateGroup(name);
             onGroupCreated({ id: res.group.id, name: res.group.name, createdAt: new Date().toISOString(), members: [] });
-            toast.success("Group created");
+            toast.success(en.admin.groups.created);
           }}
         />
       </div>
@@ -529,7 +657,7 @@ function GroupsPanel({
         <Card className="border-neutral-800 bg-neutral-900">
           <CardContent className="px-4 py-8 flex flex-col items-center gap-2 text-xs text-muted-foreground">
             <Users className="size-6 mb-1" />
-            No groups yet. Create one to get started.
+            {en.admin.groups.empty}
           </CardContent>
         </Card>
       ) : (
@@ -542,7 +670,7 @@ function GroupsPanel({
             onDelete={async () => {
               await adminDeleteGroup(group.id);
               onGroupDeleted(group.id);
-              toast.success("Group deleted");
+              toast.success(en.admin.groups.delete);
             }}
             onAddMember={async (userId) => {
               await adminAddGroupMember(group.id, userId);
@@ -584,7 +712,7 @@ function GroupCard({
           <Users weight="bold" className="size-3.5 text-muted-foreground" />
           <CardTitle className="text-xs font-semibold">{group.name}</CardTitle>
           <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-neutral-700 text-muted-foreground">
-            {group.members.length} member{group.members.length !== 1 ? "s" : ""}
+            {en.admin.groups.members(group.members.length)}
           </Badge>
         </div>
         <div className="flex items-center gap-2">
@@ -626,14 +754,14 @@ function AddMemberSelect({ nonMembers, onAdd }: { nonMembers: ApiUser[]; onAdd: 
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="h-7 text-xs border-neutral-700 bg-neutral-800 w-56 justify-start font-normal">
-          <Plus weight="bold" className="size-3 mr-1 shrink-0" /> Add student…
+          <Plus weight="bold" className="size-3 mr-1 shrink-0" /> {en.admin.groups.addStudent}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-56 p-0 border-neutral-700 bg-neutral-900" align="start">
         <Command className="bg-neutral-900">
-          <CommandInput placeholder="Search…" className="h-7 py-1 text-xs" />
+          <CommandInput placeholder={en.admin.groups.search} className="h-7 py-1 text-xs" />
           <CommandList className="max-h-48">
-            <CommandEmpty className="text-xs py-3 text-center px-2">No students found.</CommandEmpty>
+            <CommandEmpty className="text-xs py-3 text-center px-2">{en.admin.groups.noStudents}</CommandEmpty>
             <CommandGroup>
               {nonMembers.map((u) => (
                 <CommandItem
@@ -660,20 +788,20 @@ function CreateGroupDialog({ onCreate }: { onCreate: (name: string) => Promise<v
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm" className="gap-1">
-          <Plus weight="bold" className="size-3" /> New Group
+          <Plus weight="bold" className="size-3" /> {en.admin.groups.new}
         </Button>
       </DialogTrigger>
       <DialogContent className="border-neutral-800 bg-neutral-950">
         <DialogHeader>
-          <DialogTitle className="text-sm">Create Group</DialogTitle>
+          <DialogTitle className="text-sm">{en.admin.groups.createTitle}</DialogTitle>
         </DialogHeader>
         <Field>
-          <FieldLabel>Group Name</FieldLabel>
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Morning Class" />
+          <FieldLabel>{en.admin.groups.groupName}</FieldLabel>
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={en.admin.groups.groupNamePlaceholder} />
         </Field>
         <DialogFooter>
           <Button disabled={!name.trim()} onClick={async () => { await onCreate(name.trim()); setName(""); setOpen(false); }}>
-            Create
+            {en.admin.groups.create}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -685,58 +813,105 @@ function AssignGroupHomeworkDialog({ group, tests }: { group: Group; tests: Test
   const [open, setOpen] = useState(false);
   const [testId, setTestId] = useState("");
   const [sectionKinds, setSectionKinds] = useState<("listening" | "reading")[]>(["listening", "reading"]);
-  const [dueAt, setDueAt] = useState("");
+  const [dueDate, setDueDate] = useState<Date>();
+  const [dueTime, setDueTime] = useState("23:59");
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm" variant="outline" className="h-7 text-xs gap-1 border-neutral-700">
-          <Plus weight="bold" className="size-3" /> Assign Homework
+          <Plus weight="bold" className="size-3" /> {en.admin.groups.assignHomework}
         </Button>
       </DialogTrigger>
       <DialogContent className="border-neutral-800 bg-neutral-950">
         <DialogHeader>
-          <DialogTitle className="text-sm">Assign Homework to {group.name}</DialogTitle>
+          <DialogTitle className="text-sm">{en.admin.groups.assignTitle(group.name)}</DialogTitle>
         </DialogHeader>
         <FieldGroup>
           <Field>
-            <FieldLabel>Test</FieldLabel>
-            <Select value={testId} onValueChange={setTestId}>
-              <SelectTrigger><SelectValue placeholder="Select test" /></SelectTrigger>
-              <SelectContent>
-                {tests.map((t) => <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <FieldLabel>{en.admin.assignments.test}</FieldLabel>
+            <TestSelect tests={tests} value={testId} onChange={setTestId} />
           </Field>
           <Field>
-            <FieldLabel>Sections</FieldLabel>
+            <FieldLabel>{en.admin.assignments.sections}</FieldLabel>
             <Select value={sectionKinds.join(",")} onValueChange={(v) => setSectionKinds(v.split(",") as ("listening" | "reading")[])}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="listening">Listening</SelectItem>
-                <SelectItem value="reading">Reading</SelectItem>
-                <SelectItem value="listening,reading">Listening + Reading</SelectItem>
+                <SelectItem value="listening">{en.admin.assignments.listening}</SelectItem>
+                <SelectItem value="reading">{en.admin.assignments.reading}</SelectItem>
+                <SelectItem value="listening,reading">{en.admin.assignments.listeningReading}</SelectItem>
               </SelectContent>
             </Select>
           </Field>
           <Field>
-            <FieldLabel>Due Date (optional)</FieldLabel>
-            <Input value={dueAt} onChange={(e) => setDueAt(e.target.value)} type="date" />
+            <FieldLabel>{en.admin.assignments.due}</FieldLabel>
+            <div className="flex flex-col gap-2 md:flex-row md:items-start">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-40 justify-between border-neutral-700 bg-neutral-900 font-normal text-xs">
+                    {formatDateLabel(dueDate)}
+                    <CaretDown className="size-3 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0 border-neutral-700 bg-neutral-900" align="start">
+                  <div className="w-full">
+                    <Calendar mode="single" selected={dueDate} onSelect={setDueDate} captionLayout="label" className="w-full [--cell-size:1.85rem] md:[--cell-size:2.2rem]"/>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <Input
+                type="time"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+                className="w-28"
+              />
+            </div>
           </Field>
         </FieldGroup>
         <DialogFooter>
           <Button
             disabled={!testId || group.members.length === 0}
             onClick={async () => {
+              const dueAt = buildDueAt(dueDate, dueTime);
               const res = await adminAssignToGroup(group.id, { type: "homework", testId, sectionKinds, dueAt: dueAt ? new Date(dueAt).toISOString() : null });
-              toast.success(`Assigned to ${res.count} student${res.count !== 1 ? "s" : ""}`);
+              toast.success(en.admin.toasts.assignedToCount(res.count));
               setOpen(false);
             }}
           >
-            Assign to {group.members.length} student{group.members.length !== 1 ? "s" : ""}
+            {en.admin.groups.assignToCount(group.members.length)}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function TestSelect({ tests, value, onChange }: { tests: TestSummary[]; value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const selected = tests.find((t) => t.id === value);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" className="w-full justify-between font-normal border-neutral-700 bg-neutral-900">
+          {selected ? selected.title : en.admin.assignments.selectTest}
+          <CaretDown className="size-3 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-full p-0 border-neutral-700 bg-neutral-900" align="start">
+        <Command className="bg-neutral-900">
+          <CommandInput placeholder={en.admin.assignments.searchTest} className="h-8 text-xs" />
+          <CommandList className="max-h-60">
+            <CommandEmpty className="text-xs py-3 text-center px-2">{en.admin.assignments.noTest}</CommandEmpty>
+            <CommandGroup>
+              {tests.map((t) => (
+                <CommandItem key={t.id} value={t.title} className="text-xs" onSelect={() => { onChange(t.id); setOpen(false); }}>
+                  {t.title}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

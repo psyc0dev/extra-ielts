@@ -1,6 +1,6 @@
 import type { Hono } from 'hono'
 import type { AppEnv, Role } from '../lib/types'
-import { updateTestPublished } from '../lib/tests'
+import { getTestById, getTests, updateTestPublished } from '../lib/tests'
 import {
   commit,
   createPasswordHash,
@@ -9,7 +9,6 @@ import {
   parseJson,
   requireAdmin,
   requireAuth,
-  setTests,
   store,
   toApiUser,
   toTestSummary,
@@ -59,7 +58,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
   })
 
   api.get('/admin/tests', requireAuth, requireAdmin, (c) => {
-    const tests = store.tests.map((test) => toTestSummary(test, null, true))
+    const tests = getTests().map((test) => toTestSummary(test, null, true))
     return c.json({ tests })
   })
 
@@ -75,7 +74,6 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
       return c.json({ error: 'Test not found.' }, 404)
     }
 
-    setTests(updated)
     return c.json({ ok: true })
   })
 
@@ -122,7 +120,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
       return c.json({ error: 'Invalid assignment type.' }, 400)
     }
 
-    const test = store.tests.find((candidate) => candidate.id === body.testId)
+    const test = getTestById(body.testId)
     if (!test) {
       return c.json({ error: 'Test not found.' }, 404)
     }
@@ -258,7 +256,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
       return c.json({ error: 'Invalid assignment type.' }, 400)
     }
 
-    const test = store.tests.find((candidate) => candidate.id === body.testId)
+    const test = getTestById(body.testId)
     if (!test) {
       return c.json({ error: 'Test not found.' }, 404)
     }

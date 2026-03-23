@@ -43,7 +43,7 @@ export function LoginForm({
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <div className="flex flex-col items-center gap-2 text-center">
-        <img src={logo} alt="logo" className="w-10 h-10 rounded-xl mb-1" />
+        <img src={logo} alt={en.login.logoAlt} className="w-10 h-10 rounded-xl mb-1" />
         <h1 className="text-xl font-bold">{mode === "bootstrap" ? en.login.bootstrapTitle : en.login.title}</h1>
         <p className="text-sm text-muted-foreground">
           {mode === "bootstrap" ? en.login.bootstrapSubtitle : en.login.subtitle}
@@ -64,7 +64,7 @@ export function LoginForm({
             <Input
               id="identifier"
               type="text"
-              placeholder="username"
+              placeholder={en.login.placeholders.username}
               autoComplete="off"
               value={identifier}
               onChange={e => setIdentifier(e.target.value)}
@@ -77,7 +77,7 @@ export function LoginForm({
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@example.com"
+                placeholder={en.login.placeholders.adminEmail}
                 autoComplete="off"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
@@ -89,7 +89,7 @@ export function LoginForm({
             <Input
               id="password"
               type="password"
-              placeholder="********"
+              placeholder={en.login.placeholders.password}
               autoComplete="new-password"
               value={password}
               onChange={e => setPassword(e.target.value)}
@@ -107,9 +107,9 @@ export function LoginForm({
         </FieldGroup>
       </form>
       <p className="text-center text-xs text-muted-foreground">
-        By clicking continue, you agree to our{" "}
-        <a href="#" className="underline underline-offset-4 hover:text-primary">Terms of Service</a><br />
-        and <a href="#" className="underline underline-offset-4 hover:text-primary">Privacy Policy</a>.
+        {en.login.terms.prefix}{" "}
+        <a href="#" className="underline underline-offset-4 hover:text-primary">{en.login.terms.terms}</a><br />
+        {en.login.terms.and} <a href="#" className="underline underline-offset-4 hover:text-primary">{en.login.terms.privacy}</a>.
       </p>
     </div>
   )

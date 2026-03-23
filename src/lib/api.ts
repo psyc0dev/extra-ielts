@@ -40,9 +40,10 @@ export type TestDetail = {
     durationMinutes?: number;
     audioUrl?: string | null;
     passage?: string | null;
+    passageTitle?: string | null;
     questions: {
       id: string;
-      type: "mcq" | "short" | "essay" | "fill-blank" | "true-false-notgiven" | "yes-no-notgiven" | "match-headings" | "matching" | "sentence-completion" | "note-completion" | "table-completion" | "diagram-labelling";
+      type: "mcq" | "short" | "true-false-notgiven" | "yes-no-notgiven" | "match-headings" | "matching" | "sentence-completion" | "note-completion" | "table-completion" | "diagram-labelling" | "form-completion" | "flowchart-completion" | "map-labelling" | "multiple-choice-multiple" | "summary-completion" | "matching-paragraph-information" | "matching-features" | "matching-sentence-endings" | "choose-title";
       prompt: string;
       options?: string[] | null;
       items?: string[] | null;
@@ -91,8 +92,6 @@ export type AssignmentAttemptDetail = {
     listeningBand: number | null;
     startedAt: string;
     completedAt: string | null;
-    listeningStartedAt?: string | null;
-    readingStartedAt?: string | null;
   };
   test: TestDetail;
   responses: Record<string, string | null>;
@@ -229,15 +228,6 @@ export async function saveAnswer(attemptId: string, questionId: string, response
   });
 }
 
-export async function startSection(attemptId: string, kind: "listening" | "reading") {
-  return apiFetch<{ ok: boolean; listeningStartedAt?: string; readingStartedAt?: string }>(
-    `/assignments/attempts/${attemptId}/start-section`,
-    {
-      method: "POST",
-      body: JSON.stringify({ kind }),
-    }
-  );
-}
 
 export async function submitAttempt(attemptId: string) {
   return apiFetch<{ attempt: { id: string; status: string; scoreTotal: number; band: number | null } }>(

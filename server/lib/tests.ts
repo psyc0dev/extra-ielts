@@ -70,6 +70,14 @@ export const loadTestsFromDisk = () => {
 
 export const getTestsCache = () => testsCache
 
+export const getTests = () => (testsCache.length ? testsCache : loadTestsFromDisk())
+
+export const getTestById = (testId: string) => getTests().find((test) => test.id == testId) ?? null
+
+export const setTestsCache = (tests: TestDetail[]) => {
+  testsCache = tests.map(normalizeTest)
+}
+
 export const updateTestPublished = (testId: string, published: boolean) => {
   const source = testSources.get(testId)
   if (!source) return null

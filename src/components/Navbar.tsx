@@ -36,7 +36,7 @@ export default function Navbar() {
       <SidebarHeader className="flex flex-row items-center h-9 px-3 py-0 gap-2">
         <img src={logo} alt="logo" className="w-5 h-5 rounded-sm shrink-0" />
         {state === "expanded" && (
-          <span className="text-xs font-medium text-neutral-400">extra</span>
+          <span className="text-xs font-medium text-neutral-400">{en.nav.brand}</span>
         )}
       </SidebarHeader>
 

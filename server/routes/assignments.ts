@@ -1,5 +1,6 @@
 import type { Hono } from 'hono'
 import type { AppEnv } from '../lib/types'
+import { getTestById } from '../lib/tests'
 import {
   commit,
   filterTestForAssignment,
@@ -24,7 +25,7 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
       .filter((assignment) => assignment.assignedTo === user.id)
       .filter((assignment) => !type || assignment.type === type)
       .map((assignment) => {
-        const test = store.tests.find((candidate) => candidate.id === assignment.testId)
+        const test = getTestById(assignment.testId)
         if (!test) return null
         const attempt = getAssignmentAttempt(assignment.id, user.id)
         return toAssignmentSummary(assignment, test, attempt)
@@ -81,7 +82,7 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
     }
 
     const assignment = store.assignments.find((candidate) => candidate.id === attempt.assignmentId)
-    const test = store.tests.find((candidate) => candidate.id === attempt.testId)
+    const test = getTestById(attempt.testId)
     if (!assignment || !test) {
       return c.json({ error: 'Attempt data is missing.' }, 404)
     }
@@ -104,8 +105,6 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
         listeningBand: attempt.listeningBand,
         startedAt: attempt.startedAt,
         completedAt: attempt.completedAt,
-        listeningStartedAt: attempt.listeningStartedAt,
-        readingStartedAt: attempt.readingStartedAt,
       },
       test: filterTestForAssignment(test, assignment.sectionKinds),
       responses: attempt.responses,
@@ -135,41 +134,6 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
     commit()
     return c.json({ ok: true })
   })
-  
-  api.post('/assignments/attempts/:attemptId/start-section', requireAuth, async (c) => {
-    const user = c.get('user')
-    const attemptId = c.req.param('attemptId')
-    const attempt = store.attempts.find((candidate) => candidate.id === attemptId)
-    if (!attempt) {
-      return c.json({ error: 'Attempt not found.' }, 404)
-    }
-    if (attempt.userId !== user.id && user.role !== 'admin') {
-      return c.json({ error: 'Forbidden' }, 403)
-    }
-    
-    const body = await parseJson<{ kind: 'listening' | 'reading' }>(c)
-    if (!body?.kind) {
-      return c.json({ error: 'Section kind is required.' }, 400)
-    }
-    
-    if (body.kind === 'listening') {
-      if (!attempt.listeningStartedAt) {
-        attempt.listeningStartedAt = nowIso()
-        commit()
-      }
-    } else if (body.kind === 'reading') {
-      if (!attempt.readingStartedAt) {
-        attempt.readingStartedAt = nowIso()
-        commit()
-      }
-    }
-    
-    return c.json({ 
-      ok: true, 
-      listeningStartedAt: attempt.listeningStartedAt,
-      readingStartedAt: attempt.readingStartedAt
-    })
-  })
 
   api.post('/assignments/attempts/:attemptId/submit', requireAuth, (c) => {
     const user = c.get('user')
@@ -193,7 +157,7 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
       })
     }
 
-    const test = store.tests.find((candidate) => candidate.id === attempt.testId)
+    const test = getTestById(attempt.testId)
     if (!test) {
       return c.json({ error: 'Test not found.' }, 404)
     }
@@ -220,7 +184,7 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
   api.post('/assignments/tests/:testId/start', requireAuth, (c) => {
     const user = c.get('user')
     const testId = c.req.param('testId')
-    const test = store.tests.find((candidate) => candidate.id === testId)
+    const test = getTestById(testId)
     if (!test) {
       return c.json({ error: 'Test not found.' }, 404)
     }

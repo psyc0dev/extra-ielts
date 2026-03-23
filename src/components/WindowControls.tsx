@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useContext } from "react";
 import { getCurrentWindow, type Window } from "@tauri-apps/api/window";
 import { NavContext } from "@/hooks/use-nav";
 import { forceSubmitAttempt } from "@/lib/api";
+import { Minus, Square, Minimize2, X } from "lucide-react";
+import en from "@/locales/en";
 
 export default function WindowControls({ onFullscreen }: { onFullscreen?: (v: boolean) => void }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -16,52 +18,56 @@ export default function WindowControls({ onFullscreen }: { onFullscreen?: (v: bo
   }, [activeAttemptId]);
 
   useEffect(() => {
-    const appWindow = getCurrentWindow();
-    windowRef.current = appWindow;
+    let appWindow: Window | null = null;
+    let unlistenResize: (() => void) | null = null;
+    let unlistenClose: (() => void) | null = null;
 
-    appWindow.isFullscreen().then(setIsFullscreen);
+    const init = async () => {
+      appWindow = getCurrentWindow();
+      windowRef.current = appWindow;
 
-    const unlistenResize = appWindow.onResized(async () => {
       setIsFullscreen(await appWindow.isFullscreen());
-    });
 
-    const unlistenClose = appWindow.onCloseRequested(async (e) => {
-      const attemptId = attemptRef.current;
-      if (attemptId) {
-        e.preventDefault();
-        forceSubmitAttempt(attemptId);
-        // give the keepalive fetch a moment to fire
-        await new Promise(r => setTimeout(r, 300));
-        await appWindow.destroy();
-      }
-    });
+      unlistenResize = await appWindow.onResized(async () => {
+        setIsFullscreen(await appWindow!.isFullscreen());
+      });
+
+      unlistenClose = await appWindow.onCloseRequested(async (e) => {
+        const attemptId = attemptRef.current;
+        if (attemptId) {
+          e.preventDefault();
+          forceSubmitAttempt(attemptId);
+          await new Promise(r => setTimeout(r, 300));
+          await appWindow!.destroy();
+        }
+      });
+    };
+
+    init().catch(console.error);
 
     return () => {
-      unlistenResize.then(fn => fn());
-      unlistenClose.then(fn => fn());
+      unlistenResize?.();
+      unlistenClose?.();
     };
   }, []);
 
   const appWindow = windowRef.current;
 
   return (
-    <div className="flex items-center gap-2 group/controls">
-      <button onClick={() => appWindow?.minimize()} className="relative w-3 h-3 rounded-full bg-[#febc2e] hover:brightness-90 transition-all">
-        <svg className="absolute inset-0 m-auto opacity-0 group-hover/controls:opacity-100 transition-opacity" width="6" height="6" viewBox="0 0 6 6">
-          <line x1="1" y1="3" x2="5" y2="3" stroke="#7a4800" strokeWidth="1.25" strokeLinecap="round"/>
-        </svg>
+    <div className="flex self-stretch">
+      <button
+        onClick={() => appWindow?.minimize()}
+        className="w-8 h-full flex items-center justify-center text-foreground/60 hover:bg-white/15 hover:text-foreground transition-all"
+        aria-label={en.windowControls.minimize}
+      >
+        <Minus size={14} strokeWidth={1.5} />
       </button>
       <button
         onClick={async () => { const next = !isFullscreen; await appWindow?.setFullscreen(next); setIsFullscreen(next); onFullscreen?.(next); }}
-        className="relative w-3 h-3 rounded-full bg-[#28c840] hover:brightness-90 transition-all"
+        className="w-8 h-full flex items-center justify-center text-foreground/60 hover:bg-white/15 hover:text-foreground transition-all"
+        aria-label={isFullscreen ? en.windowControls.restore : en.windowControls.maximize}
       >
-        <svg className="absolute inset-0 m-auto opacity-0 group-hover/controls:opacity-100 transition-opacity" width="6" height="6" viewBox="0 0 6 6">
-          {isFullscreen ? (
-            <><line x1="1" y1="5" x2="5" y2="1" stroke="#004d00" strokeWidth="1.25" strokeLinecap="round"/><polyline points="3,5 1,5 1,3" fill="none" stroke="#004d00" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round"/></>
-          ) : (
-            <><line x1="1" y1="5" x2="5" y2="1" stroke="#004d00" strokeWidth="1.25" strokeLinecap="round"/><polyline points="3.2,1 5,1 5,2.8" fill="none" stroke="#004d00" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round"/></>
-          )}
-        </svg>
+        {isFullscreen ? <Minimize2 size={14} strokeWidth={1.5} /> : <Square size={12} strokeWidth={1.5} />}
       </button>
       <button
         onClick={async () => {
@@ -72,13 +78,10 @@ export default function WindowControls({ onFullscreen }: { onFullscreen?: (v: bo
           }
           await appWindow?.destroy();
         }}
-        className="relative w-3 h-3 rounded-full bg-[#ff5f57] hover:brightness-90 transition-all"
-        aria-label={timerActive ? "Close (submitting test)" : "Close"}
+        className="w-8 h-full flex items-center justify-center text-foreground/60 hover:bg-red-600 hover:text-white transition-all"
+        aria-label={timerActive ? en.windowControls.closeSubmitting : en.windowControls.close}
       >
-        <svg className="absolute inset-0 m-auto opacity-0 group-hover/controls:opacity-100 transition-opacity" width="6" height="6" viewBox="0 0 6 6">
-          <line x1="1" y1="1" x2="5" y2="5" stroke="#7a0000" strokeWidth="1.25" strokeLinecap="round"/>
-          <line x1="5" y1="1" x2="1" y2="5" stroke="#7a0000" strokeWidth="1.25" strokeLinecap="round"/>
-        </svg>
+        <X size={14} strokeWidth={1.5} />
       </button>
     </div>
   );
