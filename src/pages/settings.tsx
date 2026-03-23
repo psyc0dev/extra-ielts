@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Gear } from "@phosphor-icons/react";
 import en from "@/locales/en";
-import { LegalDialog } from "@/components/LegalDialog";
+import { LegalDialog } from "@/components/ui/legaldialog";
 import { Button } from "@/components/ui/button";
 
 function Row({ label, description, checked, onChange }: {

@@ -12,7 +12,7 @@ import {
 import WindowControls from "./components/WindowControls";
 import { NavProvider, useNav } from "./hooks/use-nav";
 import { Dashboard, Tests, Homework, Settings, Admin } from "./pages/index";
-import { LoginForm } from "@/components/LoginForm";
+import { LoginForm } from "@/components/ui/loginform";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import Navbar from "./components/Navbar";

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import logo from "../../src-tauri/icons/icon.ico"
 import en from "@/locales/en"
-import { LegalDialog } from "@/components/LegalDialog"
+import { LegalDialog } from "@/components/ui/legaldialog"
 
 export function LoginForm({
   className,
