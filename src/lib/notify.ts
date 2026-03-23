@@ -1,4 +1,4 @@
-import {
+﻿import {
   isPermissionGranted,
   requestPermission,
   sendNotification,

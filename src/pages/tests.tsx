@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +41,7 @@ import {
   type AssignmentAttemptDetail,
   type TestSummary,
 } from "@/lib/api";
-import { ExamRunner } from "@/components/exam-runner";
+import { TestRunner } from "@/components/TestRunner";
 import { toast } from "sonner";
 import en from "@/locales/en";
 
@@ -410,7 +410,7 @@ export function Tests({
       const res = await startTest(test.id);
       const detail = await getAttempt(res.attempt.id);
       setActiveAttempt(detail);
-      // timer starts only when user clicks Start Listening — see onListeningStart below
+      // timer starts only when user clicks Start Listening - see onListeningStart below
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : en.tests.errors.startFailed);
     }
@@ -427,20 +427,20 @@ export function Tests({
           transition={{ duration: 0.2, ease: "easeInOut" }}
           className="h-full"
         >
-          <ExamRunner
+          <TestRunner
             test={activeAttempt.test}
             attemptId={activeAttempt.attempt.id}
             initialResponses={activeAttempt.responses ?? {}}
             readOnly={activeAttempt.attempt.status === "completed"}
             onListeningStart={(sectionDurationMinutes) =>
               onStartTest(
-                en.examRunner.kinds.listening,
+                en.testRunner.kinds.listening,
                 sectionDurationMinutes * 60,
               )
             }
             onReadingStart={(sectionDurationMinutes) =>
               onStartTest(
-                en.examRunner.kinds.reading,
+                en.testRunner.kinds.reading,
                 sectionDurationMinutes * 60,
               )
             }
@@ -466,7 +466,18 @@ export function Tests({
           exit={{ opacity: 0, y: -6 }}
           transition={{ duration: 0.15, ease: "easeInOut" }}
         >
-          <div className="p-5 flex flex-col gap-4">
+          <div className="p-5 flex flex-col gap-4 font-body">
+            <div className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-[linear-gradient(135deg,rgba(6,95,70,0.2),rgba(15,23,42,0.9))] p-4">
+              <div className="absolute inset-0 opacity-50 [background:radial-gradient(circle_at_top_right,rgba(59,130,246,0.2),transparent_55%)]" />
+              <div className="relative flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-col gap-1">
+                  <Badge variant="outline" className="border-emerald-400/40 text-emerald-200 self-start -ml-1.5">{en.tests.hero.badge}</Badge>
+                  <h2 className="text-sm font-display tracking-wide">{en.tests.title}</h2>
+                  <p className="text-xs text-muted-foreground">{en.tests.hero.subtitle}</p>
+                </div>
+                <div className="text-xs text-muted-foreground">{en.tests.summary.progress}: {tests.length ? Math.round((completed / tests.length) * 100) : 0}%</div>
+              </div>
+            </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <BookOpen
@@ -520,7 +531,7 @@ export function Tests({
                   </span>
                   <span className="text-xl font-bold flex items-center gap-1">
                     <Trophy weight="bold" className="size-3.5 text-amber-400" />
-                    {avgBand ?? "-"}
+                    {avgBand ?? en.common.na}
                   </span>
                 </CardContent>
               </Card>

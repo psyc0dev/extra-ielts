@@ -1,4 +1,9 @@
-const en = {
+﻿const en = {
+  common: {
+    na: "—",
+    notAvailable: "n/a",
+  },
+
   nav: {
     dashboard: "Dashboard",
     tests: "Tests",
@@ -6,13 +11,27 @@ const en = {
     admin: "Admin",
     settings: "Settings",
     brand: "extra",
+    logoAlt: "logo",
   },
 
   app: {
     loading: "Loading...",
+    errors: {
+      saveSettingsFailed: "Failed to save settings",
+    },
+    navigation: {
+      blockedTitle: "Test in progress",
+      blockedBody: "Finish or wait for the timer to end before switching pages.",
+    },
   },
 
   dashboard: {
+    hero: {
+      badge: "Live Dashboard",
+      subtitle: "Focused actions pulled from your latest tests and homework keep a single source of truth for the next study session.",
+      latestMission: (label: string) => `Latest mission: ${label}`,
+      summary: (testsDone: number, homeworkAssigned: number) => `${testsDone} tests completed • ${homeworkAssigned} homework assigned`,
+    },
     title: "Dashboard",
     stats: {
       overallBand: "Overall Band",
@@ -26,6 +45,7 @@ const en = {
     },
     skillBreakdown: {
       title: "Skill Breakdown",
+      note: "We are working on writing and speaking tests, thanks!",
       skills: {
         listening: "Listening",
         reading: "Reading",
@@ -38,6 +58,7 @@ const en = {
       urgent: "Urgent",
       upcoming: "Upcoming",
       empty: "No upcoming homework.",
+      duePrefix: (date: string) => `Due ${date}`,
     },
     recentTests: {
       title: "Recent Tests",
@@ -48,6 +69,10 @@ const en = {
   },
 
   tests: {
+    hero: {
+      badge: "Practice Tests",
+      subtitle: "Practice makes perfect. Challenge yourself with these tests.",
+    },
     title: "Tests",
     minutesSuffix: "min",
     filter: {
@@ -63,7 +88,7 @@ const en = {
       progress: "Progress",
     },
     details: {
-      sectionsQuestions: (sections: number, questions: number) => `${sections} sections · ${questions} questions`,
+      sectionsQuestions: (sections: number, questions: number) => `${sections} sections • ${questions} questions`,
       listeningBand: "Listening band",
       readingBand: "Reading band",
       noScore: "No score yet",
@@ -76,7 +101,7 @@ const en = {
         review: "Review your answers and score",
       },
     },
-    bookHeader: (num: string) => `Cambridge IELTS ${num} — Academic`,
+    bookHeader: (num: string) => `Cambridge IELTS ${num} - Academic`,
     noMatch: "No tests match the current filter.",
     loading: "Loading tests...",
     submitted: "Test submitted",
@@ -84,7 +109,7 @@ const en = {
       startFailed: "Failed to start test",
     },
     card: {
-      minDot: (min: number, q: number) => `${min} min · ${q} Q`,
+      minDot: (min: number, q: number) => `${min} min • ${q} Q`,
     },
     actions: {
       start: "Start",
@@ -108,6 +133,11 @@ const en = {
   },
 
   homework: {
+    hero: {
+      badge: "Assignments",
+      subtitle: "Complete assignments before the deadline to track your progress.",
+      totalSuffix: "total",
+    },
     title: "Homework",
     minutesSuffix: "min",
     filter: {
@@ -134,11 +164,17 @@ const en = {
     sectionsLabel: "Sections",
     dueLabel: "due",
     pastDueMessage: "The due date for this assignment has passed. You can no longer start or continue it.",
-    scoreEmpty: "—",
+    scoreEmpty: "-",
     steps: "Steps",
     due: {
-      tomorrow: "Due tomorrow — don't forget!",
+      tomorrow: "Due tomorrow - don't forget!",
       daysLeft: (n: number) => `${n} days remaining`,
+    },
+    dueStates: {
+      today: "Due today",
+      tomorrow: "Due tomorrow",
+      soon: "Due soon",
+      thisWeek: "Due this week",
     },
   },
 
@@ -146,6 +182,7 @@ const en = {
     sections: {
       account: "Account",
       notifications: "Notifications",
+      legal: "Legal",
       dangerZone: "Danger Zone",
     },
     account: {
@@ -182,6 +219,15 @@ const en = {
       timerWarning: "Timer Warning",
       timerWarningSub: "Alert when 5 minutes remain in a test",
     },
+    legal: {
+      terms: "Terms of Service",
+      termsSub: "How the platform can be used",
+      privacy: "Privacy Policy",
+      privacySub: "How we collect and handle data",
+      policy: "Usage Policy",
+      policySub: "Academic integrity and acceptable use",
+      open: "Open",
+    },
     danger: {
       deleteAccount: "Delete account",
       deleteAccountSub: "Permanently delete your account and all data",
@@ -214,13 +260,49 @@ const en = {
     placeholders: {
       username: "username",
       adminEmail: "admin@example.com",
-      password: "• • • • • • • •",
+      password: "••••••••",
     },
     terms: {
-      prefix: "By clicking continue, you agree to our",
+      prefix: "By continuing, you agree to our",
       terms: "Terms of Service",
+      separator: ", ",
       and: "and",
       privacy: "Privacy Policy",
+      policy: "Usage Policy",
+    },
+  },
+
+  legal: {
+    updatedLabel: "Last updated:",
+    terms: {
+      title: "Terms of Service",
+      updated: "March 23, 2026",
+      body: [
+        "These Terms of Service govern your use of the extra IELTS System. By accessing the platform, you agree to comply with these terms.",
+        "You are responsible for maintaining the confidentiality of your account and for all activities that occur under your account.",
+        "You may not use the platform to disrupt exams, attempt to bypass safeguards, or interfere with other users' access.",
+        "We may suspend or terminate access if we reasonably believe the account is used in violation of these terms or applicable law.",
+      ],
+    },
+    privacy: {
+      title: "Privacy Policy",
+      updated: "March 23, 2026",
+      body: [
+        "We collect only the data required to provide test delivery, scoring, and account management features.",
+        "This may include profile details, test results, homework submissions, and device/session metadata.",
+        "We do not sell personal information. Data is shared only with authorized staff and service providers who help operate the platform.",
+        "You can request access to or deletion of your data by contacting your administrator.",
+      ],
+    },
+    policy: {
+      title: "Usage Policy",
+      updated: "March 23, 2026",
+      body: [
+        "All tests and homework are for legitimate study and assessment purposes only.",
+        "Do not share test content, solutions, or recordings outside your authorized classroom or institution.",
+        "Automated scraping, account sharing, and impersonation are prohibited.",
+        "Violations of this policy may lead to account restrictions or removal from the platform.",
+      ],
     },
   },
 
@@ -232,7 +314,7 @@ const en = {
     listeningName: "Listening",
   },
 
-  examRunner: {
+  testRunner: {
     progress: "Progress",
     answered: (a: number, t: number) => `${a}/${t} answered`,
     submitTest: "Submit Test",
@@ -267,7 +349,7 @@ const en = {
       startingIn: (s: number) => `Starting in ${s}s`,
       playing: "Playing...",
       done: "Done",
-      audioUnavailable: "Audio unavailable,",
+      audioUnavailable: "Audio unavailable, please try again later",
       prepTime: (s: number) => `Preparation time: ${s}s remaining`,
       inProgress: "Listening in progress - answer the questions",
       finished: "Audio finished",
@@ -330,8 +412,35 @@ const en = {
   },
 
   admin: {
+    errors: {
+      updateFailed: "Failed to update",
+    },
     title: "Admin Dashboard",
     subtitle: "Manage tests and homework.",
+    panel: {
+      badge: "Control Center",
+      title: "Admin Panel",
+      subtitle: "Full control over users, tests, and assignments.",
+      note: "Changes here affect all students instantly. Use with care.",
+    },
+    sections: {
+      overview: "Overview",
+      overviewSub: "Key totals across the platform",
+      users: "Users",
+      usersSub: "Create, review, and audit accounts",
+      tests: "Tests",
+      testsSub: "Publish and maintain test library",
+      assignments: "Assignments",
+      assignmentsSub: "Assign work and track due dates",
+      groups: "Groups",
+      groupsSub: "Manage cohorts and shared homework",
+    },
+    overview: {
+      users: "Total users",
+      tests: "Active tests",
+      assignments: "Homework assigned",
+      groups: "Groups",
+    },
     tabs: {
       users: "Users",
       tests: "Tests",
@@ -341,6 +450,7 @@ const en = {
     users: {
       title: "Users",
       new: "New User",
+      search: "Search users...",
       table: {
         username: "Username",
         email: "Email",
@@ -358,8 +468,12 @@ const en = {
         create: "Create",
       },
     },
-    tests: {
-      title: "Tests",
+      tests: {
+    hero: {
+      badge: "Practice Tests",
+      subtitle: "Practice makes perfect. Challenge yourself with these tests.",
+    },
+    title: "Tests",
       minutesSuffix: "min",
       table: {
         title: "Title",
@@ -368,6 +482,7 @@ const en = {
         status: "Status",
         published: "Published",
       },
+      search: "Search tests...",
       status: {
         published: "Published",
         draft: "Draft",
@@ -384,6 +499,7 @@ const en = {
       create: "Create",
       searchTest: "Search test...",
       noTest: "No test found.",
+      search: "Search assignments...",
       table: {
         test: "Test",
         sections: "Sections",
@@ -443,3 +559,14 @@ const en = {
 } as const;
 
 export default en;
+
+
+
+
+
+
+
+
+
+
+

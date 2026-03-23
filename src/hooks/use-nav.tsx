@@ -1,5 +1,6 @@
 import { createContext, useContext, useState } from "react";
 import { toast } from "sonner";
+import en from "@/locales/en";
 
 type Page = "Dashboard" | "Tests" | "Homework" | "Settings" | "Admin";
 
@@ -22,7 +23,9 @@ export function NavProvider({ children }: { children: React.ReactNode }) {
 
   const setPage = (p: Page, id?: string) => {
     if (timerActive) {
-      toast.warning("Test in progress", { description: "Finish or wait for the timer to end before switching pages." });
+      toast.warning(en.app.navigation.blockedTitle, {
+        description: en.app.navigation.blockedBody,
+      });
       return;
     }
     setPendingId(id ?? null);
@@ -30,7 +33,18 @@ export function NavProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <NavContext.Provider value={{ page, setPage, pendingId, clearPendingId: () => setPendingId(null), timerActive, setTimerActive, activeAttemptId, setActiveAttemptId }}>
+    <NavContext.Provider
+      value={{
+        page,
+        setPage,
+        pendingId,
+        clearPendingId: () => setPendingId(null),
+        timerActive,
+        setTimerActive,
+        activeAttemptId,
+        setActiveAttemptId,
+      }}
+    >
       {children}
     </NavContext.Provider>
   );

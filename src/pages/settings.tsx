@@ -21,6 +21,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Gear } from "@phosphor-icons/react";
 import en from "@/locales/en";
+import { LegalDialog } from "@/components/LegalDialog";
+import { Button } from "@/components/ui/button";
 
 function Row({ label, description, checked, onChange }: {
   label: string;
@@ -35,6 +37,33 @@ function Row({ label, description, checked, onChange }: {
         <span className="text-xs text-muted-foreground">{description}</span>
       </div>
       <Switch checked={checked} onCheckedChange={onChange} />
+    </div>
+  );
+}
+
+function LegalRow({ label, description, kind }: {
+  label: string;
+  description: string;
+  kind: "terms" | "privacy" | "policy";
+}) {
+  const doc = en.legal[kind];
+  return (
+    <div className="py-4 border-b border-neutral-800 last:border-0">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <span className="text-sm font-semibold">{label}</span>
+          <span className="text-xs text-muted-foreground">{description}</span>
+          <span className="text-xs text-muted-foreground">{en.legal.updatedLabel} {doc.updated}</span>
+        </div>
+        <LegalDialog
+          kind={kind}
+          trigger={(
+            <Button type="button" variant="secondary" size="sm">
+              {en.settings.legal.open}
+            </Button>
+          )}
+        />
+      </div>
     </div>
   );
 }
@@ -131,6 +160,15 @@ export function Settings({ onSignOut, username, role, settings, onSettingsChange
                 </AlertDialogContent>
               </AlertDialog>
             </div>
+          </div>
+        </div>
+
+        <div>
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">{s.sections.legal}</h2>
+          <div className="rounded-xl border border-neutral-800 px-4">
+            <LegalRow label={s.legal.terms} description={s.legal.termsSub} kind="terms" />
+            <LegalRow label={s.legal.privacy} description={s.legal.privacySub} kind="privacy" />
+            <LegalRow label={s.legal.policy} description={s.legal.policySub} kind="policy" />
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useContext } from "react";
+﻿import { useState, useEffect, useRef, useContext } from "react";
 import { getCurrentWindow, type Window } from "@tauri-apps/api/window";
 import { NavContext } from "@/hooks/use-nav";
 import { forceSubmitAttempt } from "@/lib/api";

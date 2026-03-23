@@ -1,4 +1,4 @@
-import sfx from "@/sounds/sfx.wav";
+﻿import sfx from "@/sounds/sfx.wav";
 
 export const playSound = () => {
   try {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+﻿import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -43,16 +43,26 @@ import {
   Trophy,
   Headphones,
   BookOpen as BookOpenIcon,
+  Gauge,
+  ClipboardText,
+  UsersThree,
   CaretDown,
   CaretUp
 } from "@phosphor-icons/react";
 import en from "@/locales/en";
+
+type AdminSection = "overview" | "users" | "tests" | "assignments" | "groups";
 
 export function Admin() {
   const [users, setUsers] = useState<ApiUser[]>([]);
   const [tests, setTests] = useState<TestSummary[]>([]);
   const [homeworkAssignments, setHomeworkAssignments] = useState<AdminAssignment[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [section, setSection] = useState<AdminSection>("overview");
+  const [userQuery, setUserQuery] = useState("");
+  const [testQuery, setTestQuery] = useState("");
+  const [assignmentQuery, setAssignmentQuery] = useState("");
+  const [groupQuery, setGroupQuery] = useState("");
 
   const loadAll = useCallback(async () => {
     const [usersRes, testsRes, homeworkRes, groupsRes] = await Promise.all([
@@ -76,134 +86,317 @@ export function Admin() {
     [tests]
   );
 
+  const visibleUsers = useMemo(() => {
+    const q = userQuery.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter((u) => [u.username, u.email, u.role].some((v) => (v ?? "").toLowerCase().includes(q)));
+  }, [users, userQuery]);
+
+  const visibleTests = useMemo(() => {
+    const q = testQuery.trim().toLowerCase();
+    if (!q) return tests;
+    return tests.filter((t) => t.title.toLowerCase().includes(q));
+  }, [tests, testQuery]);
+
+  const visibleAssignments = useMemo(() => {
+    const q = assignmentQuery.trim().toLowerCase();
+    if (!q) return homeworkAssignments;
+    return homeworkAssignments.filter((a) => {
+      const title = testMap.get(a.testId) ?? a.testId;
+      return `${title} ${a.assignedToName}`.toLowerCase().includes(q);
+    });
+  }, [homeworkAssignments, assignmentQuery, testMap]);
+
+  const visibleGroups = useMemo(() => {
+    const q = groupQuery.trim().toLowerCase();
+    if (!q) return groups;
+    return groups.filter((g) => g.name.toLowerCase().includes(q));
+  }, [groups, groupQuery]);
+
   const togglePublished = async (testId: string, published: boolean) => {
     try {
       await adminToggleTestPublished(testId, published);
       setTests((prev) => prev.map((t) => t.id === testId ? { ...t, published } : t));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update");
+      toast.error(err instanceof Error ? err.message : en.admin.errors.updateFailed);
     }
   };
 
+  const navItems: { id: AdminSection; label: string; description: string; icon: ReactNode }[] = [
+    { id: "overview", label: en.admin.sections.overview, description: en.admin.sections.overviewSub, icon: <Gauge weight="bold" className="size-4" /> },
+    { id: "users", label: en.admin.sections.users, description: en.admin.sections.usersSub, icon: <UsersThree weight="bold" className="size-4" /> },
+    { id: "tests", label: en.admin.sections.tests, description: en.admin.sections.testsSub, icon: <BookOpenIcon weight="bold" className="size-4" /> },
+    { id: "assignments", label: en.admin.sections.assignments, description: en.admin.sections.assignmentsSub, icon: <ClipboardText weight="bold" className="size-4" /> },
+    { id: "groups", label: en.admin.sections.groups, description: en.admin.sections.groupsSub, icon: <Users weight="bold" className="size-4" /> },
+  ];
+
   return (
-    <div className="p-6 flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-sm font-semibold">{en.admin.title}</h2>
-          <p className="text-xs text-muted-foreground">{en.admin.subtitle}</p>
-        </div>
-      </div>
+    <div className="p-4 md:p-6 h-full">
+      <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4 h-full">
+        <aside className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 flex flex-col gap-4">
+          <div>
+            <div className="text-xs text-muted-foreground">{en.admin.panel.badge}</div>
+            <div className="text-base font-semibold">{en.admin.panel.title}</div>
+            <div className="text-xs text-muted-foreground mt-1">{en.admin.panel.subtitle}</div>
+          </div>
+          <div className="flex flex-col gap-2">
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setSection(item.id)}
+                className={`w-full text-left rounded-xl border px-3 py-2.5 transition-colors ${
+                  section === item.id
+                    ? "border-emerald-700/60 bg-emerald-900/20 text-white"
+                    : "border-neutral-800 hover:bg-neutral-900/60 text-muted-foreground"
+                }`}
+              >
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  {item.icon}
+                  {item.label}
+                </div>
+                <div className="text-[11px] text-muted-foreground mt-1">{item.description}</div>
+              </button>
+            ))}
+          </div>
+          <div className="rounded-xl border border-neutral-800 bg-neutral-900/60 px-3 py-2 text-xs text-muted-foreground">
+            {en.admin.panel.note}
+          </div>
+        </aside>
 
-      <Tabs defaultValue="users">
-        <TabsList>
-          <TabsTrigger value="users">{en.admin.tabs.users}</TabsTrigger>
-          <TabsTrigger value="tests">{en.admin.tabs.tests}</TabsTrigger>
-          <TabsTrigger value="homework">{en.admin.tabs.homework}</TabsTrigger>
-          <TabsTrigger value="groups">{en.admin.tabs.groups}</TabsTrigger>
-        </TabsList>
+        <section className="flex flex-col gap-4 min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">{en.admin.title}</div>
+              <div className="text-xs text-muted-foreground">{en.admin.subtitle}</div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {section === "users" && (
+                <CreateUserDialog
+                  onCreate={async (payload) => {
+                    const res = await adminCreateUser(payload);
+                    setUsers((prev) => [res.user, ...prev]);
+                  }}
+                />
+              )}
+              {section === "assignments" && (
+                <CreateAssignmentDialog
+                  tests={tests}
+                  users={users}
+                  groups={groups}
+                  type="homework"
+                  onCreate={async (payload) => {
+                    const res = await adminCreateAssignment({
+                      ...payload,
+                      dueAt: payload.dueAt ? new Date(payload.dueAt).toISOString() : null,
+                    });
+                    toast.success(en.admin.toasts.assignmentCreated);
+                    setHomeworkAssignments((prev) => [
+                      {
+                        id: res.assignment.id,
+                        type: "homework",
+                        testId: payload.testId,
+                        sectionKinds: payload.sectionKinds,
+                        assignedTo: payload.assignedTo,
+                        assignedToName: users.find((u) => u.id === payload.assignedTo)?.username ?? "",
+                        assignedBy: "",
+                        assignedByName: "",
+                        dueAt: payload.dueAt ?? null,
+                        createdAt: new Date().toISOString(),
+                      },
+                      ...prev,
+                    ]);
+                  }}
+                />
+              )}
+              {section === "groups" && (
+                <CreateGroupDialog
+                  onCreate={async (name) => {
+                    const res = await adminCreateGroup(name);
+                    setGroups((prev) => [
+                      { id: res.group.id, name: res.group.name, createdAt: new Date().toISOString(), members: [] },
+                      ...prev,
+                    ]);
+                    toast.success(en.admin.groups.created);
+                  }}
+                />
+              )}
+            </div>
+          </div>
 
-        <TabsContent value="users">
-          <Card className="border-neutral-800 bg-neutral-900">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-xs font-semibold">{en.admin.users.title}</CardTitle>
-              <CreateUserDialog
-                onCreate={async (payload) => {
-                  const res = await adminCreateUser(payload);
-                  setUsers((prev) => [res.user, ...prev]);
-                }}
-              />
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{en.admin.users.table.username}</TableHead>
-                    <TableHead>{en.admin.users.table.email}</TableHead>
-                    <TableHead>{en.admin.users.table.role}</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((user) => (
-                    <UserRow key={user.id} user={user} testMap={testMap} />
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
+          {section === "overview" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+              <Card className="border-neutral-800 bg-neutral-950/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xs font-semibold">{en.admin.overview.users}</CardTitle>
+                </CardHeader>
+                <CardContent className="text-2xl font-semibold">{users.length}</CardContent>
+              </Card>
+              <Card className="border-neutral-800 bg-neutral-950/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xs font-semibold">{en.admin.overview.tests}</CardTitle>
+                </CardHeader>
+                <CardContent className="text-2xl font-semibold">{tests.length}</CardContent>
+              </Card>
+              <Card className="border-neutral-800 bg-neutral-950/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xs font-semibold">{en.admin.overview.assignments}</CardTitle>
+                </CardHeader>
+                <CardContent className="text-2xl font-semibold">{homeworkAssignments.length}</CardContent>
+              </Card>
+              <Card className="border-neutral-800 bg-neutral-950/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xs font-semibold">{en.admin.overview.groups}</CardTitle>
+                </CardHeader>
+                <CardContent className="text-2xl font-semibold">{groups.length}</CardContent>
+              </Card>
+            </div>
+          )}
 
-        <TabsContent value="tests">
-          <Card className="border-neutral-800 bg-neutral-900">
-            <CardHeader>
-              <CardTitle className="text-xs font-semibold">{en.admin.tests.title}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{en.admin.tests.table.title}</TableHead>
-                    <TableHead>{en.admin.tests.table.duration}</TableHead>
-                    <TableHead>{en.admin.tests.table.sections}</TableHead>
-                    <TableHead>{en.admin.tests.table.status}</TableHead>
-                    <TableHead>{en.admin.tests.table.published}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {tests.map((test) => (
-                    <TableRow key={test.id}>
-                      <TableCell className="font-medium">{test.title}</TableCell>
-                      <TableCell className="text-muted-foreground">{test.durationMinutes} {en.admin.tests.minutesSuffix}</TableCell>
-                      <TableCell className="text-muted-foreground">{test.sectionsCount}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={test.published
-                            ? "border-emerald-800 text-emerald-400"
-                            : "border-neutral-700 text-muted-foreground"}
-                        >
-                          {test.published ? en.admin.tests.status.published : en.admin.tests.status.draft}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Switch
-                          checked={test.published ?? false}
-                          onCheckedChange={(checked) => togglePublished(test.id, checked)}
-                        />
-                      </TableCell>
+          {section === "users" && (
+            <Card className="border-neutral-800 bg-neutral-900">
+              <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <CardTitle className="text-xs font-semibold">{en.admin.users.title}</CardTitle>
+                <Input
+                  value={userQuery}
+                  onChange={(e) => setUserQuery(e.target.value)}
+                  placeholder={en.admin.users.search}
+                  className="max-w-xs"
+                />
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{en.admin.users.table.username}</TableHead>
+                      <TableHead>{en.admin.users.table.email}</TableHead>
+                      <TableHead>{en.admin.users.table.role}</TableHead>
+                      <TableHead />
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  </TableHeader>
+                  <TableBody>
+                    {visibleUsers.map((user) => (
+                      <UserRow key={user.id} user={user} testMap={testMap} />
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
 
-        <TabsContent value="homework">
-          <AssignmentPanel
-            title={en.admin.assignments.title}
-            assignments={homeworkAssignments}
-            tests={tests}
-            users={users}
-            groups={groups}
-            testMap={testMap}
-            type="homework"
-            onCreated={(assignment) => setHomeworkAssignments((prev) => [assignment, ...prev])}
-          />
-        </TabsContent>
+          {section === "tests" && (
+            <Card className="border-neutral-800 bg-neutral-900">
+              <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <CardTitle className="text-xs font-semibold">{en.admin.tests.title}</CardTitle>
+                <Input
+                  value={testQuery}
+                  onChange={(e) => setTestQuery(e.target.value)}
+                  placeholder={en.admin.tests.search}
+                  className="max-w-xs"
+                />
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{en.admin.tests.table.title}</TableHead>
+                      <TableHead>{en.admin.tests.table.duration}</TableHead>
+                      <TableHead>{en.admin.tests.table.sections}</TableHead>
+                      <TableHead>{en.admin.tests.table.status}</TableHead>
+                      <TableHead>{en.admin.tests.table.published}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {visibleTests.map((test) => (
+                      <TableRow key={test.id}>
+                        <TableCell className="font-medium">{test.title}</TableCell>
+                        <TableCell className="text-muted-foreground">{test.durationMinutes} {en.admin.tests.minutesSuffix}</TableCell>
+                        <TableCell className="text-muted-foreground">{test.sectionsCount}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={test.published
+                              ? "border-emerald-800 text-emerald-400"
+                              : "border-neutral-700 text-muted-foreground"}
+                          >
+                            {test.published ? en.admin.tests.status.published : en.admin.tests.status.draft}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Switch
+                            checked={test.published ?? false}
+                            onCheckedChange={(checked) => togglePublished(test.id, checked)}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
 
-        <TabsContent value="groups">
-          <GroupsPanel
-            groups={groups}
-            users={users}
-            tests={tests}
-            onGroupCreated={(g) => setGroups((prev) => [g, ...prev])}
-            onGroupDeleted={(id) => setGroups((prev) => prev.filter((g) => g.id !== id))}
-            onMemberAdded={(groupId, user) => setGroups((prev) => prev.map((g) => g.id === groupId ? { ...g, members: [...g.members, user] } : g))}
-            onMemberRemoved={(groupId, userId) => setGroups((prev) => prev.map((g) => g.id === groupId ? { ...g, members: g.members.filter((m) => m.id !== userId) } : g))}
-          />
-        </TabsContent>
-      </Tabs>
+          {section === "assignments" && (
+            <Card className="border-neutral-800 bg-neutral-900">
+              <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <CardTitle className="text-xs font-semibold">{en.admin.assignments.title}</CardTitle>
+                <Input
+                  value={assignmentQuery}
+                  onChange={(e) => setAssignmentQuery(e.target.value)}
+                  placeholder={en.admin.assignments.search}
+                  className="max-w-xs"
+                />
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{en.admin.assignments.table.test}</TableHead>
+                      <TableHead>{en.admin.assignments.table.sections}</TableHead>
+                      <TableHead>{en.admin.assignments.table.assignedTo}</TableHead>
+                      <TableHead>{en.admin.assignments.table.due}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {visibleAssignments.map((assignment) => (
+                      <TableRow key={assignment.id}>
+                        <TableCell>{testMap.get(assignment.testId) ?? assignment.testId}</TableCell>
+                        <TableCell className="capitalize">{assignment.sectionKinds.join(", ")}</TableCell>
+                        <TableCell>{assignment.assignedToName}</TableCell>
+                        <TableCell className="text-muted-foreground">{assignment.dueAt ? new Date(assignment.dueAt).toLocaleDateString() : en.common.na}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+
+          {section === "groups" && (
+            <Card className="border-neutral-800 bg-neutral-900">
+              <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <CardTitle className="text-xs font-semibold">{en.admin.groups.title}</CardTitle>
+                <Input
+                  value={groupQuery}
+                  onChange={(e) => setGroupQuery(e.target.value)}
+                  placeholder={en.admin.groups.search}
+                  className="max-w-xs"
+                />
+              </CardHeader>
+              <CardContent>
+                <GroupsPanel
+                  groups={visibleGroups}
+                  users={users}
+                  tests={tests}
+                  onGroupCreated={(g) => setGroups((prev) => [g, ...prev])}
+                  onGroupDeleted={(id) => setGroups((prev) => prev.filter((g) => g.id !== id))}
+                  onMemberAdded={(groupId, user) => setGroups((prev) => prev.map((g) => g.id === groupId ? { ...g, members: [...g.members, user] } : g))}
+                  onMemberRemoved={(groupId, userId) => setGroups((prev) => prev.map((g) => g.id === groupId ? { ...g, members: g.members.filter((m) => m.id !== userId) } : g))}
+                />
+              </CardContent>
+            </Card>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
@@ -230,7 +423,7 @@ function UserRow({ user, testMap }: { user: ApiUser; testMap: Map<string, string
     <>
       <TableRow className={user.role === "student" ? "cursor-pointer hover:bg-neutral-800/50" : ""} onClick={toggle}>
         <TableCell className="font-medium">{user.username}</TableCell>
-        <TableCell className="text-muted-foreground">{user.email ?? "-"}</TableCell>
+        <TableCell className="text-muted-foreground">{user.email ?? en.common.na}</TableCell>
         <TableCell className="capitalize">{user.role}</TableCell>
         <TableCell className="w-6">
           {user.role === "student" && (
@@ -247,9 +440,9 @@ function UserRow({ user, testMap }: { user: ApiUser; testMap: Map<string, string
               <div className="flex flex-col gap-3">
                 <div className="grid grid-cols-4 gap-3">
                   <StatChip label={en.admin.stats.testsDone} value={`${stats.testsCompleted}/${stats.testsTotal}`} />
-                  <StatChip label={en.admin.stats.avgBand} value={stats.avgBand ?? "-"} icon={<Trophy weight="bold" className="size-3 text-amber-400" />} />
-                  <StatChip label={en.admin.stats.listening} value={stats.avgListeningBand ?? "-"} icon={<Headphones weight="bold" className="size-3 text-sky-400" />} />
-                  <StatChip label={en.admin.stats.reading} value={stats.avgReadingBand ?? "-"} icon={<BookOpenIcon weight="bold" className="size-3 text-violet-400" />} />
+                  <StatChip label={en.admin.stats.avgBand} value={stats.avgBand ?? en.common.na} icon={<Trophy weight="bold" className="size-3 text-amber-400" />} />
+                  <StatChip label={en.admin.stats.listening} value={stats.avgListeningBand ?? en.common.na} icon={<Headphones weight="bold" className="size-3 text-sky-400" />} />
+                  <StatChip label={en.admin.stats.reading} value={stats.avgReadingBand ?? en.common.na} icon={<BookOpenIcon weight="bold" className="size-3 text-violet-400" />} />
                 </div>
                 {stats.recentAttempts.length > 0 && (
                   <div className="flex flex-col gap-1">
@@ -365,7 +558,7 @@ function AssignmentPanel({
                 <TableCell>{testMap.get(assignment.testId) ?? assignment.testId}</TableCell>
                 <TableCell className="capitalize">{assignment.sectionKinds.join(", ")}</TableCell>
                 <TableCell>{assignment.assignedToName}</TableCell>
-                <TableCell className="text-muted-foreground">{assignment.dueAt ? new Date(assignment.dueAt).toLocaleDateString() : "-"}</TableCell>
+                <TableCell className="text-muted-foreground">{assignment.dueAt ? new Date(assignment.dueAt).toLocaleDateString() : en.common.na}</TableCell>
               </TableRow>
             ))}
           </TableBody>

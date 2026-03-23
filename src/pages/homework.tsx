@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { BookOpen, ClockCountdown, Trophy, ArrowRight, Play, SpinnerGap, Headphones, PencilLine, MicrophoneStage } from "@phosphor-icons/react";
-import { ExamRunner } from "@/components/exam-runner";
+import { TestRunner } from "@/components/TestRunner";
 import { getAttempt, listAssignments, startAssignment, type AssignmentAttemptDetail, type AssignmentSummary } from "@/lib/api";
 import { useNav } from "@/hooks/use-nav";
 import { toast } from "sonner";
@@ -28,6 +28,34 @@ const sectionIcon: Record<string, React.ReactNode> = {
   speaking: <MicrophoneStage weight="bold" className="size-3" />,
 };
 
+type DueStatus = "overdue" | "today" | "tomorrow" | "soon" | "this-week" | "upcoming";
+
+function formatDueText(dueAt: string | null) {
+  if (!dueAt) return null;
+  const parsed = new Date(dueAt);
+  const label = en.homework.dueLabel;
+  if (Number.isNaN(parsed.getTime())) return { text: `${label} ${dueAt}`, status: "upcoming" as DueStatus };
+  const date = parsed.toLocaleDateString();
+  const time = parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return { text: `${label} ${date} ${time}`, status: getDueStatus(parsed) };
+}
+
+function getDueStatus(dueAt: Date): DueStatus {
+  const now = new Date();
+  if (dueAt.getTime() < now.getTime()) return "overdue";
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startTomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const startDayAfterTomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
+  const startInThreeDays = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 3);
+  const startInSevenDays = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
+
+  if (dueAt >= startToday && dueAt < startTomorrow) return "today";
+  if (dueAt >= startTomorrow && dueAt < startDayAfterTomorrow) return "tomorrow";
+  if (dueAt >= startDayAfterTomorrow && dueAt < startInThreeDays) return "soon";
+  if (dueAt >= startInThreeDays && dueAt < startInSevenDays) return "this-week";
+  return "upcoming";
+}
+
 function ScorePill({ score, label }: { score: number | null; label: string }) {
   return (
     <Tooltip>
@@ -47,6 +75,8 @@ function ScorePill({ score, label }: { score: number | null; label: string }) {
 function HomeworkCard({ assignment, status, onOpen }: { assignment: AssignmentSummary; status: Status; onOpen: (assignment: AssignmentSummary) => void }) {
   const cfg = statusConfig[status];
   const isPastDue = assignment.dueAt != null && new Date(assignment.dueAt) < new Date() && status !== "completed";
+  const dueText = formatDueText(assignment.dueAt);
+  const dueStatus = dueText?.status;
   
   return (
     <Card className="rounded-xl border-neutral-800 bg-neutral-900 hover:border-neutral-700 transition-colors">
@@ -58,7 +88,7 @@ function HomeworkCard({ assignment, status, onOpen }: { assignment: AssignmentSu
               <ClockCountdown weight="bold" className="size-3 text-muted-foreground" />
               <span className="text-[10px] text-muted-foreground">
                 {assignment.durationMinutes} {en.homework.minutesSuffix}
-                {assignment.dueAt ? ` · ${en.homework.dueLabel} ${new Date(assignment.dueAt).toLocaleDateString()}` : ""}
+                {dueText ? ` • ${dueText.text}` : ""}
               </span>
             </div>
             <div className="text-[10px] text-muted-foreground capitalize">
@@ -68,6 +98,28 @@ function HomeworkCard({ assignment, status, onOpen }: { assignment: AssignmentSu
           <div className="flex flex-col items-end gap-1.5 shrink-0">
             <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${cfg.className}`}>{cfg.label}</Badge>
             {isPastDue && <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-red-800 text-red-400">{en.homework.expired}</Badge>}
+            {!isPastDue && dueStatus && dueStatus !== "upcoming" && (
+              <Badge
+                variant="outline"
+                className={`text-[10px] px-1.5 py-0 ${
+                  dueStatus === "today"
+                    ? "border-red-800 text-red-400"
+                    : dueStatus === "tomorrow"
+                      ? "border-orange-700 text-orange-400"
+                      : dueStatus === "soon"
+                        ? "border-amber-700 text-amber-400"
+                        : "border-sky-700 text-sky-400"
+                }`}
+              >
+                {dueStatus === "today"
+                  ? en.homework.dueStates.today
+                  : dueStatus === "tomorrow"
+                    ? en.homework.dueStates.tomorrow
+                    : dueStatus === "soon"
+                      ? en.homework.dueStates.soon
+                      : en.homework.dueStates.thisWeek}
+              </Badge>
+            )}
             {assignment.attempt?.band != null && (
               <span className="flex items-center gap-1 text-xs font-bold">
                 <Trophy weight="bold" className="size-3 text-amber-400" />
@@ -253,16 +305,16 @@ export function Homework({
 
   if (activeAttempt) {
     return (
-      <ExamRunner
+      <TestRunner
         test={activeAttempt.test}
         attemptId={activeAttempt.attempt.id}
         initialResponses={activeAttempt.responses}
         readOnly={activeAttempt.attempt.status === "completed"}
         onListeningStart={(sectionDurationMinutes) =>
-          onStartTest(en.examRunner.kinds.listening, sectionDurationMinutes * 60)
+          onStartTest(en.testRunner.kinds.listening, sectionDurationMinutes * 60)
         }
         onReadingStart={(sectionDurationMinutes) =>
-          onStartTest(en.examRunner.kinds.reading, sectionDurationMinutes * 60)
+          onStartTest(en.testRunner.kinds.reading, sectionDurationMinutes * 60)
         }
         onSectionFinish={() => { sectionFinishRef.current = true; onStopTest(); }}
         onTimerFinish={registerSubmit}
@@ -282,7 +334,18 @@ export function Homework({
 
   return (
     <TooltipProvider>
-      <div className="p-5 flex flex-col gap-4">
+      <div className="p-5 flex flex-col gap-4 font-body">
+        <div className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-[linear-gradient(135deg,rgba(30,64,175,0.25),rgba(10,10,10,0.9))] p-4">
+          <div className="absolute inset-0 opacity-40 [background:radial-gradient(circle_at_bottom_left,rgba(251,191,36,0.2),transparent_60%)]" />
+          <div className="relative flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-col gap-1">
+              <Badge variant="outline" className="border-sky-400/40 text-sky-200 self-start -ml-1.5">{en.homework.hero.badge}</Badge>
+              <h2 className="text-sm font-display tracking-wide">{en.homework.title}</h2>
+              <p className="text-xs text-muted-foreground">{en.homework.hero.subtitle}</p>
+            </div>
+            <div className="text-xs text-muted-foreground">{assignments.length} {en.homework.hero.totalSuffix}</div>
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           <BookOpen weight="bold" className="size-4 text-muted-foreground" />
           <span className="text-sm font-semibold">{en.homework.title}</span>

@@ -1,4 +1,4 @@
-export type ApiUser = {
+﻿export type ApiUser = {
   id: string;
   username: string;
   email: string | null;

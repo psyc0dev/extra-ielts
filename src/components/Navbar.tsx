@@ -1,4 +1,4 @@
-import { House, BookOpen, Notebook, Gear, ShieldCheck } from "@phosphor-icons/react";
+﻿import { House, BookOpen, Notebook, Gear, ShieldCheck } from "@phosphor-icons/react";
 import {
   Sidebar,
   SidebarContent,
@@ -34,7 +34,7 @@ export default function Navbar() {
   return (
     <Sidebar collapsible="icon" className="h-full">
       <SidebarHeader className="flex flex-row items-center h-9 px-3 py-0 gap-2">
-        <img src={logo} alt="logo" className="w-5 h-5 rounded-sm shrink-0" />
+        <img src={logo} alt={en.nav.logoAlt} className="w-5 h-5 rounded-sm shrink-0" />
         {state === "expanded" && (
           <span className="text-xs font-medium text-neutral-400">{en.nav.brand}</span>
         )}

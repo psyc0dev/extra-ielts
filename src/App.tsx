@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
@@ -12,7 +12,7 @@ import {
 import WindowControls from "./components/WindowControls";
 import { NavProvider, useNav } from "./hooks/use-nav";
 import { Dashboard, Tests, Homework, Settings, Admin } from "./pages/index";
-import { LoginForm } from "@/components/login-form";
+import { LoginForm } from "@/components/LoginForm";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import Navbar from "./components/Navbar";
@@ -56,6 +56,13 @@ function PageContent({
   isAdmin: boolean;
 }) {
   const { page } = useNav();
+  const pageLabels: Record<string, string> = {
+    Dashboard: en.nav.dashboard,
+    Tests: en.nav.tests,
+    Homework: en.nav.homework,
+    Settings: en.nav.settings,
+    Admin: en.nav.admin,
+  };
 
   const pages: Record<string, React.ReactNode> = {
     Dashboard: <Dashboard />,
@@ -82,7 +89,7 @@ function PageContent({
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbPage>{page}</BreadcrumbPage>
+                <BreadcrumbPage>{pageLabels[page] ?? page}</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -152,7 +159,7 @@ function AppShell({
       const res = await updateSettings(patch);
       setSettings(res.settings);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to save settings";
+      const message = err instanceof Error ? err.message : en.app.errors.saveSettingsFailed;
       toast.error(message);
     }
   };

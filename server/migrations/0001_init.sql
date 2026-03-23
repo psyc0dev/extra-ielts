@@ -1,4 +1,3 @@
--- Dev SQLite schema for IELTS Delivery System
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS users (

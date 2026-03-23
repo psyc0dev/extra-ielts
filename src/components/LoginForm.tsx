@@ -1,4 +1,4 @@
-import { useState } from "react"
+﻿import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import logo from "../../src-tauri/icons/icon.ico"
 import en from "@/locales/en"
+import { LegalDialog } from "@/components/LegalDialog"
 
 export function LoginForm({
   className,
@@ -108,8 +109,33 @@ export function LoginForm({
       </form>
       <p className="text-center text-xs text-muted-foreground">
         {en.login.terms.prefix}{" "}
-        <a href="#" className="underline underline-offset-4 hover:text-primary">{en.login.terms.terms}</a><br />
-        {en.login.terms.and} <a href="#" className="underline underline-offset-4 hover:text-primary">{en.login.terms.privacy}</a>.
+        <LegalDialog
+          kind="terms"
+          trigger={(
+            <button type="button" className="underline underline-offset-4 hover:text-primary">
+              {en.login.terms.terms}
+            </button>
+          )}
+        />
+        {en.login.terms.separator}
+        <LegalDialog
+          kind="privacy"
+          trigger={(
+            <button type="button" className="underline underline-offset-4 hover:text-primary">
+              {en.login.terms.privacy}
+            </button>
+          )}
+        />
+        {" "}{en.login.terms.and}{" "}
+        <LegalDialog
+          kind="policy"
+          trigger={(
+            <button type="button" className="underline underline-offset-4 hover:text-primary">
+              {en.login.terms.policy}
+            </button>
+          )}
+        />
+        .
       </p>
     </div>
   )
