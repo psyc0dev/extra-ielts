@@ -78,7 +78,7 @@ export default function WindowControls({ onFullscreen }: { onFullscreen?: (v: bo
           }
           await appWindow?.destroy();
         }}
-        className="w-8 h-full flex items-center justify-center text-foreground/60 hover:bg-red-600 hover:text-white transition-all"
+        className={`w-8 h-full flex items-center justify-center text-foreground/60 hover:bg-red-600 hover:text-white transition-all ${isFullscreen ? 'rounded-none' : ''}`}
         aria-label={timerActive ? en.windowControls.closeSubmitting : en.windowControls.close}
       >
         <X size={14} strokeWidth={1.5} />

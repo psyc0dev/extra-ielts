@@ -5,7 +5,7 @@ import { initDevDb } from './dev-db'
 import { loadTestsFromDisk } from './lib/tests'
 
 const tests = loadTestsFromDisk()
-const { snapshot, persist } = initDevDb(tests)
+const { snapshot, persist } = initDevDb()
 const app = createApp({ snapshot, persist, tests })
 
 const staticRoot = join(import.meta.dir, '..', 'dist')

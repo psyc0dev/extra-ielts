@@ -10,12 +10,24 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Slider } from "@/components/ui/slider";
 import { BookOpen, CheckCircle, Play, SpeakerHigh, SpeakerLow, SpeakerNone, SpeakerSlash, TextAlignLeft, XCircle } from "@phosphor-icons/react";
 import { saveAnswer, submitAttempt, forceSubmitAttempt, type TestDetail } from "@/lib/api";
+import { toast } from "sonner";
 import { QuestionInputWrapper } from "./question-inputs";
 import { useNav } from "@/hooks/use-nav";
 import en from "@/locales/en";
 
 type ListeningPhase = "idle" | "prep" | "playing" | "done" | "error";
 type ReadingPhase = "idle" | "reading";
+
+const getKindDurationMinutes = (test: TestDetail, kind: "listening" | "reading") => {
+  const byKind = (test as { durationMinutesByKind?: Partial<Record<"listening" | "reading", number>> })
+    .durationMinutesByKind;
+  const fromByKind = byKind?.[kind];
+  if (typeof fromByKind === "number") return fromByKind;
+
+  const section = test.sections.find((s) => s.kind === kind && typeof s.durationMinutes === "number");
+  if (section && typeof section.durationMinutes === "number") return section.durationMinutes;
+  return null;
+};
 
 export function ExamRunner({
   test, attemptId, initialResponses, onExit, onSubmitted, onListeningStart, onReadingStart, onSectionFinish, onTimerFinish, readOnly = false,
@@ -35,6 +47,7 @@ export function ExamRunner({
   const [activeSectionId, setActiveSectionId] = useState(sections[0]?.id ?? "");
   const [listeningPhase, setListeningPhase] = useState<ListeningPhase>("idle");
   const [readingPhase, setReadingPhase] = useState<ReadingPhase>("idle");
+  const audioErrorHandled = useRef(false);
   const [submittedSections, setSubmittedSections] = useState<Set<string>>(new Set());
   const [answers, setAnswers] = useState<Record<string, string | null>>(initialResponses ?? {});
   const [submitting, startSubmit] = useTransition();
@@ -59,6 +72,15 @@ export function ExamRunner({
   );
 
   const isAttemptInProgress = !readOnly && !!activeSection;
+
+  useEffect(() => {
+    if (readOnly) return;
+    if (listeningPhase !== "error") return;
+    if (audioErrorHandled.current) return;
+    audioErrorHandled.current = true;
+    toast.error(en.examRunner.listening.audioUnavailable);
+    onExit();
+  }, [listeningPhase, readOnly, onExit]);
 
   // Fire-and-forget on unload -- do NOT call e.preventDefault() in Tauri, it blocks the window from closing
   useEffect(() => {
@@ -311,7 +333,7 @@ export function ExamRunner({
               readOnly={readOnly}
               phase={listeningPhase}
               onPhaseChange={async (p) => {
-                const duration = activeSection?.durationMinutes ?? test.durationMinutes;
+                const duration = getKindDurationMinutes(test, "listening") ?? test.durationMinutes;
                 if (p === "prep") {
                   onListeningStart?.(duration); 
                 }
@@ -329,7 +351,7 @@ export function ExamRunner({
               phase={readingPhase}
               onPhaseChange={setReadingPhase}
               onReadingStart={() => {
-                const duration = activeSection?.durationMinutes ?? test.durationMinutes;
+                const duration = getKindDurationMinutes(test, "reading") ?? test.durationMinutes;
                 onReadingStart?.(duration);
               }}
             />

@@ -267,7 +267,7 @@ const en = {
       startingIn: (s: number) => `Starting in ${s}s`,
       playing: "Playing...",
       done: "Done",
-      audioUnavailable: "Audio unavailable",
+      audioUnavailable: "Audio unavailable,",
       prepTime: (s: number) => `Preparation time: ${s}s remaining`,
       inProgress: "Listening in progress - answer the questions",
       finished: "Audio finished",

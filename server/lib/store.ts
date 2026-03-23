@@ -179,7 +179,7 @@ export const toAssignmentSummary = (
   type: assignment.type,
   testId: assignment.testId,
   title: test.title,
-  durationMinutes: test.durationMinutes,
+  durationMinutes: getAssignmentDurationMinutes(test, assignment.sectionKinds),
   dueAt: assignment.dueAt,
   sectionKinds: assignment.sectionKinds,
   attempt: toAttemptSummary(attempt),
@@ -189,6 +189,27 @@ export const filterTestForAssignment = (test: TestDetail, sectionKinds: Array<'l
   ...test,
   sections: test.sections.filter((section) => sectionKinds.includes(section.kind)),
 })
+
+const getKindDurationMinutes = (test: TestDetail, kind: 'listening' | 'reading') => {
+  const byKind = (test as { durationMinutesByKind?: Partial<Record<'listening' | 'reading', number>> })
+    .durationMinutesByKind
+  const fromByKind = byKind?.[kind]
+  if (typeof fromByKind === 'number') return fromByKind
+
+  const section = test.sections.find((s) => s.kind === kind && typeof s.durationMinutes === 'number')
+  if (section && typeof section.durationMinutes === 'number') return section.durationMinutes
+  return null
+}
+
+export const getAssignmentDurationMinutes = (test: TestDetail, sectionKinds: Array<'listening' | 'reading'>) => {
+  const uniqueKinds = Array.from(new Set(sectionKinds))
+  const durations = uniqueKinds
+    .map((kind) => getKindDurationMinutes(test, kind))
+    .filter((value): value is number => typeof value === 'number')
+
+  if (!durations.length) return test.durationMinutes
+  return durations.reduce((sum, value) => sum + value, 0)
+}
 
 const isCorrect = (correct: string | string[] | null | undefined, response: unknown) => {
   if (correct == null) return null

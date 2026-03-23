@@ -1,14 +1,14 @@
 {
   "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "title": "Practice Test",
-  "durationMinutes": 80,
+  "durationMinutes": 120,
   "published": true,
   "sections": [
     {
       "id": "s1a2b3c4-d5e6-f789-0abc-def123456789-L1",
       "kind": "listening",
       "title": "Listening Part 1",
-      "durationMinutes": 40,
+      "durationMinutes": 60,
       "audioUrl": "AUDIO_PART_1_URL",
       "questions": [
         {
@@ -123,7 +123,6 @@
       "id": "s1a2b3c4-d5e6-f789-0abc-def123456789-L2",
       "kind": "listening",
       "title": "Listening Part 2",
-      "durationMinutes": 40,
       "audioUrl": "AUDIO_PART_2_URL",
       "questions": [
         {
@@ -226,7 +225,6 @@
       "id": "s1a2b3c4-d5e6-f789-0abc-def123456789-L3",
       "kind": "listening",
       "title": "Listening Part 3",
-      "durationMinutes": 40,
       "audioUrl": "AUDIO_PART_3_URL",
       "questions": [
         {
@@ -323,7 +321,6 @@
       "id": "s1a2b3c4-d5e6-f789-0abc-def123456789-L4",
       "kind": "listening",
       "title": "Listening Part 4",
-      "durationMinutes": 40,
       "audioUrl": "AUDIO_PART_4_URL",
       "questions": [
         {
@@ -617,7 +614,6 @@
       "kind": "reading",
       "title": "Reading Passage 2",
       "passageTitle": "The Psychology of Sleep",
-      "durationMinutes": 60,
       "passage": "Sleep is one of the most fundamental biological processes, yet it remains one of the least understood. For much of human history, sleep was considered a passive state — a simple shutdown of the body and mind. Modern neuroscience has overturned this view entirely. Far from being inactive, the sleeping brain is engaged in a complex series of processes essential for memory consolidation, emotional regulation, and physical repair.\n\nSleep is divided into several stages, broadly categorised as non-rapid eye movement (NREM) sleep and rapid eye movement (REM) sleep. NREM sleep, which accounts for roughly seventy-five percent of total sleep time, is further divided into three stages of increasing depth. During the deepest stage, known as slow-wave sleep, the body releases growth hormones and repairs tissue. REM sleep, by contrast, is characterised by vivid dreaming and heightened brain activity resembling the waking state.\n\nOne of the most significant functions of sleep is memory consolidation. During sleep, the hippocampus — a region of the brain associated with learning — replays the day's experiences and transfers information to the neocortex for long-term storage. Studies have shown that people who sleep after learning a new skill perform significantly better on tests of that skill than those who remain awake. This finding has important implications for education, suggesting that adequate sleep is not a luxury but a necessity for effective learning.\n\nSleep deprivation has wide-ranging consequences. In the short term, even a single night of poor sleep can impair attention, decision-making, and emotional control. Chronically sleep-deprived individuals are at greater risk of developing conditions such as obesity, type 2 diabetes, cardiovascular disease, and depression. Research has also linked insufficient sleep to a weakened immune system, making the body more susceptible to infections.\n\nDespite the well-documented importance of sleep, many people in modern societies are chronically under-slept. The widespread use of artificial light, particularly the blue light emitted by smartphones and computer screens, disrupts the body's natural circadian rhythm by suppressing the production of melatonin, the hormone that signals the onset of sleep. Shift workers, who must sleep at irregular hours, are particularly vulnerable to circadian disruption and its associated health risks.\n\nCultural attitudes towards sleep also play a role. In many high-achieving professional environments, sleeping less is worn as a badge of honour, with long working hours seen as a sign of dedication. This attitude is increasingly being challenged by sleep researchers, who argue that prioritising sleep leads to greater productivity, creativity, and overall wellbeing. Some forward-thinking companies have begun introducing nap rooms and flexible working hours to support healthier sleep habits among their employees.\n\nThe science of sleep continues to evolve. Researchers are investigating the role of sleep in clearing toxic waste products from the brain via the glymphatic system — a process that may be linked to the prevention of neurodegenerative diseases such as Alzheimer's. As our understanding deepens, it is becoming clear that sleep is not time wasted, but one of the most productive things the human body can do.",
       "questions": [
         {
@@ -758,7 +754,6 @@
       "kind": "reading",
       "title": "Reading Passage 3",
       "passageTitle": "The Economics of Remote Work",
-      "durationMinutes": 60,
       "passage": "The widespread adoption of remote work, accelerated by the global pandemic of 2020, has fundamentally altered the relationship between employers, employees, and the physical workplace. What began as an emergency measure has evolved into a permanent feature of the modern economy, prompting businesses, urban planners, and policymakers to reconsider long-held assumptions about how and where work should take place.\n\nFor employees, the shift to remote work has brought both benefits and challenges. On the positive side, the elimination of daily commutes has saved workers significant time and money. Studies conducted in the United Kingdom and the United States found that remote workers saved an average of forty-five minutes per day by not commuting, time that many redirected towards exercise, family, and personal development. Surveys also consistently show that remote workers report higher levels of job satisfaction and a better work-life balance compared to their office-based counterparts.\n\nHowever, remote work is not without its drawbacks. Many employees report feelings of isolation and a weakening of professional relationships. The informal interactions that occur naturally in an office environment — brief conversations by the coffee machine, spontaneous brainstorming sessions — are difficult to replicate digitally. Junior employees, in particular, may miss out on the mentoring and on-the-job learning that comes from working alongside more experienced colleagues. Some researchers have raised concerns that remote work may slow career progression for those who are less visible to management.\n\nFrom an employer's perspective, remote work offers the opportunity to reduce overhead costs significantly. Companies that have downsized their office space report savings of tens of thousands of pounds annually. Remote work also expands the talent pool, allowing businesses to hire skilled workers regardless of geographic location. However, managing a distributed workforce presents its own challenges, including maintaining company culture, ensuring data security, and monitoring productivity without resorting to intrusive surveillance.\n\nThe economic impact of remote work extends beyond individual companies. City centres, which once depended on the daily influx of office workers to sustain cafes, restaurants, and retail shops, have seen a marked decline in footfall. Commercial property values in major business districts have fallen in several cities, while residential property prices in suburban and rural areas have risen as workers seek larger homes with dedicated office space. This geographic redistribution of economic activity has significant implications for local tax revenues and public services.\n\nGovernments have responded to these shifts in various ways. Some have introduced tax incentives to encourage businesses to maintain a physical presence in city centres, while others have invested in digital infrastructure to support remote workers in rural areas. A number of countries have introduced so-called digital nomad visas, allowing foreign remote workers to live and work legally within their borders, in an effort to attract high-earning professionals and stimulate local economies.\n\nLooking ahead, most analysts expect a hybrid model of work — combining remote and in-office days — to become the dominant arrangement for knowledge workers. This model attempts to capture the flexibility and cost savings of remote work while preserving the collaborative and social benefits of the physical workplace. The long-term success of hybrid work will depend on how effectively organisations can adapt their management practices, technology infrastructure, and workplace culture to support a more fluid and distributed workforce.",
       "questions": [
         {

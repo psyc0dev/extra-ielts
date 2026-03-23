@@ -1,7 +1,7 @@
 import { Database } from 'bun:sqlite'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { StoreSnapshot, TestDetail, UserSettings } from './lib/types'
+import type { StoreSnapshot, UserSettings } from './lib/types'
 
 const nowIso = () => new Date().toISOString()
 
@@ -31,33 +31,6 @@ const runMigrations = (db: Database) => {
       throw error
     }
   }
-}
-
-const syncTests = (db: Database, tests: TestDetail[]) => {
-  const upsertTest = db.query(
-    `INSERT INTO tests (id, title, duration_minutes, published, sections_json, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET
-       title = excluded.title,
-       duration_minutes = excluded.duration_minutes,
-       published = excluded.published,
-       sections_json = excluded.sections_json`
-  )
-
-  const tx = db.transaction(() => {
-    for (const test of tests) {
-      upsertTest.run(
-        test.id,
-        test.title,
-        test.durationMinutes,
-        test.published ? 1 : 0,
-        JSON.stringify(test.sections ?? []),
-        nowIso()
-      )
-    }
-  })
-
-  tx()
 }
 
 const loadSnapshot = (db: Database): StoreSnapshot => {
@@ -182,7 +155,7 @@ const saveSnapshot = (db: Database, snapshot: StoreSnapshot) => {
     'INSERT INTO assignments (id, type, test_id, section_kinds_json, assigned_to, assigned_by, due_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   )
   const insertAttempt = db.query(
-    'INSERT INTO attempts (id, assignment_id, test_id, user_id, status, score_total, band, reading_band, listening_band, started_at, completed_at, responses_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO attempts (id, assignment_id, test_id, user_id, status, score_total, band, reading_band, listening_band, started_at, completed_at, responses_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
   )
   const insertGroup = db.query('INSERT INTO groups (id, name, created_at) VALUES (?, ?, ?)')
   const insertGroupMember = db.query('INSERT INTO group_members (group_id, user_id) VALUES (?, ?)')
@@ -245,11 +218,10 @@ const saveSnapshot = (db: Database, snapshot: StoreSnapshot) => {
   tx()
 }
 
-export const initDevDb = (tests: TestDetail[]) => {
+export const initDevDb = () => {
   const dbPath = process.env.DEV_DB_PATH ?? join(import.meta.dir, 'dev.db')
   const db = new Database(dbPath)
   runMigrations(db)
-  syncTests(db, tests)
   const snapshot = loadSnapshot(db)
   return {
     db,

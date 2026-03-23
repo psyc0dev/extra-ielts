@@ -10,6 +10,7 @@ import {
   requireAuth,
   scoreAttempt,
   store,
+  getAssignmentDurationMinutes,
   toAssignmentSummary,
 } from '../lib/store'
 
@@ -93,7 +94,7 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
         type: assignment.type,
         testId: assignment.testId,
         title: test.title,
-        durationMinutes: test.durationMinutes,
+        durationMinutes: getAssignmentDurationMinutes(test, assignment.sectionKinds),
         sectionKinds: assignment.sectionKinds,
       },
       attempt: {

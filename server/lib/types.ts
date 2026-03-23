@@ -65,6 +65,7 @@ export type TestDetail = {
     id: string
     kind: SectionKind
     title: string
+    durationMinutes?: number
     audioUrl?: string | null
     passage?: string | null
     passageTitle?: string | null
