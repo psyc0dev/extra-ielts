@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import type { AppEnv, StoreSnapshot, TestDetail } from './lib/types'
-import { loadTestsFromDisk, setTestsCache } from './lib/tests'
+import { loadTestsFromDisk, setTestsCache, setPersistPublished } from './lib/tests'
 import { loadSnapshot, setPersist } from './lib/store'
 import { registerAdminRoutes } from './routes/admin'
 import { registerAssignmentRoutes } from './routes/assignments'
@@ -13,12 +13,18 @@ import { registerTestRoutes } from './routes/tests'
 export const createApp = (options?: {
   snapshot?: StoreSnapshot
   persist?: (snapshot: StoreSnapshot) => void
+  persistPublished?: (testId: string, published: boolean) => void
+  publishedOverrides?: Map<string, boolean>
   tests?: TestDetail[]
 }) => {
   const app = new Hono<AppEnv>()
   const api = new Hono<AppEnv>()
 
-  const tests = options?.tests ?? loadTestsFromDisk()
+  if (options?.persistPublished) {
+    setPersistPublished(options.persistPublished)
+  }
+
+  const tests = options?.tests ?? loadTestsFromDisk(options?.publishedOverrides)
   setTestsCache(tests)
   loadSnapshot(options?.snapshot)
   setPersist(options?.persist)

@@ -218,15 +218,28 @@ const saveSnapshot = (db: Database, snapshot: StoreSnapshot) => {
   tx()
 }
 
+export const loadPublishedOverrides = (db: Database): Map<string, boolean> => {
+  const rows = db.query('SELECT id, published FROM tests').all() as Array<{ id: string; published: number }>
+  return new Map(rows.map((r) => [r.id, r.published === 1]))
+}
+
+export const savePublished = (db: Database, testId: string, published: boolean) => {
+  db.query('INSERT INTO tests (id, published) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET published = excluded.published')
+    .run(testId, published ? 1 : 0)
+}
+
 export const initDevDb = () => {
   const dbPath = process.env.DEV_DB_PATH ?? join(import.meta.dir, 'dev.db')
   const db = new Database(dbPath)
   runMigrations(db)
   const snapshot = loadSnapshot(db)
+  const publishedOverrides = loadPublishedOverrides(db)
   return {
     db,
     snapshot,
+    publishedOverrides,
     persist: (next: StoreSnapshot) => saveSnapshot(db, next),
+    persistPublished: (testId: string, published: boolean) => savePublished(db, testId, published),
   }
 }
 
