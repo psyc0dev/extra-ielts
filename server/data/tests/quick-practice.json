@@ -2,7 +2,7 @@
   "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "title": "Practice Test",
   "durationMinutes": 120,
-  "published": true,
+  "published": false,
   "sections": [
     {
       "id": "s1a2b3c4-d5e6-f789-0abc-def123456789-L1",

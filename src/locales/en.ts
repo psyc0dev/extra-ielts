@@ -1,6 +1,6 @@
 ﻿const en = {
   common: {
-    na: "—",
+    na: "n/a",
     notAvailable: "n/a",
   },
 
