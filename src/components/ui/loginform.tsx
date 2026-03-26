@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import logo from "../../../src-tauri/icons/icon.ico"
+import logo from "../../icons/extra-round.png"
 import en from "@/locales/en"
 import { LegalDialog } from "@/components/ui/legaldialog"
 

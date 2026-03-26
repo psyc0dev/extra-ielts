@@ -45,12 +45,11 @@
     },
     skillBreakdown: {
       title: "Skill Breakdown",
-      note: "We are working on writing and speaking tests, thanks!",
+      note: "We are working on writing tests, thanks!",
       skills: {
         listening: "Listening",
         reading: "Reading",
         writing: "Writing",
-        speaking: "Speaking",
       },
     },
     upcomingHomework: {
@@ -146,7 +145,6 @@
       writing: "Writing",
       reading: "Reading",
       listening: "Listening",
-      speaking: "Speaking",
     },
     tabs: {
       all: "all",

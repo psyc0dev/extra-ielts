@@ -290,10 +290,10 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
 
   api.get('/admin/users/:userId/stats', requireAuth, requireAdmin, (c) => {
     const userId = c.req.param('userId')
+    const userAssignments = store.assignments.filter((assignment) => assignment.assignedTo === userId)
+    const assignmentsById = new Map(userAssignments.map((assignment) => [assignment.id, assignment]))
     const userAttempts = store.attempts.filter((attempt) => attempt.userId === userId)
     const completedAttempts = userAttempts.filter((attempt) => attempt.status === 'completed')
-    const testsCompleted = completedAttempts.length
-    const testsTotal = store.assignments.filter((assignment) => assignment.assignedTo === userId).length
 
     const average = (values: Array<number | null>) => {
       const filtered = values.filter((value): value is number => typeof value === 'number')
@@ -302,13 +302,16 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
       return Math.round((total / filtered.length) * 10) / 10
     }
 
-    const stats = {
-      testsCompleted,
-      testsTotal,
-      avgBand: average(completedAttempts.map((attempt) => attempt.band)),
-      avgReadingBand: average(completedAttempts.map((attempt) => attempt.readingBand)),
-      avgListeningBand: average(completedAttempts.map((attempt) => attempt.listeningBand)),
-      recentAttempts: completedAttempts
+    const byType = (type: 'task' | 'homework') =>
+      completedAttempts.filter((attempt) => assignmentsById.get(attempt.assignmentId)?.type === type)
+
+    const summarize = (attempts: typeof completedAttempts, total: number) => ({
+      completed: attempts.length,
+      total,
+      avgBand: average(attempts.map((attempt) => attempt.band)),
+      avgReadingBand: average(attempts.map((attempt) => attempt.readingBand)),
+      avgListeningBand: average(attempts.map((attempt) => attempt.listeningBand)),
+      recentAttempts: attempts
         .slice()
         .sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''))
         .slice(0, 5)
@@ -319,6 +322,14 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
           listeningBand: attempt.listeningBand,
           completedAt: attempt.completedAt,
         })),
+    })
+
+    const testsTotal = userAssignments.filter((assignment) => assignment.type === 'task').length
+    const homeworkTotal = userAssignments.filter((assignment) => assignment.type === 'homework').length
+
+    const stats = {
+      tests: summarize(byType('task'), testsTotal),
+      homework: summarize(byType('homework'), homeworkTotal),
     }
 
     return c.json({ stats })

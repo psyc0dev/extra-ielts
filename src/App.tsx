@@ -20,6 +20,7 @@ import { TimerWidget } from "./components/TimerWidget";
 import en from "./locales/en";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { getSettings, updateSettings, type UserSettings } from "@/lib/api";
+import LoadingScreen from "./components/LoadingScreen";
 
 const defaultSettings: UserSettings = {
   notifications: true,
@@ -209,13 +210,15 @@ function AppShell({
 function AppBody() {
   const { user, loading, loginUser, logoutUser, bootstrap, needsBootstrap } = useAuth();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
 
-  if (loading) {
-    return (
-      <div className="dark flex h-screen items-center justify-center bg-neutral-900 text-white">
-        <div className="text-xs text-muted-foreground">{en.app.loading}</div>
-      </div>
-    );
+  useEffect(() => {
+    const id = window.setTimeout(() => setShowSplash(false), 1800);
+    return () => window.clearTimeout(id);
+  }, []);
+
+  if (loading || showSplash) {
+    return <LoadingScreen label={en.app.loading} />;
   }
 
   return (

@@ -145,9 +145,9 @@ export type Group = {
   members: { id: string; username: string; email: string | null }[]
 }
 
-export type StudentStats = {
-  testsCompleted: number
-  testsTotal: number
+export type StudentStatsBucket = {
+  completed: number
+  total: number
   avgBand: number | null
   avgReadingBand: number | null
   avgListeningBand: number | null
@@ -158,6 +158,11 @@ export type StudentStats = {
     listeningBand: number | null
     completedAt: string | null
   }[]
+}
+
+export type StudentStats = {
+  tests: StudentStatsBucket
+  homework: StudentStatsBucket
 }
 
 export type User = ApiUser & {
@@ -231,5 +236,6 @@ export type AppEnv = {
   Bindings: Bindings
   Variables: AppVariables
 }
+
 
 

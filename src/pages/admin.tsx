@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -46,12 +46,11 @@ import {
   Gauge,
   ClipboardText,
   UsersThree,
-  CaretDown,
-  CaretUp
+  CaretDown
 } from "@phosphor-icons/react";
 import en from "@/locales/en";
 
-type AdminSection = "overview" | "users" | "tests" | "assignments" | "groups";
+type AdminSection = "overview" | "users" | "tests" | "assignments" | "groups" | "user-details" | "group-details";
 
 export function Admin() {
   const [users, setUsers] = useState<ApiUser[]>([]);
@@ -63,6 +62,8 @@ export function Admin() {
   const [testQuery, setTestQuery] = useState("");
   const [assignmentQuery, setAssignmentQuery] = useState("");
   const [groupQuery, setGroupQuery] = useState("");
+  const [selectedUser, setSelectedUser] = useState<ApiUser | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
 
   const loadAll = useCallback(async () => {
     const [usersRes, testsRes, homeworkRes, groupsRes] = await Promise.all([
@@ -113,14 +114,14 @@ export function Admin() {
     return groups.filter((g) => g.name.toLowerCase().includes(q));
   }, [groups, groupQuery]);
 
-  const togglePublished = async (testId: string, published: boolean) => {
+  const togglePublished = useCallback(async (testId: string, published: boolean) => {
     try {
       await adminToggleTestPublished(testId, published);
       setTests((prev) => prev.map((t) => t.id === testId ? { ...t, published } : t));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : en.admin.errors.updateFailed);
     }
-  };
+  }, []);
 
   const navItems: { id: AdminSection; label: string; description: string; icon: ReactNode }[] = [
     { id: "overview", label: en.admin.sections.overview, description: en.admin.sections.overviewSub, icon: <Gauge weight="bold" className="size-4" /> },
@@ -270,12 +271,19 @@ export function Admin() {
                       <TableHead>{en.admin.users.table.username}</TableHead>
                       <TableHead>{en.admin.users.table.email}</TableHead>
                       <TableHead>{en.admin.users.table.role}</TableHead>
-                      <TableHead />
+                      <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {visibleUsers.map((user) => (
-                      <UserRow key={user.id} user={user} testMap={testMap} />
+                      <UserRow
+                        key={user.id}
+                        user={user}
+                        onView={(target) => {
+                          setSelectedUser(target);
+                          setSection("user-details");
+                        }}
+                      />
                     ))}
                   </TableBody>
                 </Table>
@@ -387,6 +395,10 @@ export function Admin() {
                   groups={visibleGroups}
                   users={users}
                   tests={tests}
+                  onViewGroup={(group) => {
+                    setSelectedGroup(group);
+                    setSection("group-details");
+                  }}
                   onGroupCreated={(g) => setGroups((prev) => [g, ...prev])}
                   onGroupDeleted={(id) => setGroups((prev) => prev.filter((g) => g.id !== id))}
                   onMemberAdded={(groupId, user) => setGroups((prev) => prev.map((g) => g.id === groupId ? { ...g, members: [...g.members, user] } : g))}
@@ -395,79 +407,55 @@ export function Admin() {
               </CardContent>
             </Card>
           )}
+
+          {section === "user-details" && selectedUser && (
+            <UserDetailsPage
+              user={selectedUser}
+              testMap={testMap}
+              onBack={() => {
+                setSection("users");
+                setSelectedUser(null);
+              }}
+            />
+          )}
+
+          {section === "group-details" && selectedGroup && (
+            <GroupDetailsPage
+              group={selectedGroup}
+              onBack={() => {
+                setSection("groups");
+                setSelectedGroup(null);
+              }}
+              onViewUser={(userId) => {
+                const user = users.find((u) => u.id === userId);
+                if (!user) return;
+                setSelectedUser(user);
+                setSection("user-details");
+              }}
+            />
+          )}
         </section>
       </div>
     </div>
   );
 }
 
-function UserRow({ user, testMap }: { user: ApiUser; testMap: Map<string, string> }) {
-  const [expanded, setExpanded] = useState(false);
-  const [stats, setStats] = useState<StudentStats | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const toggle = async () => {
-    if (user.role !== "student") return;
-    if (!expanded && !stats) {
-      setLoading(true);
-      try {
-        const res = await adminGetStudentStats(user.id);
-        setStats(res.stats);
-      } catch { /* ignore */ }
-      finally { setLoading(false); }
-    }
-    setExpanded((v) => !v);
-  };
-
+function UserRow({ user, onView }: { user: ApiUser; onView: (user: ApiUser) => void }) {
   return (
-    <>
-      <TableRow className={user.role === "student" ? "cursor-pointer hover:bg-neutral-800/50" : ""} onClick={toggle}>
-        <TableCell className="font-medium">{user.username}</TableCell>
-        <TableCell className="text-muted-foreground">{user.email ?? en.common.na}</TableCell>
-        <TableCell className="capitalize">{user.role}</TableCell>
-        <TableCell className="w-6">
-          {user.role === "student" && (
-            expanded ? <CaretUp className="size-3 text-muted-foreground" /> : <CaretDown className="size-3 text-muted-foreground" />
-          )}
-        </TableCell>
-      </TableRow>
-      {expanded && user.role === "student" && (
-        <TableRow>
-          <TableCell colSpan={4} className="bg-neutral-950 p-4">
-            {loading ? (
-              <span className="text-xs text-muted-foreground">{en.admin.stats.loading}</span>
-            ) : stats ? (
-              <div className="flex flex-col gap-3">
-                <div className="grid grid-cols-4 gap-3">
-                  <StatChip label={en.admin.stats.testsDone} value={`${stats.testsCompleted}/${stats.testsTotal}`} />
-                  <StatChip label={en.admin.stats.avgBand} value={stats.avgBand ?? en.common.na} icon={<Trophy weight="bold" className="size-3 text-amber-400" />} />
-                  <StatChip label={en.admin.stats.listening} value={stats.avgListeningBand ?? en.common.na} icon={<Headphones weight="bold" className="size-3 text-sky-400" />} />
-                  <StatChip label={en.admin.stats.reading} value={stats.avgReadingBand ?? en.common.na} icon={<BookOpenIcon weight="bold" className="size-3 text-violet-400" />} />
-                </div>
-                {stats.recentAttempts.length > 0 && (
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">{en.admin.stats.recent}</span>
-                    {stats.recentAttempts.map((a, i) => (
-                      <div key={i} className="flex items-center justify-between text-xs px-2 py-1 rounded-md bg-neutral-900">
-                        <span className="text-muted-foreground">{testMap.get(a.testId) ?? a.testId}</span>
-                        <div className="flex items-center gap-3">
-                          {a.listeningBand != null && <span className="flex items-center gap-0.5 text-sky-400"><Headphones weight="bold" className="size-3" />{a.listeningBand}</span>}
-                          {a.readingBand != null && <span className="flex items-center gap-0.5 text-violet-400"><BookOpenIcon weight="bold" className="size-3" />{a.readingBand}</span>}
-                          {a.band != null && <span className="flex items-center gap-0.5 font-semibold"><Trophy weight="bold" className="size-3 text-amber-400" />{a.band}</span>}
-                          <span className="text-muted-foreground text-[10px]">{a.completedAt ? new Date(a.completedAt).toLocaleDateString() : ""}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <span className="text-xs text-muted-foreground">{en.admin.stats.noData}</span>
-            )}
-          </TableCell>
-        </TableRow>
-      )}
-    </>
+    <TableRow>
+      <TableCell className="font-medium">{user.username}</TableCell>
+      <TableCell className="text-muted-foreground">{user.email ?? en.common.na}</TableCell>
+      <TableCell className="capitalize">{user.role}</TableCell>
+      <TableCell className="text-right">
+        {user.role === "student" ? (
+          <Button size="sm" variant="outline" className="h-7 text-xs border-neutral-700" onClick={() => onView(user)}>
+            View stats
+          </Button>
+        ) : (
+          <span className="text-xs text-muted-foreground">{en.common.na}</span>
+        )}
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -491,6 +479,189 @@ function buildDueAt(dueDate?: Date, dueTime?: string) {
 
 function formatDateLabel(date?: Date) {
   return date ? date.toLocaleDateString() : en.admin.assignments.pickDate;
+}
+
+function UserDetailsPage({
+  user,
+  testMap,
+  onBack,
+}: {
+  user: ApiUser;
+  testMap: Map<string, string>;
+  onBack: () => void;
+}) {
+  const [stats, setStats] = useState<StudentStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    if (user.role !== "student") {
+      setLoading(false);
+      return;
+    }
+    adminGetStudentStats(user.id)
+      .then((res) => {
+        if (mounted) setStats(res.stats);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => { mounted = false; };
+  }, [user]);
+
+  return (
+    <Card className="border-neutral-800 bg-neutral-900">
+      <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <CardTitle className="text-xs font-semibold">User stats</CardTitle>
+          <div className="text-xs text-muted-foreground mt-1">{user.username} � {user.email ?? en.common.na}</div>
+        </div>
+        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onBack}>
+          Back to users
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {user.role !== "student" && (
+          <div className="text-xs text-muted-foreground">No stats available for admins.</div>
+        )}
+        {user.role === "student" && loading && (
+          <div className="text-xs text-muted-foreground">{en.admin.stats.loading}</div>
+        )}
+        {user.role === "student" && !loading && stats && (
+          <div className="flex flex-col gap-5">
+            {([
+              { label: en.admin.sections.tests, data: stats.tests },
+              { label: en.admin.sections.assignments, data: stats.homework },
+            ]).map(({ label, data }) => (
+              <div key={label} className="flex flex-col gap-3">
+                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">{label}</span>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <StatChip label={en.admin.stats.testsDone} value={`${data.completed}/${data.total}`} />
+                  <StatChip label={en.admin.stats.avgBand} value={data.avgBand ?? en.common.na} icon={<Trophy weight="bold" className="size-3 text-amber-400" />} />
+                  <StatChip label={en.admin.stats.listening} value={data.avgListeningBand ?? en.common.na} icon={<Headphones weight="bold" className="size-3 text-sky-400" />} />
+                  <StatChip label={en.admin.stats.reading} value={data.avgReadingBand ?? en.common.na} icon={<BookOpenIcon weight="bold" className="size-3 text-violet-400" />} />
+                </div>
+                {data.recentAttempts.length > 0 ? (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">{en.admin.stats.recent}</span>
+                    <div className="flex flex-col gap-2">
+                      {data.recentAttempts.map((a, i) => (
+                        <div key={`${label}-${i}`} className="flex flex-col gap-1 rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-xs md:flex-row md:items-center md:justify-between">
+                          <span className="text-muted-foreground">{testMap.get(a.testId) ?? a.testId}</span>
+                          <div className="flex items-center gap-3">
+                            {a.listeningBand != null && <span className="flex items-center gap-0.5 text-sky-400"><Headphones weight="bold" className="size-3" />{a.listeningBand}</span>}
+                            {a.readingBand != null && <span className="flex items-center gap-0.5 text-violet-400"><BookOpenIcon weight="bold" className="size-3" />{a.readingBand}</span>}
+                            {a.band != null && <span className="flex items-center gap-0.5 font-semibold"><Trophy weight="bold" className="size-3 text-amber-400" />{a.band}</span>}
+                            <span className="text-muted-foreground text-[10px]">{a.completedAt ? new Date(a.completedAt).toLocaleDateString() : ""}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground">{en.admin.stats.noData}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        {user.role === "student" && !loading && !stats && (
+          <div className="text-xs text-muted-foreground">{en.admin.stats.noData}</div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function GroupDetailsPage({
+  group,
+  onBack,
+  onViewUser,
+}: {
+  group: Group;
+  onBack: () => void;
+  onViewUser: (userId: string) => void;
+}) {
+  const [statsByUser, setStatsByUser] = useState<Record<string, StudentStats | null>>({});
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    if (group.members.length === 0) return;
+    setLoading(true);
+    Promise.all(
+      group.members.map((member) =>
+        adminGetStudentStats(member.id)
+          .then((res) => [member.id, res.stats] as const)
+          .catch(() => [member.id, null] as const)
+      )
+    )
+      .then((rows) => {
+        if (!mounted) return;
+        const next: Record<string, StudentStats | null> = {};
+        rows.forEach(([id, stats]) => { next[id] = stats; });
+        setStatsByUser(next);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => { mounted = false; };
+  }, [group]);
+
+  return (
+    <Card className="border-neutral-800 bg-neutral-900">
+      <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <CardTitle className="text-xs font-semibold">Group stats</CardTitle>
+          <div className="text-xs text-muted-foreground mt-1">{group.name} � {group.members.length} members</div>
+        </div>
+        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onBack}>
+          Back to groups
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {group.members.length === 0 ? (
+          <div className="text-xs text-muted-foreground">No members yet.</div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Student</TableHead>
+                <TableHead>Tests done</TableHead>
+                <TableHead>Tests avg band</TableHead>
+                <TableHead>Assignments done</TableHead>
+                <TableHead>Assignments avg band</TableHead>
+                <TableHead className="text-right">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {group.members.map((member) => {
+                const stats = statsByUser[member.id];
+                const testsDone = stats ? `${stats.tests.completed}/${stats.tests.total}` : en.common.na;
+                const testsAvg = stats?.tests.avgBand ?? en.common.na;
+                const assignmentsDone = stats ? `${stats.homework.completed}/${stats.homework.total}` : en.common.na;
+                const assignmentsAvg = stats?.homework.avgBand ?? en.common.na;
+                return (
+                <TableRow key={member.id}>
+                  <TableCell className="font-medium">{member.username}</TableCell>
+                  <TableCell className="text-muted-foreground">{loading ? en.admin.stats.loading : testsDone}</TableCell>
+                  <TableCell>{loading ? en.admin.stats.loading : testsAvg}</TableCell>
+                  <TableCell>{loading ? en.admin.stats.loading : assignmentsDone}</TableCell>
+                  <TableCell>{loading ? en.admin.stats.loading : assignmentsAvg}</TableCell>
+                  <TableCell className="text-right">
+                    <Button size="sm" variant="outline" className="h-7 text-xs border-neutral-700" onClick={() => onViewUser(member.id)}>
+                      View stats
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              )})}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 function AssignmentPanel({
@@ -821,6 +992,7 @@ function GroupsPanel({
   groups,
   users,
   tests,
+  onViewGroup,
   onGroupCreated,
   onGroupDeleted,
   onMemberAdded,
@@ -829,6 +1001,7 @@ function GroupsPanel({
   groups: Group[];
   users: ApiUser[];
   tests: TestSummary[];
+  onViewGroup: (group: Group) => void;
   onGroupCreated: (g: Group) => void;
   onGroupDeleted: (id: string) => void;
   onMemberAdded: (groupId: string, user: { id: string; username: string; email: string | null }) => void;
@@ -860,6 +1033,7 @@ function GroupsPanel({
             group={group}
             users={users}
             tests={tests}
+            onView={() => onViewGroup(group)}
             onDelete={async () => {
               await adminDeleteGroup(group.id);
               onGroupDeleted(group.id);
@@ -885,6 +1059,7 @@ function GroupCard({
   group,
   users,
   tests,
+  onView,
   onDelete,
   onAddMember,
   onRemoveMember,
@@ -892,6 +1067,7 @@ function GroupCard({
   group: Group;
   users: ApiUser[];
   tests: TestSummary[];
+  onView: () => void;
   onDelete: () => Promise<void>;
   onAddMember: (userId: string) => Promise<void>;
   onRemoveMember: (userId: string) => Promise<void>;
@@ -910,6 +1086,9 @@ function GroupCard({
         </div>
         <div className="flex items-center gap-2">
           <AssignGroupHomeworkDialog group={group} tests={tests} />
+          <Button size="sm" variant="outline" className="h-7 text-xs border-neutral-700" onClick={onView}>
+            View details
+          </Button>
           <Button
             size="sm"
             variant="ghost"

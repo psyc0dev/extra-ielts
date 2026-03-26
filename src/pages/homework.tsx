@@ -96,29 +96,33 @@ function HomeworkCard({ assignment, status, onOpen }: { assignment: AssignmentSu
             </div>
           </div>
           <div className="flex flex-col items-end gap-1.5 shrink-0">
-            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${cfg.className}`}>{cfg.label}</Badge>
-            {isPastDue && <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-red-800 text-red-400">{en.homework.expired}</Badge>}
-            {!isPastDue && dueStatus && dueStatus !== "upcoming" && (
-              <Badge
-                variant="outline"
-                className={`text-[10px] px-1.5 py-0 ${
-                  dueStatus === "today"
-                    ? "border-red-800 text-red-400"
-                    : dueStatus === "tomorrow"
-                      ? "border-orange-700 text-orange-400"
-                      : dueStatus === "soon"
-                        ? "border-amber-700 text-amber-400"
-                        : "border-sky-700 text-sky-400"
-                }`}
-              >
-                {dueStatus === "today"
-                  ? en.homework.dueStates.today
-                  : dueStatus === "tomorrow"
-                    ? en.homework.dueStates.tomorrow
-                    : dueStatus === "soon"
-                      ? en.homework.dueStates.soon
-                      : en.homework.dueStates.thisWeek}
-              </Badge>
+            {status !== "completed" && (
+              <>
+                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${cfg.className}`}>{cfg.label}</Badge>
+                {isPastDue && <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-red-800 text-red-400">{en.homework.expired}</Badge>}
+                {!isPastDue && dueStatus && dueStatus !== "upcoming" && (
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] px-1.5 py-0 ${
+                      dueStatus === "today"
+                        ? "border-red-800 text-red-400"
+                        : dueStatus === "tomorrow"
+                          ? "border-orange-700 text-orange-400"
+                          : dueStatus === "soon"
+                            ? "border-amber-700 text-amber-400"
+                            : "border-sky-700 text-sky-400"
+                    }`}
+                  >
+                    {dueStatus === "today"
+                      ? en.homework.dueStates.today
+                      : dueStatus === "tomorrow"
+                        ? en.homework.dueStates.tomorrow
+                        : dueStatus === "soon"
+                          ? en.homework.dueStates.soon
+                          : en.homework.dueStates.thisWeek}
+                  </Badge>
+                )}
+              </>
             )}
             {assignment.attempt?.band != null && (
               <span className="flex items-center gap-1 text-xs font-bold">
@@ -188,7 +192,9 @@ function HomeworkDialog({
             {assignment.title}
           </DialogTitle>
           <DialogDescription className="flex items-center gap-2 pt-1">
-            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${cfg.className}`}>{cfg.label}</Badge>
+            {status !== "completed" && (
+              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${cfg.className}`}>{cfg.label}</Badge>
+            )}
           </DialogDescription>
         </DialogHeader>
 

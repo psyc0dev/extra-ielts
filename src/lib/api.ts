@@ -117,13 +117,18 @@ export type Group = {
   members: { id: string; username: string; email: string | null }[];
 };
 
-export type StudentStats = {
-  testsCompleted: number;
-  testsTotal: number;
+export type StudentStatsBucket = {
+  completed: number;
+  total: number;
   avgBand: number | null;
   avgReadingBand: number | null;
   avgListeningBand: number | null;
   recentAttempts: { testId: string; band: number | null; readingBand: number | null; listeningBand: number | null; completedAt: string | null }[];
+};
+
+export type StudentStats = {
+  tests: StudentStatsBucket;
+  homework: StudentStatsBucket;
 };
 
 import Cookies from "js-cookie";

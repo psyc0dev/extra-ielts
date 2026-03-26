@@ -13,7 +13,7 @@ import {
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useNav } from "@/hooks/use-nav";
 import { useAuth } from "@/hooks/use-auth";
-import logo from "../../src-tauri/icons/icon.ico";
+import logo from "../icons/extra.jpg";
 import en from "@/locales/en";
 
 export default function Navbar() {
