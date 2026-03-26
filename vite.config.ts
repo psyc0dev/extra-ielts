@@ -11,6 +11,12 @@ export default defineConfig({
     },
   },
   clearScreen: false,
-  server: { port: 1420, strictPort: true },
+  server: {
+    port: 1420,
+    strictPort: true,
+    watch: {
+      ignored: ['**/server/**', '**/src-tauri/**'],
+    },
+  },
   build: { outDir: 'dist' },
 })

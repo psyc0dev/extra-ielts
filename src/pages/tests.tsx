@@ -372,7 +372,7 @@ export function Tests({
 
   const refresh = async () => {
     const res = await listTests();
-    setTests(res.tests);
+    setTests(res.tests.filter((t) => t.published !== false));
   };
 
   useEffect(() => {

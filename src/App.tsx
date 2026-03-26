@@ -213,7 +213,7 @@ function AppBody() {
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
-    const id = window.setTimeout(() => setShowSplash(false), 1800);
+    const id = window.setTimeout(() => setShowSplash(false), 2500);
     return () => window.clearTimeout(id);
   }, []);
 
