@@ -8,6 +8,7 @@
     dashboard: "Dashboard",
     tests: "Tests",
     homework: "Homework",
+    writing: "Writing",
     admin: "Admin",
     settings: "Settings",
     brand: "extra",
