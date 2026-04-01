@@ -129,6 +129,7 @@ export function Writing() {
           <CardHeader className="px-4 pt-4 pb-3 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-semibold">Evaluation Results</CardTitle>
             <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">{result.word_count} words</span>
               {result.penalty > 0 && (
                 <span className="text-xs text-amber-400">−{result.penalty} penalty</span>
               )}
