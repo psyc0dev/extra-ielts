@@ -1,4 +1,5 @@
 import { useState } from "react";
+import axios from "axios";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,12 +53,11 @@ export function Writing() {
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch("https://psyc0dev-extraai.hf.space/evaluate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, essay }),
-      });
-      const data = await res.json();
+      const { data } = await axios.post(
+        "https://82c6-35-197-62-23.ngrok-free.app/evaluate",
+        { topic, essay },
+        { headers: { "ngrok-skip-browser-warning": "1" } }
+      );
       if (data.error) throw new Error(data.error);
       setResult(data);
     } catch (err) {

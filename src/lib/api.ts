@@ -132,6 +132,7 @@ export type StudentStats = {
 };
 
 import Cookies from "js-cookie";
+import axios from "axios";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8787";
 const TOKEN_KEY = "accessToken";
@@ -149,22 +150,21 @@ export function setToken(token: string | null) {
 }
 
 async function apiFetch<T>(path: string, options: RequestInit = {}) {
-  const headers = new Headers(options.headers ?? {});
-  headers.set("Content-Type", "application/json");
   const token = getToken();
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-  });
-
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const message = data?.error ?? "Request failed";
+  try {
+    const { data } = await axios<T>(`${API_BASE}${path}`, {
+      method: (options.method as string) ?? "GET",
+      data: options.body,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    return data;
+  } catch (err) {
+    const message = axios.isAxiosError(err) ? (err.response?.data?.error ?? "Request failed") : "Request failed";
     throw new Error(message);
   }
-  return data as T;
 }
 
 export async function getBootstrapStatus() {
@@ -248,14 +248,11 @@ export function forceSubmitAttempt(attemptId: string) {
   const token = getToken();
   const url = `${API_BASE}/assignments/attempts/${attemptId}/submit`;
   
-  // Use fetch with keepalive if supported, otherwise just a regular fire-and-forget fetch
-  fetch(url, {
-    method: "POST",
-    keepalive: true,
+  axios.post(url, null, {
     headers: {
-      "Authorization": token ? `Bearer ${token}` : "",
-      "Content-Type": "application/json"
-    }
+      Authorization: token ? `Bearer ${token}` : "",
+      "Content-Type": "application/json",
+    },
   }).catch(() => { /* ignore */ });
 }
 
