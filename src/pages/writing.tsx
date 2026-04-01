@@ -1,13 +1,10 @@
 import { useState } from "react";
-import { Client } from "@gradio/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Sparkle, ArrowClockwise, PaperPlaneTilt } from "@phosphor-icons/react";
 import { toast } from "sonner";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 
 const TOPICS = [
   "Some people think that universities should provide graduates with the knowledge and skills needed in the workplace. Others think that the true function of a university is to give access to knowledge for its own sake. Discuss both views and give your opinion.",
@@ -20,8 +17,18 @@ const TOPICS = [
   "Some people think that a sense of competition in children should be encouraged. Others believe that children who are taught to co-operate rather than compete become more useful adults. Discuss both views and give your opinion.",
 ];
 
+type CriterionScore = { score: number; label: string; comment: string };
 type EvalResult = {
-  summary: string;
+  word_count: number;
+  penalty: number;
+  overall: number;
+  overall_label: string;
+  criteria: {
+    task_response: CriterionScore;
+    coherence_and_cohesion: CriterionScore;
+    lexical_resource: CriterionScore;
+    grammatical_range_and_accuracy: CriterionScore;
+  };
 };
 
 export function Writing() {
@@ -45,10 +52,14 @@ export function Writing() {
     setLoading(true);
     setResult(null);
     try {
-      const client = await Client.connect("https://75ab3dcb50778d916b.gradio.live/");
-      const res = await client.predict("/evaluate", { topic, essay });
-      const [summary] = res.data as [string, ...unknown[]];
-      setResult({ summary });
+      const res = await fetch("https://psyc0dev-extraai.hf.space/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic, essay }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setResult(data);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Evaluation failed.");
     } finally {
@@ -115,21 +126,29 @@ export function Writing() {
 
       {result && (
         <Card className="rounded-xl border-neutral-800 bg-neutral-900">
-          <CardHeader className="px-4 pt-4 pb-3">
+          <CardHeader className="px-4 pt-4 pb-3 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-semibold">Evaluation Results</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            <div className="text-sm leading-relaxed prose prose-invert prose-sm max-w-none
-              [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs
-              [&_th]:border [&_th]:border-neutral-700 [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-semibold [&_th]:bg-neutral-800
-              [&_td]:border [&_td]:border-neutral-700 [&_td]:px-3 [&_td]:py-1.5
-              [&_strong]:text-white [&_em]:text-neutral-300
-              [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-4 [&_li]:mb-0.5
-              [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1
-              [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1
-              [&_hr]:border-neutral-700 [&_hr]:my-2">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.summary}</ReactMarkdown>
+            <div className="flex items-center gap-2">
+              {result.penalty > 0 && (
+                <span className="text-xs text-amber-400">−{result.penalty} penalty</span>
+              )}
+              <Badge variant="outline" className="border-violet-400/40 text-violet-200 text-xs">
+                Overall {result.overall} · {result.overall_label}
+              </Badge>
             </div>
+          </CardHeader>
+          <CardContent className="px-4 pb-4 flex flex-col gap-2">
+            {(Object.entries(result.criteria) as [string, CriterionScore][]).map(([key, val]) => (
+              <div key={key} className="rounded-lg border border-neutral-800 bg-neutral-950 p-3 flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold capitalize text-neutral-300">
+                    {key.replace(/_/g, " ")}
+                  </span>
+                  <span className="text-xs text-violet-300">{val.score} · {val.label}</span>
+                </div>
+                <p className="text-xs text-neutral-400 leading-relaxed">{val.comment}</p>
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}
