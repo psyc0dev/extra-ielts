@@ -1,8 +1,6 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import type { AppEnv, StoreSnapshot, TestDetail } from './lib/types'
-import { loadTestsFromDisk, setTestsCache, setPersistPublished } from './lib/tests'
-import { loadSnapshot, setPersist } from './lib/store'
+import type { AppEnv } from './lib/types'
 import { registerAdminRoutes } from './routes/admin'
 import { registerAssignmentRoutes } from './routes/assignments'
 import { registerAuthRoutes } from './routes/auth'
@@ -10,34 +8,17 @@ import { registerHealthRoutes } from './routes/health'
 import { registerSettingsRoutes } from './routes/settings'
 import { registerTestRoutes } from './routes/tests'
 import { registerWritingRoutes } from './routes/writing'
+import { registerAccountRoutes } from './routes/account'
 
-export const createApp = (options?: {
-  snapshot?: StoreSnapshot
-  persist?: (snapshot: StoreSnapshot) => void
-  persistPublished?: (testId: string, published: boolean) => void
-  publishedOverrides?: Map<string, boolean>
-  tests?: TestDetail[]
-}) => {
+export const createApp = () => {
   const app = new Hono<AppEnv>()
   const api = new Hono<AppEnv>()
 
-  if (options?.persistPublished) {
-    setPersistPublished(options.persistPublished)
-  }
-
-  const tests = options?.tests ?? loadTestsFromDisk(options?.publishedOverrides)
-  setTestsCache(tests)
-  loadSnapshot(options?.snapshot)
-  setPersist(options?.persist)
-
-  api.use(
-    '*',
-    cors({
-      origin: (_origin, c) => c.env?.CORS_ORIGIN ?? '*',
-      allowMethods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      credentials: true,
-    })
-  )
+  api.use('*', cors({
+    origin: (_origin, c) => c.env?.CORS_ORIGIN ?? '*',
+    allowMethods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    credentials: true,
+  }))
 
   registerHealthRoutes(api)
   registerAuthRoutes(api)
@@ -45,14 +26,11 @@ export const createApp = (options?: {
   registerTestRoutes(api)
   registerAssignmentRoutes(api)
   registerWritingRoutes(api)
+  registerAccountRoutes(api)
   registerAdminRoutes(api)
 
-  api.notFound((c) => {
-    return c.json({ error: 'API route not found.' }, 404)
-  })
+  api.notFound((c) => c.json({ error: 'API route not found.' }, 404))
 
   app.route('/api', api)
-  app.route('/', api)
-
   return app
 }

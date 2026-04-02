@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -57,6 +58,7 @@ export function Admin() {
   const [tests, setTests] = useState<TestSummary[]>([]);
   const [homeworkAssignments, setHomeworkAssignments] = useState<AdminAssignment[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [loading, setLoading] = useState(true);
   const [section, setSection] = useState<AdminSection>("overview");
   const [userQuery, setUserQuery] = useState("");
   const [testQuery, setTestQuery] = useState("");
@@ -76,6 +78,7 @@ export function Admin() {
     setTests(testsRes.tests);
     setHomeworkAssignments(homeworkRes.assignments);
     setGroups(groupsRes.groups);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -226,6 +229,14 @@ export function Admin() {
 
           {section === "overview" && (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+              {loading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <Card key={i} className="border-neutral-800 bg-neutral-950/50">
+                    <CardHeader className="pb-2"><Skeleton className="h-3 w-20" /></CardHeader>
+                    <CardContent><Skeleton className="h-8 w-12" /></CardContent>
+                  </Card>
+                ))
+              ) : (<>
               <Card className="border-neutral-800 bg-neutral-950/50">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xs font-semibold">{en.admin.overview.users}</CardTitle>
@@ -250,6 +261,7 @@ export function Admin() {
                 </CardHeader>
                 <CardContent className="text-2xl font-semibold">{groups.length}</CardContent>
               </Card>
+              </>)}
             </div>
           )}
 
@@ -275,15 +287,14 @@ export function Admin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {visibleUsers.map((user) => (
-                      <UserRow
-                        key={user.id}
-                        user={user}
-                        onView={(target) => {
-                          setSelectedUser(target);
-                          setSection("user-details");
-                        }}
-                      />
+                    {loading ? Array.from({ length: 4 }).map((_, i) => (
+                      <TableRow key={i}>
+                        {Array.from({ length: 4 }).map((__, j) => <TableCell key={j}><Skeleton className="h-3 w-full" /></TableCell>)}
+                      </TableRow>
+                    )) : visibleUsers.length === 0 ? (
+                      <TableRow><TableCell colSpan={4} className="text-center text-xs text-muted-foreground py-8">No users found.</TableCell></TableRow>
+                    ) : visibleUsers.map((user) => (
+                      <UserRow key={user.id} user={user} onView={(target) => { setSelectedUser(target); setSection("user-details"); }} />
                     ))}
                   </TableBody>
                 </Table>
@@ -314,7 +325,13 @@ export function Admin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {visibleTests.map((test) => (
+                    {loading ? Array.from({ length: 4 }).map((_, i) => (
+                      <TableRow key={i}>
+                        {Array.from({ length: 5 }).map((__, j) => <TableCell key={j}><Skeleton className="h-3 w-full" /></TableCell>)}
+                      </TableRow>
+                    )) : visibleTests.length === 0 ? (
+                      <TableRow><TableCell colSpan={5} className="text-center text-xs text-muted-foreground py-8">No tests found.</TableCell></TableRow>
+                    ) : visibleTests.map((test) => (
                       <TableRow key={test.id}>
                         <TableCell className="font-medium">{test.title}</TableCell>
                         <TableCell className="text-muted-foreground">{test.durationMinutes} {en.admin.tests.minutesSuffix}</TableCell>
@@ -365,7 +382,13 @@ export function Admin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {visibleAssignments.map((assignment) => (
+                    {loading ? Array.from({ length: 4 }).map((_, i) => (
+                      <TableRow key={i}>
+                        {Array.from({ length: 4 }).map((__, j) => <TableCell key={j}><Skeleton className="h-3 w-full" /></TableCell>)}
+                      </TableRow>
+                    )) : visibleAssignments.length === 0 ? (
+                      <TableRow><TableCell colSpan={4} className="text-center text-xs text-muted-foreground py-8">No assignments found.</TableCell></TableRow>
+                    ) : visibleAssignments.map((assignment) => (
                       <TableRow key={assignment.id}>
                         <TableCell>{testMap.get(assignment.testId) ?? assignment.testId}</TableCell>
                         <TableCell className="capitalize">{assignment.sectionKinds.join(", ")}</TableCell>

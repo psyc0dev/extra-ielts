@@ -1,8 +1,9 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Trophy, BookOpen, Notebook, Fire, ClockCountdown, ArrowRight } from "@phosphor-icons/react";
 import { listAssignments, type AssignmentSummary } from "@/lib/api";
 import { useNav } from "@/hooks/use-nav";
@@ -11,94 +12,62 @@ import en from "@/locales/en";
 export function Dashboard() {
   const [tasks, setTasks] = useState<AssignmentSummary[]>([]);
   const [homework, setHomework] = useState<AssignmentSummary[]>([]);
+  const [loading, setLoading] = useState(true);
   const { setPage } = useNav();
 
   useEffect(() => {
-    listAssignments("task")
-      .then((res) => setTasks(res.assignments))
-      .catch(() => setTasks([]));
-    listAssignments("homework")
-      .then((res) => setHomework(res.assignments))
-      .catch(() => setHomework([]));
+    Promise.all([listAssignments("task"), listAssignments("homework")])
+      .then(([t, h]) => { setTasks(t.assignments); setHomework(h.assignments); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
-  const completedTasks = useMemo(
-    () => tasks.filter((task) => task.attempt?.status === "completed"),
-    [tasks]
-  );
-
-  const completedHomework = useMemo(
-    () => homework.filter((item) => item.attempt?.status === "completed"),
-    [homework]
-  );
+  const completedTasks = useMemo(() => tasks.filter((t) => t.attempt?.status === "completed"), [tasks]);
+  const completedHomework = useMemo(() => homework.filter((h) => h.attempt?.status === "completed"), [homework]);
 
   const avgBand = useMemo(() => {
-    const bands = completedTasks.map((task) => task.attempt?.band).filter((b): b is number => b != null);
-    if (!bands.length) return 0;
-    return +(bands.reduce((a, b) => a + b, 0) / bands.length).toFixed(2);
+    const bands = completedTasks.map((t) => t.attempt?.band).filter((b): b is number => b != null);
+    return bands.length ? +(bands.reduce((a, b) => a + b, 0) / bands.length).toFixed(2) : 0;
   }, [completedTasks]);
 
   const avgListeningBand = useMemo(() => {
-    const bands = completedTasks
-      .map((task) => task.attempt?.listeningBand)
-      .filter((b): b is number => b != null);
-    if (!bands.length) return null;
-    return +(bands.reduce((a, b) => a + b, 0) / bands.length).toFixed(1);
+    const bands = completedTasks.map((t) => t.attempt?.listeningBand).filter((b): b is number => b != null);
+    return bands.length ? +(bands.reduce((a, b) => a + b, 0) / bands.length).toFixed(1) : null;
   }, [completedTasks]);
 
   const avgReadingBand = useMemo(() => {
-    const bands = completedTasks
-      .map((task) => task.attempt?.readingBand)
-      .filter((b): b is number => b != null);
-    if (!bands.length) return null;
-    return +(bands.reduce((a, b) => a + b, 0) / bands.length).toFixed(1);
+    const bands = completedTasks.map((t) => t.attempt?.readingBand).filter((b): b is number => b != null);
+    return bands.length ? +(bands.reduce((a, b) => a + b, 0) / bands.length).toFixed(1) : null;
   }, [completedTasks]);
 
-  const recentTests = useMemo(
-    () => completedTasks.slice(0, 3).map((task) => ({
-      name: task.title,
-      date: task.attempt?.completedAt ? new Date(task.attempt.completedAt).toLocaleDateString() : "",
-      score: task.attempt?.band ?? 0,
-      status: en.dashboard.recentTests.status,
-    })),
-    [completedTasks]
-  );
+  const recentTests = useMemo(() => completedTasks.slice(0, 3).map((t) => ({
+    name: t.title,
+    date: t.attempt?.completedAt ? new Date(t.attempt.completedAt).toLocaleDateString() : "",
+    score: t.attempt?.band ?? 0,
+    status: en.dashboard.recentTests.status,
+  })), [completedTasks]);
 
-  const upcomingHomework = useMemo(
-    () => homework
-      .filter((item) => item.attempt?.status !== "completed" && item.dueAt)
-      .sort((a, b) => new Date(a.dueAt ?? 0).getTime() - new Date(b.dueAt ?? 0).getTime())
-      .slice(0, 3)
-      .map((item) => ({
-        id: item.id,
-        title: item.title,
-        due: item.dueAt ? new Date(item.dueAt).toLocaleDateString() : "",
-        urgent: item.dueAt ? new Date(item.dueAt).getTime() - Date.now() < 2 * 24 * 60 * 60 * 1000 : false,
-      })),
-    [homework]
-  );
-
-  const computeStreak = (entries: AssignmentSummary[]) => {
-    const pad = (value: number) => value.toString().padStart(2, "0");
-    const toKey = (value: Date) => `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
-    const keys = new Set<string>();
-    const addAttempt = (attempt?: AssignmentSummary["attempt"]) => {
-      if (!attempt?.completedAt) return;
-      const date = new Date(attempt.completedAt);
-      keys.add(toKey(date));
-    };
-    entries.forEach((entry) => addAttempt(entry.attempt));
-    let streak = 0;
-    const today = new Date();
-    const current = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    while (keys.has(toKey(current))) {
-      streak += 1;
-      current.setDate(current.getDate() - 1);
-    }
-    return streak;
-  };
+  const upcomingHomework = useMemo(() => homework
+    .filter((h) => h.attempt?.status !== "completed" && h.dueAt)
+    .sort((a, b) => new Date(a.dueAt ?? 0).getTime() - new Date(b.dueAt ?? 0).getTime())
+    .slice(0, 3)
+    .map((h) => ({
+      id: h.id,
+      title: h.title,
+      due: h.dueAt ? new Date(h.dueAt).toLocaleDateString() : "",
+      urgent: h.dueAt ? new Date(h.dueAt).getTime() - Date.now() < 2 * 24 * 60 * 60 * 1000 : false,
+    })), [homework]);
 
   const streak = useMemo(() => {
+    const computeStreak = (entries: AssignmentSummary[]) => {
+      const pad = (v: number) => v.toString().padStart(2, "0");
+      const toKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      const keys = new Set(entries.filter((e) => e.attempt?.completedAt).map((e) => toKey(new Date(e.attempt!.completedAt!))));
+      let s = 0;
+      const cur = new Date(); cur.setHours(0, 0, 0, 0);
+      while (keys.has(toKey(cur))) { s++; cur.setDate(cur.getDate() - 1); }
+      return s;
+    };
     return Math.max(computeStreak(completedTasks), computeStreak(completedHomework));
   }, [completedTasks, completedHomework]);
 
@@ -107,6 +76,37 @@ export function Dashboard() {
     const latest = tasks[0];
     return `${latest.title} • ${latest.attempt?.band ?? en.common.notAvailable}`;
   }, [tasks]);
+
+  const statCards = [
+    {
+      icon: <Trophy weight="bold" className="size-3.5" />,
+      label: en.dashboard.stats.overallBand,
+      value: avgBand || "-",
+      sub: en.dashboard.stats.target,
+      onClick: () => setPage("Tests"),
+    },
+    {
+      icon: <BookOpen weight="bold" className="size-3.5" />,
+      label: en.dashboard.stats.testsTaken,
+      value: completedTasks.length,
+      sub: en.dashboard.stats.testsTakenSub,
+      onClick: () => setPage("Tests"),
+    },
+    {
+      icon: <Notebook weight="bold" className="size-3.5" />,
+      label: en.dashboard.stats.homeworkDone,
+      value: <span>{completedHomework.length}<span className="text-lg text-muted-foreground">/{homework.length}</span></span>,
+      sub: en.dashboard.stats.homeworkPending(Math.max(0, homework.length - completedHomework.length)),
+      onClick: () => setPage("Homework"),
+    },
+    {
+      icon: <Fire weight="bold" className="size-3.5" />,
+      label: en.dashboard.stats.streak,
+      value: streak,
+      sub: en.dashboard.stats.streakSub,
+      onClick: undefined,
+    },
+  ];
 
   return (
     <div className="p-5 flex flex-col gap-4 font-body">
@@ -119,59 +119,26 @@ export function Dashboard() {
             <p className="text-xs text-muted-foreground max-w-lg">{en.dashboard.hero.subtitle}</p>
           </div>
           <div className="flex flex-col gap-1 text-right text-xs text-muted-foreground">
-            <span>{en.dashboard.hero.latestMission(focusBadge)}</span>
-            <span>{en.dashboard.hero.summary(completedTasks.length, homework.length)}</span>
+            {loading ? <><Skeleton className="h-3 w-40 ml-auto" /><Skeleton className="h-3 w-32 ml-auto mt-1" /></> : (
+              <><span>{en.dashboard.hero.latestMission(focusBadge)}</span><span>{en.dashboard.hero.summary(completedTasks.length, homework.length)}</span></>
+            )}
           </div>
         </div>
       </div>
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card className="rounded-xl border-neutral-800 bg-neutral-900 cursor-pointer hover:border-neutral-700 transition-colors" onClick={() => setPage("Tests")}>
-          <CardHeader className="pb-2 pt-4 px-4">
-            <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-              <Trophy weight="bold" className="size-3.5" /> {en.dashboard.stats.overallBand}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            <span className="text-3xl font-bold">{avgBand || "-"}</span>
-            <p className="text-xs text-muted-foreground mt-1">{en.dashboard.stats.target}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-xl border-neutral-800 bg-neutral-900 cursor-pointer hover:border-neutral-700 transition-colors" onClick={() => setPage("Tests")}>
-          <CardHeader className="pb-2 pt-4 px-4">
-            <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-              <BookOpen weight="bold" className="size-3.5" /> {en.dashboard.stats.testsTaken}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            <span className="text-3xl font-bold">{completedTasks.length}</span>
-            <p className="text-xs text-muted-foreground mt-1">{en.dashboard.stats.testsTakenSub}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-xl border-neutral-800 bg-neutral-900 cursor-pointer hover:border-neutral-700 transition-colors" onClick={() => setPage("Homework")}>
-          <CardHeader className="pb-2 pt-4 px-4">
-            <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-              <Notebook weight="bold" className="size-3.5" /> {en.dashboard.stats.homeworkDone}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            <span className="text-3xl font-bold">{completedHomework.length}<span className="text-lg text-muted-foreground">/{homework.length}</span></span>
-            <p className="text-xs text-muted-foreground mt-1">{en.dashboard.stats.homeworkPending(Math.max(0, homework.length - completedHomework.length))}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-xl border-neutral-800 bg-neutral-900">
-          <CardHeader className="pb-2 pt-4 px-4">
-            <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-              <Fire weight="bold" className="size-3.5" /> {en.dashboard.stats.streak}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            <span className="text-3xl font-bold">{streak}</span>
-            <p className="text-xs text-muted-foreground mt-1">{en.dashboard.stats.streakSub}</p>
-          </CardContent>
-        </Card>
+        {statCards.map((card, i) => (
+          <Card key={i} className={`rounded-xl border-neutral-800 bg-neutral-900 ${card.onClick ? "cursor-pointer hover:border-neutral-700 transition-colors" : ""}`} onClick={card.onClick}>
+            <CardHeader className="pb-2 pt-4 px-4">
+              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-2">{card.icon} {card.label}</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4">
+              {loading ? <><Skeleton className="h-8 w-12" /><Skeleton className="h-2.5 w-24 mt-2" /></> : (
+                <><span className="text-3xl font-bold">{card.value}</span><p className="text-xs text-muted-foreground mt-1">{card.sub}</p></>
+              )}
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-4">
@@ -180,22 +147,27 @@ export function Dashboard() {
             <CardTitle className="text-sm font-semibold">{en.dashboard.skillBreakdown.title}</CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4 flex flex-col gap-4">
-            {[
-              { key: "listening", label: en.dashboard.skillBreakdown.skills.listening, band: avgListeningBand },
-              { key: "reading", label: en.dashboard.skillBreakdown.skills.reading, band: avgReadingBand },
-            ].map((entry) => (
-              <div key={entry.key} className="flex flex-col gap-1">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">{entry.label}</span>
-                  <span className="font-semibold">{entry.band ?? en.common.na}</span>
+            {loading ? (
+              Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="flex flex-col gap-1">
+                  <div className="flex justify-between"><Skeleton className="h-3 w-16" /><Skeleton className="h-3 w-8" /></div>
+                  <Skeleton className="h-1.5 w-full" />
                 </div>
-                <Progress
-                  value={entry.band != null ? (entry.band / 9) * 100 : 0}
-                  className="h-1.5"
-                  indicatorClassName={entry.key === "listening" ? "bg-sky-500" : "bg-emerald-500"}
-                />
-              </div>
-            ))}
+              ))
+            ) : (
+              [
+                { key: "listening", label: en.dashboard.skillBreakdown.skills.listening, band: avgListeningBand, color: "bg-sky-500" },
+                { key: "reading", label: en.dashboard.skillBreakdown.skills.reading, band: avgReadingBand, color: "bg-emerald-500" },
+              ].map((entry) => (
+                <div key={entry.key} className="flex flex-col gap-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">{entry.label}</span>
+                    <span className="font-semibold">{entry.band ?? en.common.na}</span>
+                  </div>
+                  <Progress value={entry.band != null ? (entry.band / 9) * 100 : 0} className="h-1.5" indicatorClassName={entry.color} />
+                </div>
+              ))
+            )}
             <p className="text-[10px] text-muted-foreground">{en.dashboard.skillBreakdown.note}</p>
           </CardContent>
         </Card>
@@ -208,11 +180,18 @@ export function Dashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4 flex flex-col gap-3">
-            {upcomingHomework.length === 0 ? (
+            {loading ? (
+              Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="rounded-lg border border-neutral-800 px-3 py-3 flex flex-col gap-1.5">
+                  <Skeleton className="h-3 w-3/4" />
+                  <Skeleton className="h-2.5 w-1/2" />
+                </div>
+              ))
+            ) : upcomingHomework.length === 0 ? (
               <div className="text-xs text-muted-foreground py-6">{en.dashboard.upcomingHomework.empty}</div>
             ) : (
               upcomingHomework.map((hw) => (
-                <div key={hw.id} className="flex items-center justify-between gap-3 rounded-lg border border-neutral-800 px-3 py-3 text-xs transition-colors hover:border-emerald-500/50" onClick={() => setPage("Homework", hw.id)}>
+                <div key={hw.id} className="flex items-center justify-between gap-3 rounded-lg border border-neutral-800 px-3 py-3 text-xs transition-colors hover:border-emerald-500/50 cursor-pointer" onClick={() => setPage("Homework", hw.id)}>
                   <div className="flex flex-col gap-0.5">
                     <span className="font-medium text-sm">{hw.title}</span>
                     <span className="text-xs text-muted-foreground">{en.dashboard.upcomingHomework.duePrefix(hw.due)}</span>
@@ -221,9 +200,7 @@ export function Dashboard() {
                     <Badge variant="outline" className={hw.urgent ? "border-red-800 text-red-400" : "border-neutral-700 text-muted-foreground"}>
                       {hw.urgent ? en.dashboard.upcomingHomework.urgent : en.dashboard.upcomingHomework.upcoming}
                     </Badge>
-                    <Button variant="ghost" size="xs" onClick={(e) => { e.stopPropagation(); setPage("Homework", hw.id); }}>
-                      {en.tests.actions.continue}
-                    </Button>
+                    <Button variant="ghost" size="xs" onClick={(e) => { e.stopPropagation(); setPage("Homework", hw.id); }}>{en.tests.actions.continue}</Button>
                   </div>
                 </div>
               ))
@@ -242,7 +219,14 @@ export function Dashboard() {
           </CardTitle>
         </CardHeader>
         <CardContent className="px-4 pb-4 flex flex-col">
-          {recentTests.length === 0 ? (
+          {loading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between py-3 border-b border-neutral-800 last:border-0">
+                <div className="flex flex-col gap-1"><Skeleton className="h-3 w-32" /><Skeleton className="h-2.5 w-20 mt-0.5" /></div>
+                <div className="flex items-center gap-3"><Skeleton className="h-4 w-8" /><Skeleton className="h-5 w-16 rounded-full" /></div>
+              </div>
+            ))
+          ) : recentTests.length === 0 ? (
             <div className="text-xs text-muted-foreground py-6">{en.dashboard.recentTests.empty}</div>
           ) : (
             recentTests.map((test, i) => (

@@ -19,7 +19,7 @@ import Navbar from "./components/Navbar";
 import { TimerWidget } from "./components/TimerWidget";
 import en from "./locales/en";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
-import { getSettings, updateSettings, type UserSettings } from "@/lib/api";
+import { getSettings, updateSettings, type UserSettings, type ApiUser } from "@/lib/api";
 import LoadingScreen from "./components/LoadingScreen";
 
 const defaultSettings: UserSettings = {
@@ -35,8 +35,8 @@ interface ActiveTest {
 
 function PageContent({
   onSignOut,
-  username,
-  role,
+  user,
+  onUserUpdate,
   settings,
   onSettingsChange,
   onStartTest,
@@ -46,8 +46,8 @@ function PageContent({
   isAdmin,
 }: {
   onSignOut: () => void;
-  username: string;
-  role: string;
+  user: ApiUser;
+  onUserUpdate: (u: ApiUser) => void;
   settings: UserSettings;
   onSettingsChange: (patch: Partial<UserSettings>) => void;
   onStartTest: (name: string, seconds: number) => void;
@@ -74,8 +74,8 @@ function PageContent({
     Settings: (
       <Settings
         onSignOut={onSignOut}
-        username={username}
-        role={role}
+        user={user}
+        onUserUpdate={onUserUpdate}
         settings={settings}
         onSettingsChange={onSettingsChange}
       />
@@ -120,18 +120,18 @@ function PageContent({
 
 function AppShell({
   onSignOut,
-  username,
+  user,
+  onUserUpdate,
   isFullscreen,
   setIsFullscreen,
   isAdmin,
-  role,
 }: {
   onSignOut: () => void;
-  username: string;
+  user: ApiUser;
+  onUserUpdate: (u: ApiUser) => void;
   isFullscreen: boolean;
   setIsFullscreen: (v: boolean) => void;
   isAdmin: boolean;
-  role: string;
 }) {
   const { timerActive, setTimerActive } = useNav();
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
@@ -176,8 +176,8 @@ function AppShell({
             <SidebarInset>
               <PageContent
                 onSignOut={onSignOut}
-                username={username}
-                role={role}
+                user={user}
+                onUserUpdate={onUserUpdate}
                 settings={settings}
                 onSettingsChange={handleSettingsChange}
                 onStartTest={(name, seconds) => {
@@ -210,7 +210,7 @@ function AppShell({
 }
 
 function AppBody() {
-  const { user, loading, loginUser, logoutUser, bootstrap, needsBootstrap } = useAuth();
+  const { user, loading, loginUser, logoutUser, bootstrap, needsBootstrap, refreshUser } = useAuth();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
 
@@ -224,11 +224,12 @@ function AppBody() {
   }
 
   return (
-    <div
-      className="dark flex flex-col h-screen font-sans bg-neutral-900 text-white overflow-hidden"
-      style={{ clipPath: isFullscreen ? "none" : "inset(0 round 6px)", transition: "clip-path 0.3s ease" }}
-    >
+    <>
       <Toaster />
+      <div
+        className="dark flex flex-col h-screen font-sans bg-neutral-900 text-white overflow-hidden"
+        style={{ clipPath: isFullscreen ? "none" : "inset(0 round 6px)", transition: "clip-path 0.3s ease" }}
+      >
       {!user ? (
         <div className="flex flex-col flex-1">
           <div data-tauri-drag-region className="flex h-9 items-center justify-end select-none border-b border-neutral-800">
@@ -256,16 +257,17 @@ function AppBody() {
           <TooltipProvider>
             <AppShell
               onSignOut={logoutUser}
-              username={user.username}
+              user={user}
+              onUserUpdate={(updated) => refreshUser().catch(() => undefined)}
               isFullscreen={isFullscreen}
               setIsFullscreen={setIsFullscreen}
               isAdmin={user.role === "admin"}
-              role={user.role}
             />
           </TooltipProvider>
         </NavProvider>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 

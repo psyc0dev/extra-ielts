@@ -28,6 +28,7 @@ export type ApiUser = {
   username: string
   email: string | null
   role: Role
+  avatarUrl?: string | null
 }
 
 export type UserSettings = {
@@ -167,6 +168,7 @@ export type StudentStats = {
 
 export type User = ApiUser & {
   passwordHash: string
+  avatarUrl?: string | null
 }
 
 export type Assignment = {
@@ -219,12 +221,14 @@ export type StoreSnapshot = {
 }
 
 export type Bindings = {
-  DB?: {
-    prepare: (query: string) => {
-      first?: () => Promise<unknown>
-    }
-  }
+  DB: D1Database
   CORS_ORIGIN?: string
+  JWT_SECRET: string
+  EVALUATOR_URL?: string
+  GENERATOR_URL?: string
+  RESEND_API_KEY?: string
+  RESEND_FROM?: string
+  APP_URL?: string
 }
 
 type AppVariables = {

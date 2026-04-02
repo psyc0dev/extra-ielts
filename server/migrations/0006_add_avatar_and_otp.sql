@@ -1,0 +1,8 @@
+ALTER TABLE users ADD COLUMN avatar_url TEXT;
+
+CREATE TABLE IF NOT EXISTS otp_tokens (
+  otp TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);

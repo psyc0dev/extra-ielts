@@ -1,70 +1,29 @@
-import { mkdirSync, readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import type { TestDetail } from './types'
+// Tests are bundled at build time — import all JSON files from data/tests
+// Add new test imports here as needed
+import quickPractice from '../data/tests/quick-practice.json'
 
-const testsDir = process.env.TESTS_DIR ?? join(import.meta.dir, '..', 'data', 'tests')
+const raw: unknown[] = [quickPractice]
 
-let testsCache: TestDetail[] = []
-let persistPublished: ((testId: string, published: boolean) => void) | null = null
-
-const ensureTestsDir = () => {
-  mkdirSync(testsDir, { recursive: true })
+const normalizeTest = (r: unknown): TestDetail => {
+  const t = r as TestDetail
+  return { ...t, published: t.published ?? false, sections: t.sections ?? [] }
 }
 
-const normalizeTest = (raw: TestDetail): TestDetail => ({
-  ...raw,
-  published: false,
-  sections: raw.sections ?? [],
-})
-
-export const setPersistPublished = (fn: (testId: string, published: boolean) => void) => {
-  persistPublished = fn
-}
-
-export const loadTestsFromDisk = (publishedOverrides?: Map<string, boolean>) => {
-  ensureTestsDir()
-
-  const files = readdirSync(testsDir).filter((file) => file.endsWith('.json')).sort()
-  const tests: TestDetail[] = []
-
-  for (const file of files) {
-    const filePath = join(testsDir, file)
-    const raw = JSON.parse(readFileSync(filePath, 'utf8'))
-
-    const push = (item: TestDetail) => {
-      const test = normalizeTest(item)
-      if (publishedOverrides?.has(test.id)) {
-        test.published = publishedOverrides.get(test.id)!
-      }
-      tests.push(test)
-    }
-
-    if (Array.isArray(raw)) { raw.forEach((item) => push(item as TestDetail)); continue }
-    if (raw && Array.isArray(raw.tests)) { raw.tests.forEach((item: TestDetail) => push(item)); continue }
-    if (raw && raw.test) { push(raw.test as TestDetail); continue }
-    push(raw as TestDetail)
+const flatten = (items: unknown[]): TestDetail[] => {
+  const out: TestDetail[] = []
+  for (const item of items) {
+    if (Array.isArray(item)) { item.forEach((i) => out.push(normalizeTest(i))); continue }
+    const obj = item as Record<string, unknown>
+    if (Array.isArray(obj.tests)) { (obj.tests as unknown[]).forEach((i) => out.push(normalizeTest(i))); continue }
+    if (obj.test) { out.push(normalizeTest(obj.test)); continue }
+    out.push(normalizeTest(item))
   }
-
-  testsCache = tests
-  return testsCache
+  return out
 }
 
-export const getTestsCache = () => testsCache
+export const getTests = (publishedOverrides?: Map<string, boolean>): TestDetail[] =>
+  flatten(raw).map((t) => publishedOverrides?.has(t.id) ? { ...t, published: publishedOverrides.get(t.id)! } : t)
 
-export const getTests = () => (testsCache.length ? testsCache : loadTestsFromDisk())
-
-export const getTestById = (testId: string) => getTests().find((test) => test.id === testId) ?? null
-
-export const setTestsCache = (tests: TestDetail[]) => {
-  testsCache = tests.map(normalizeTest)
-}
-
-export const updateTestPublished = (testId: string, published: boolean) => {
-  const test = testsCache.find((t) => t.id === testId)
-  if (!test) return null
-  test.published = published
-  persistPublished?.(testId, published)
-  return test
-}
-
-export const getTestsDir = () => testsDir
+export const getTestById = (id: string, publishedOverrides?: Map<string, boolean>) =>
+  getTests(publishedOverrides).find((t) => t.id === id) ?? null

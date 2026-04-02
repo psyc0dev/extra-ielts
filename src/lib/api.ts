@@ -3,6 +3,7 @@
   username: string;
   email: string | null;
   role: "admin" | "student";
+  avatarUrl?: string | null;
 };
 export type UserSettings = {
   notifications: boolean;
@@ -135,7 +136,7 @@ export type StudentStats = {
 import Cookies from "js-cookie";
 import axios from "axios";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8787";
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
 const TOKEN_KEY = "accessToken";
 
 function getToken() {
@@ -331,6 +332,31 @@ export async function adminAssignToGroup(groupId: string, payload: { type: "task
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function requestPasswordReset(email: string) {
+  return apiFetch<{ ok: boolean }>('/account/request-password-reset', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  })
+}
+
+export async function resetPassword(otp: string, password: string) {
+  return apiFetch<{ ok: boolean }>('/account/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ otp, password }),
+  })
+}
+
+export async function uploadAvatar(dataUrl: string) {
+  return apiFetch<{ avatarUrl: string }>('/account/avatar', {
+    method: 'POST',
+    body: JSON.stringify({ dataUrl }),
+  })
+}
+
+export async function deleteAccount() {
+  return apiFetch<{ ok: boolean }>('/account', { method: 'DELETE' })
 }
 
 export async function generateWritingTopic() {

@@ -1,17 +1,21 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "extra-ielts",
+  "name": "api",
   "main": "server/worker.ts",
   "compatibility_date": "2026-03-01",
+  "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "ielts-delivery-system",
-      "database_id": "<add-your-d1-id>",
+      "database_name": "extra-db",
+      "database_id": "b10c9082-e3e2-47cd-adde-15209b05a1ad",
       "migrations_dir": "./server/migrations"
     }
   ],
   "vars": {
-    "CORS_ORIGIN": "*"
+    "CORS_ORIGIN": "*",
+    "EVALUATOR_URL": "https://82c6-35-197-62-23.ngrok-free.app",
+    "GENERATOR_URL": "https://extra-corporation-extra-ai-generator.hf.space",
+    "RESEND_FROM": "extra IELTS <onboarding@resend.dev>"
   }
 }
