@@ -1,8 +1,8 @@
 @echo off
 setlocal EnableDelayedExpansion
 
-if exist ai\extra-ai-evaluator\.git move ai\extra-ai-evaluator\.git ai\extra-ai-evaluator\.git.bak >nul
-if exist ai\extra-ai-generator\.git move ai\extra-ai-generator\.git ai\extra-ai-generator\.git.bak >nul
+if exist ai\extra-ai-evaluator\.git rename ai\extra-ai-evaluator\.git .git.bak >nul
+if exist ai\extra-ai-generator\.git rename ai\extra-ai-generator\.git .git.bak >nul
 
 git add .
 set "files="
@@ -32,5 +32,5 @@ if not defined files (
 git commit -m "!msg!"
 git push origin main
 
-if exist ai\extra-ai-evaluator\.git.bak move ai\extra-ai-evaluator\.git.bak ai\extra-ai-evaluator\.git >nul
-if exist ai\extra-ai-generator\.git.bak move ai\extra-ai-generator\.git.bak ai\extra-ai-generator\.git >nul
+if exist ai\extra-ai-evaluator\.git.bak rename ai\extra-ai-evaluator\.git.bak .git >nul
+if exist ai\extra-ai-generator\.git.bak rename ai\extra-ai-generator\.git.bak .git >nul
