@@ -34,7 +34,7 @@ export function Writing() {
     setEssay("");
     try {
       const data = await generateWritingTopic();
-      if ((data as { error?: string }).error) throw new Error((data as { error: string }).error);
+      if (data.error) throw new Error(data.error);
       setTopic(data.topic);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to generate topic.");
@@ -52,7 +52,7 @@ export function Writing() {
     setResult(null);
     try {
       const data = await evaluateWritingEssay({ topic, essay });
-      if ((data as { error?: string }).error) throw new Error((data as { error: string }).error);
+      if (data.error) throw new Error(data.error);
       setResult(data);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Evaluation failed.");

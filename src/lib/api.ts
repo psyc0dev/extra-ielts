@@ -334,7 +334,7 @@ export async function adminAssignToGroup(groupId: string, payload: { type: "task
 }
 
 export async function generateWritingTopic() {
-  return apiFetch<{ topic: string }>('/writing/generate', { method: 'POST' })
+  return apiFetch<{ topic: string; error?: string }>('/writing/generate', { method: 'POST' })
 }
 
 export async function evaluateWritingEssay(payload: { topic: string; essay: string }) {
@@ -343,7 +343,13 @@ export async function evaluateWritingEssay(payload: { topic: string; essay: stri
     penalty: number
     overall: number
     overall_label: string
-    criteria: Record<string, { score: number; label: string; comment: string }>
+    error?: string
+    criteria: {
+      task_response: { score: number; label: string; comment: string }
+      coherence_and_cohesion: { score: number; label: string; comment: string }
+      lexical_resource: { score: number; label: string; comment: string }
+      grammatical_range_and_accuracy: { score: number; label: string; comment: string }
+    }
   }>('/writing/evaluate', { method: 'POST', body: JSON.stringify(payload) })
 }
 
