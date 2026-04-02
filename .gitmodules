@@ -1,0 +1,3 @@
+[submodule "ai/extra-ai-evaluator"]
+	path = ai/extra-ai-evaluator
+	url = https://huggingface.co/spaces/extra-corporation/extraAI
