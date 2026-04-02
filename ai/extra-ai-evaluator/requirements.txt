@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+nest_asyncio
+transformers
+torch
+outlines
+pydantic
+huggingface_hub
+accelerate
+bitsandbytes
