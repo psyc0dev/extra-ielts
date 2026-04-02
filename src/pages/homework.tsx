@@ -188,8 +188,8 @@ export function Homework({ onStartTest, onStopTest, timerActive }: {
   onStartTest: (name: string, seconds: number) => void; onStopTest: () => void; timerActive: boolean;
 }) {
   const [loading, setLoading] = useState(true);
+  const sk = useDelayedLoading(loading);
   const [assignments, setAssignments] = useState<AssignmentSummary[]>([]);
-  const showSkeleton = useDelayedLoading(loading);
   const [activeAttempt, setActiveAttempt] = useState<AssignmentAttemptDetail | null>(null);
   const [selected, setSelected] = useState<AssignmentSummary | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -264,7 +264,7 @@ export function Homework({ onStartTest, onStopTest, timerActive }: {
 
         <ScrollArea className="w-full" type="scroll">
           <div className="grid gap-3">
-            {loading && !showSkeleton ? null : loading ? (
+            {sk ? (
               Array.from({ length: 3 }).map((_, i) => <HomeworkCardSkeleton key={i} />)
             ) : assignments.length === 0 ? (
               <div className="flex items-center justify-center py-10 text-xs text-muted-foreground">{en.homework.empty}</div>

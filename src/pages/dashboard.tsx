@@ -14,7 +14,7 @@ export function Dashboard() {
   const [tasks, setTasks] = useState<AssignmentSummary[]>([]);
   const [homework, setHomework] = useState<AssignmentSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const showSkeleton = useDelayedLoading(loading);
+  const sk = useDelayedLoading(loading);
   const { setPage } = useNav();
 
   useEffect(() => {
@@ -86,8 +86,6 @@ export function Dashboard() {
     { icon: <Fire weight="bold" className="size-3.5" />, label: en.dashboard.stats.streak, value: streak, sub: en.dashboard.stats.streakSub, onClick: undefined },
   ];
 
-  const sk = loading && showSkeleton;
-
   return (
     <div className="p-5 flex flex-col gap-4 font-body">
       <div className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-[linear-gradient(135deg,rgba(22,22,22,0.9),rgba(5,30,52,0.95))] p-5">
@@ -99,9 +97,9 @@ export function Dashboard() {
             <p className="text-xs text-muted-foreground max-w-lg">{en.dashboard.hero.subtitle}</p>
           </div>
           <div className="flex flex-col gap-1 text-right text-xs text-muted-foreground">
-            {sk ? <><Skeleton className="h-3 w-40 ml-auto" /><Skeleton className="h-3 w-32 ml-auto mt-1" /></> : !loading ? (
+            {sk ? <><Skeleton className="h-3 w-40 ml-auto" /><Skeleton className="h-3 w-32 ml-auto mt-1" /></> : (
               <><span>{en.dashboard.hero.latestMission(focusBadge)}</span><span>{en.dashboard.hero.summary(completedTasks.length, homework.length)}</span></>
-            ) : null}
+            )}
           </div>
         </div>
       </div>
@@ -113,9 +111,9 @@ export function Dashboard() {
               <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-2">{card.icon} {card.label}</CardTitle>
             </CardHeader>
             <CardContent className="px-4 pb-4">
-              {sk ? <><Skeleton className="h-8 w-12" /><Skeleton className="h-2.5 w-24 mt-2" /></> : !loading ? (
+              {sk ? <><Skeleton className="h-8 w-12" /><Skeleton className="h-2.5 w-24 mt-2" /></> : (
                 <><span className="text-3xl font-bold">{card.value}</span><p className="text-xs text-muted-foreground mt-1">{card.sub}</p></>
-              ) : null}
+              )}
             </CardContent>
           </Card>
         ))}

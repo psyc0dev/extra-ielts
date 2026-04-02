@@ -60,8 +60,7 @@ export function Admin() {
   const [homeworkAssignments, setHomeworkAssignments] = useState<AdminAssignment[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
-  const showSkeleton = useDelayedLoading(loading);
-  const sk = loading && showSkeleton;
+  const sk = useDelayedLoading(loading);
   const [section, setSection] = useState<AdminSection>("overview");
   const [userQuery, setUserQuery] = useState("");
   const [testQuery, setTestQuery] = useState("");
