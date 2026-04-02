@@ -7,16 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Sparkle, ArrowClockwise, PaperPlaneTilt } from "@phosphor-icons/react";
 import { toast } from "sonner";
 
-const TOPICS = [
-  "Some people think that universities should provide graduates with the knowledge and skills needed in the workplace. Others think that the true function of a university is to give access to knowledge for its own sake. Discuss both views and give your opinion.",
-  "In many countries, the proportion of older people is steadily increasing. Does this trend have more positive or negative effects on society?",
-  "The best way to solve the world's environmental problems is to increase the price of fuel. To what extent do you agree or disagree?",
-  "Some people believe that it is best to accept a bad situation, such as an unsatisfactory job or shortage of money. Others argue that it is better to try and improve such situations. Discuss both views and give your opinion.",
-  "Governments should spend money on railways rather than roads. To what extent do you agree or disagree?",
-  "Many people believe that social networking sites have had a huge negative impact on both individuals and society. To what extent do you agree?",
-  "In some countries, owning a home rather than renting one is very important for people. Why might this be the case? Do you think this is a positive or negative situation?",
-  "Some people think that a sense of competition in children should be encouraged. Others believe that children who are taught to co-operate rather than compete become more useful adults. Discuss both views and give your opinion.",
-];
+const EVALUATOR_URL = import.meta.env.VITE_EVALUATOR_URL;
+const GENERATOR_URL = import.meta.env.VITE_GENERATOR_URL;
 
 type CriterionScore = { score: number; label: string; comment: string };
 type EvalResult = {
@@ -36,13 +28,22 @@ export function Writing() {
   const [topic, setTopic] = useState("");
   const [essay, setEssay] = useState("");
   const [loading, setLoading] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<EvalResult | null>(null);
 
-  const generateTopic = () => {
-    const next = TOPICS[Math.floor(Math.random() * TOPICS.length)];
-    setTopic(next);
+  const generateTopic = async () => {
+    setGenerating(true);
     setResult(null);
     setEssay("");
+    try {
+      const { data } = await axios.post(`${GENERATOR_URL}/generate`);
+      if (data.error) throw new Error(data.error);
+      setTopic(data.topic);
+    } catch {
+      toast.error("Failed to generate topic.");
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const evaluate = async () => {
@@ -54,7 +55,7 @@ export function Writing() {
     setResult(null);
     try {
       const { data } = await axios.post(
-        "https://82c6-35-197-62-23.ngrok-free.app/evaluate",
+        `${EVALUATOR_URL}/evaluate`,
         { topic, essay },
         { headers: { "ngrok-skip-browser-warning": "1" } }
       );
@@ -85,8 +86,8 @@ export function Writing() {
       <Card className="rounded-xl border-neutral-800 bg-neutral-900">
         <CardHeader className="px-4 pt-4 pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-semibold">Topic</CardTitle>
-          <Button variant="outline" size="sm" onClick={generateTopic} className="gap-1.5 text-xs h-7">
-            <Sparkle weight="bold" className="size-3.5" /> Generate Topic
+          <Button variant="outline" size="sm" onClick={generateTopic} disabled={generating} className="gap-1.5 text-xs h-7">
+            <Sparkle weight="bold" className="size-3.5" /> {generating ? "Generating..." : "Generate Topic"}
           </Button>
         </CardHeader>
         <CardContent className="px-4 pb-4">
