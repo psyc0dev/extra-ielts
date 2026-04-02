@@ -407,7 +407,7 @@ function QuestionCard({ question, idx, answers, isCorrect, onAnswerChange, readO
             </span>
             {!isCorrect && (
               <span className="text-[10px] text-muted-foreground">
-                {en.testRunner.question.correctAnswer} <span className="text-white">{Array.isArray(question.correctAnswer) && isMultiBlank ? question.correctAnswer.join(" / ") : Array.isArray(question.correctAnswer) ? question.correctAnswer.join(" or ") : question.correctAnswer}</span>
+                {en.testRunner.question.correctAnswer} <span className="text-white">{Array.isArray(question.correctAnswer) ? question.correctAnswer.join(" / ") : question.correctAnswer}</span>
               </span>
             )}
           </div>
