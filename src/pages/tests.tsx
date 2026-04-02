@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { BookOpen, ClockCountdown, Trophy, ArrowRight, Play, Headphones } from "@phosphor-icons/react";
 import { listTests, startTest, getAttempt, type AssignmentAttemptDetail, type TestSummary } from "@/lib/api";
+import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import { TestRunner } from "@/components/TestRunner";
 import { toast } from "sonner";
 import en from "@/locales/en";
@@ -177,6 +178,7 @@ export function Tests({ onStartTest, onStopTest, timerActive }: {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tests, setTests] = useState<TestSummary[]>([]);
+  const showSkeleton = useDelayedLoading(loading);
   const [activeAttempt, setActiveAttempt] = useState<AssignmentAttemptDetail | null>(null);
   const submitRef = useRef<(() => void) | null>(null);
   const wasTimerActive = useRef(false);
@@ -280,7 +282,7 @@ export function Tests({ onStartTest, onStopTest, timerActive }: {
                     <span className="text-[10px] text-muted-foreground">
                       {key === "completed" ? en.tests.summary.completed : key === "avgBand" ? en.tests.summary.avgBand : en.tests.summary.progress}
                     </span>
-                    {loading ? <Skeleton className="h-7 w-12 mt-0.5" /> : key === "completed" ? (
+                    {loading && !showSkeleton ? null : loading ? <Skeleton className="h-7 w-12 mt-0.5" /> : key === "completed" ? (
                       <span className="text-xl font-bold">{completed}<span className="text-sm text-muted-foreground">/{tests.length}</span></span>
                     ) : key === "avgBand" ? (
                       <span className="text-xl font-bold flex items-center gap-1"><Trophy weight="bold" className="size-3.5 text-amber-400" />{avgBand ?? en.common.na}</span>
@@ -297,7 +299,7 @@ export function Tests({ onStartTest, onStopTest, timerActive }: {
 
             <ScrollArea className="w-full" type="scroll">
               <div className="grid gap-3">
-                {loading ? (
+                {loading && !showSkeleton ? null : loading ? (
                   Array.from({ length: 4 }).map((_, i) => <TestCardSkeleton key={i} />)
                 ) : filtered.length === 0 ? (
                   <div className="flex items-center justify-center py-10 text-xs text-muted-foreground">{en.tests.noMatch}</div>

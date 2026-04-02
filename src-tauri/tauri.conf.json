@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.psyc0dev.ielts",
   "build": {
+    "beforeBuildCommand": "bun run build",
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420"
   },

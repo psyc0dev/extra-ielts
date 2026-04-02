@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { BookOpen, ClockCountdown, Trophy, ArrowRight, Play, Headphones, PencilLine, MicrophoneStage } from "@phosphor-icons/react";
 import { TestRunner } from "@/components/TestRunner";
 import { getAttempt, listAssignments, startAssignment, type AssignmentAttemptDetail, type AssignmentSummary } from "@/lib/api";
+import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import { useNav } from "@/hooks/use-nav";
 import { toast } from "sonner";
 import en from "@/locales/en";
@@ -188,6 +189,7 @@ export function Homework({ onStartTest, onStopTest, timerActive }: {
 }) {
   const [loading, setLoading] = useState(true);
   const [assignments, setAssignments] = useState<AssignmentSummary[]>([]);
+  const showSkeleton = useDelayedLoading(loading);
   const [activeAttempt, setActiveAttempt] = useState<AssignmentAttemptDetail | null>(null);
   const [selected, setSelected] = useState<AssignmentSummary | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -262,7 +264,7 @@ export function Homework({ onStartTest, onStopTest, timerActive }: {
 
         <ScrollArea className="w-full" type="scroll">
           <div className="grid gap-3">
-            {loading ? (
+            {loading && !showSkeleton ? null : loading ? (
               Array.from({ length: 3 }).map((_, i) => <HomeworkCardSkeleton key={i} />)
             ) : assignments.length === 0 ? (
               <div className="flex items-center justify-center py-10 text-xs text-muted-foreground">{en.homework.empty}</div>

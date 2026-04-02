@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,8 @@ export function Admin() {
   const [homeworkAssignments, setHomeworkAssignments] = useState<AdminAssignment[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
+  const showSkeleton = useDelayedLoading(loading);
+  const sk = loading && showSkeleton;
   const [section, setSection] = useState<AdminSection>("overview");
   const [userQuery, setUserQuery] = useState("");
   const [testQuery, setTestQuery] = useState("");
@@ -229,7 +232,7 @@ export function Admin() {
 
           {section === "overview" && (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-              {loading ? (
+              {sk ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <Card key={i} className="border-neutral-800 bg-neutral-950/50">
                     <CardHeader className="pb-2"><Skeleton className="h-3 w-20" /></CardHeader>
@@ -287,7 +290,7 @@ export function Admin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {loading ? Array.from({ length: 4 }).map((_, i) => (
+                    {sk ? Array.from({ length: 4 }).map((_, i) => (
                       <TableRow key={i}>
                         {Array.from({ length: 4 }).map((__, j) => <TableCell key={j}><Skeleton className="h-3 w-full" /></TableCell>)}
                       </TableRow>
@@ -325,7 +328,7 @@ export function Admin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {loading ? Array.from({ length: 4 }).map((_, i) => (
+                    {sk ? Array.from({ length: 4 }).map((_, i) => (
                       <TableRow key={i}>
                         {Array.from({ length: 5 }).map((__, j) => <TableCell key={j}><Skeleton className="h-3 w-full" /></TableCell>)}
                       </TableRow>
@@ -382,7 +385,7 @@ export function Admin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {loading ? Array.from({ length: 4 }).map((_, i) => (
+                    {sk ? Array.from({ length: 4 }).map((_, i) => (
                       <TableRow key={i}>
                         {Array.from({ length: 4 }).map((__, j) => <TableCell key={j}><Skeleton className="h-3 w-full" /></TableCell>)}
                       </TableRow>

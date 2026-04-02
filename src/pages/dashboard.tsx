@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Trophy, BookOpen, Notebook, Fire, ClockCountdown, ArrowRight } from "@phosphor-icons/react";
 import { listAssignments, type AssignmentSummary } from "@/lib/api";
+import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import { useNav } from "@/hooks/use-nav";
 import en from "@/locales/en";
 
@@ -13,6 +14,7 @@ export function Dashboard() {
   const [tasks, setTasks] = useState<AssignmentSummary[]>([]);
   const [homework, setHomework] = useState<AssignmentSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const showSkeleton = useDelayedLoading(loading);
   const { setPage } = useNav();
 
   useEffect(() => {
@@ -78,35 +80,13 @@ export function Dashboard() {
   }, [tasks]);
 
   const statCards = [
-    {
-      icon: <Trophy weight="bold" className="size-3.5" />,
-      label: en.dashboard.stats.overallBand,
-      value: avgBand || "-",
-      sub: en.dashboard.stats.target,
-      onClick: () => setPage("Tests"),
-    },
-    {
-      icon: <BookOpen weight="bold" className="size-3.5" />,
-      label: en.dashboard.stats.testsTaken,
-      value: completedTasks.length,
-      sub: en.dashboard.stats.testsTakenSub,
-      onClick: () => setPage("Tests"),
-    },
-    {
-      icon: <Notebook weight="bold" className="size-3.5" />,
-      label: en.dashboard.stats.homeworkDone,
-      value: <span>{completedHomework.length}<span className="text-lg text-muted-foreground">/{homework.length}</span></span>,
-      sub: en.dashboard.stats.homeworkPending(Math.max(0, homework.length - completedHomework.length)),
-      onClick: () => setPage("Homework"),
-    },
-    {
-      icon: <Fire weight="bold" className="size-3.5" />,
-      label: en.dashboard.stats.streak,
-      value: streak,
-      sub: en.dashboard.stats.streakSub,
-      onClick: undefined,
-    },
+    { icon: <Trophy weight="bold" className="size-3.5" />, label: en.dashboard.stats.overallBand, value: avgBand || "-", sub: en.dashboard.stats.target, onClick: () => setPage("Tests") },
+    { icon: <BookOpen weight="bold" className="size-3.5" />, label: en.dashboard.stats.testsTaken, value: completedTasks.length, sub: en.dashboard.stats.testsTakenSub, onClick: () => setPage("Tests") },
+    { icon: <Notebook weight="bold" className="size-3.5" />, label: en.dashboard.stats.homeworkDone, value: <span>{completedHomework.length}<span className="text-lg text-muted-foreground">/{homework.length}</span></span>, sub: en.dashboard.stats.homeworkPending(Math.max(0, homework.length - completedHomework.length)), onClick: () => setPage("Homework") },
+    { icon: <Fire weight="bold" className="size-3.5" />, label: en.dashboard.stats.streak, value: streak, sub: en.dashboard.stats.streakSub, onClick: undefined },
   ];
+
+  const sk = loading && showSkeleton;
 
   return (
     <div className="p-5 flex flex-col gap-4 font-body">
@@ -119,9 +99,9 @@ export function Dashboard() {
             <p className="text-xs text-muted-foreground max-w-lg">{en.dashboard.hero.subtitle}</p>
           </div>
           <div className="flex flex-col gap-1 text-right text-xs text-muted-foreground">
-            {loading ? <><Skeleton className="h-3 w-40 ml-auto" /><Skeleton className="h-3 w-32 ml-auto mt-1" /></> : (
+            {sk ? <><Skeleton className="h-3 w-40 ml-auto" /><Skeleton className="h-3 w-32 ml-auto mt-1" /></> : !loading ? (
               <><span>{en.dashboard.hero.latestMission(focusBadge)}</span><span>{en.dashboard.hero.summary(completedTasks.length, homework.length)}</span></>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
@@ -133,9 +113,9 @@ export function Dashboard() {
               <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-2">{card.icon} {card.label}</CardTitle>
             </CardHeader>
             <CardContent className="px-4 pb-4">
-              {loading ? <><Skeleton className="h-8 w-12" /><Skeleton className="h-2.5 w-24 mt-2" /></> : (
+              {sk ? <><Skeleton className="h-8 w-12" /><Skeleton className="h-2.5 w-24 mt-2" /></> : !loading ? (
                 <><span className="text-3xl font-bold">{card.value}</span><p className="text-xs text-muted-foreground mt-1">{card.sub}</p></>
-              )}
+              ) : null}
             </CardContent>
           </Card>
         ))}
@@ -147,7 +127,7 @@ export function Dashboard() {
             <CardTitle className="text-sm font-semibold">{en.dashboard.skillBreakdown.title}</CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4 flex flex-col gap-4">
-            {loading ? (
+            {sk ? (
               Array.from({ length: 2 }).map((_, i) => (
                 <div key={i} className="flex flex-col gap-1">
                   <div className="flex justify-between"><Skeleton className="h-3 w-16" /><Skeleton className="h-3 w-8" /></div>
@@ -180,7 +160,7 @@ export function Dashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4 flex flex-col gap-3">
-            {loading ? (
+            {sk ? (
               Array.from({ length: 2 }).map((_, i) => (
                 <div key={i} className="rounded-lg border border-neutral-800 px-3 py-3 flex flex-col gap-1.5">
                   <Skeleton className="h-3 w-3/4" />
@@ -219,7 +199,7 @@ export function Dashboard() {
           </CardTitle>
         </CardHeader>
         <CardContent className="px-4 pb-4 flex flex-col">
-          {loading ? (
+          {sk ? (
             Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="flex items-center justify-between py-3 border-b border-neutral-800 last:border-0">
                 <div className="flex flex-col gap-1"><Skeleton className="h-3 w-32" /><Skeleton className="h-2.5 w-20 mt-0.5" /></div>
