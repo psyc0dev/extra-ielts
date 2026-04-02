@@ -431,6 +431,7 @@ export function Tests({
             test={activeAttempt.test}
             attemptId={activeAttempt.attempt.id}
             initialResponses={activeAttempt.responses ?? {}}
+            correctness={activeAttempt.correctness}
             readOnly={activeAttempt.attempt.status === "completed"}
             onListeningStart={(sectionDurationMinutes) =>
               onStartTest(

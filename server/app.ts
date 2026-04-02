@@ -9,6 +9,7 @@ import { registerAuthRoutes } from './routes/auth'
 import { registerHealthRoutes } from './routes/health'
 import { registerSettingsRoutes } from './routes/settings'
 import { registerTestRoutes } from './routes/tests'
+import { registerWritingRoutes } from './routes/writing'
 
 export const createApp = (options?: {
   snapshot?: StoreSnapshot
@@ -43,6 +44,7 @@ export const createApp = (options?: {
   registerSettingsRoutes(api)
   registerTestRoutes(api)
   registerAssignmentRoutes(api)
+  registerWritingRoutes(api)
   registerAdminRoutes(api)
 
   api.notFound((c) => {

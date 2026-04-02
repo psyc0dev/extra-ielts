@@ -27,11 +27,12 @@ const getKindDurationMinutes = (test: TestDetail, kind: "listening" | "reading")
 };
 
 export function TestRunner({
-  test, attemptId, initialResponses, onExit, onSubmitted, onListeningStart, onReadingStart, onSectionFinish, onTimerFinish, readOnly = false,
+  test, attemptId, initialResponses, correctness, onExit, onSubmitted, onListeningStart, onReadingStart, onSectionFinish, onTimerFinish, readOnly = false,
 }: {
   test: TestDetail;
   attemptId: string;
   initialResponses: Record<string, string | null>;
+  correctness?: Record<string, boolean>;
   onExit: () => void;
   onSubmitted: (scoreTotal: number, band: number | null) => void;
   onListeningStart?: (durationMinutes: number) => void;
@@ -105,10 +106,11 @@ export function TestRunner({
       question={question}
       idx={idx}
       answers={answers}
+      isCorrect={correctness ? (correctness[question.id] ?? null) : null}
       onAnswerChange={onAnswerChange}
       readOnly={readOnly}
     />
-  ), [answers, onAnswerChange, readOnly]);
+  ), [answers, correctness, onAnswerChange, readOnly]);
 
   const activeSectionQuestions = questions;
   const activeSectionAnsweredCount = activeSectionQuestions.filter(
@@ -379,39 +381,14 @@ export function TestRunner({
 
 const typeLabels: Record<string, string> = en.testRunner.typeLabels;
 
-function QuestionCard({ question, idx, answers, onAnswerChange, readOnly }: {
+function QuestionCard({ question, idx, answers, isCorrect, onAnswerChange, readOnly }: {
   question: TestDetail["sections"][number]["questions"][number];
   idx: number;
   answers: Record<string, string | null>;
+  isCorrect: boolean | null;
   onAnswerChange: (id: string, value: string | null) => void;
   readOnly: boolean;
 }) {
-  const correct = question.correctAnswer != null
-    ? Array.isArray(question.correctAnswer)
-      ? question.correctAnswer.map(s => s.toLowerCase())
-      : [String(question.correctAnswer).toLowerCase()]
-    : null;
-  const rawValue = answers[question.id];
-  const isMultiBlank = Array.isArray(question.correctAnswer) && typeof rawValue === "string" && (rawValue as string).startsWith("[");
-  const isMultiSelect = question.type === "multiple-choice-multiple";
-  let isCorrect: boolean | null = null;
-  if (correct !== null) {
-    if (isMultiSelect) {
-      try {
-        const given: string[] = JSON.parse(rawValue as string);
-        const correctSet = new Set(correct);
-        isCorrect = given.length === correctSet.size && given.every(g => correctSet.has(g.toLowerCase().trim()));
-      } catch { isCorrect = false; }
-    } else if (isMultiBlank) {
-      try {
-        const given: string[] = JSON.parse(rawValue as string);
-        isCorrect = Array.isArray(question.correctAnswer) && question.correctAnswer.every((c, i) => c.toLowerCase() === (given[i] ?? "").toLowerCase().trim());
-      } catch { isCorrect = false; }
-    } else {
-      const given = String(rawValue ?? "").toLowerCase().trim();
-      isCorrect = correct.includes(given);
-    }
-  }
 
   return (
     <Card className="border-neutral-800 bg-neutral-950">

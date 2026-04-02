@@ -95,6 +95,7 @@ export type AssignmentAttemptDetail = {
   };
   test: TestDetail;
   responses: Record<string, string | null>;
+  correctness?: Record<string, boolean>;
 };
 
 export type AdminAssignment = {
@@ -330,6 +331,20 @@ export async function adminAssignToGroup(groupId: string, payload: { type: "task
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function generateWritingTopic() {
+  return apiFetch<{ topic: string }>('/writing/generate', { method: 'POST' })
+}
+
+export async function evaluateWritingEssay(payload: { topic: string; essay: string }) {
+  return apiFetch<{
+    word_count: number
+    penalty: number
+    overall: number
+    overall_label: string
+    criteria: Record<string, { score: number; label: string; comment: string }>
+  }>('/writing/evaluate', { method: 'POST', body: JSON.stringify(payload) })
 }
 
 export async function startTest(testId: string) {

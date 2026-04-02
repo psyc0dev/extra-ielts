@@ -1,14 +1,11 @@
 import { useState } from "react";
-import axios from "axios";
+import { generateWritingTopic, evaluateWritingEssay } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Sparkle, ArrowClockwise, PaperPlaneTilt } from "@phosphor-icons/react";
 import { toast } from "sonner";
-
-const EVALUATOR_URL = import.meta.env.VITE_EVALUATOR_URL;
-const GENERATOR_URL = import.meta.env.VITE_GENERATOR_URL;
 
 type CriterionScore = { score: number; label: string; comment: string };
 type EvalResult = {
@@ -36,11 +33,11 @@ export function Writing() {
     setResult(null);
     setEssay("");
     try {
-      const { data } = await axios.post(`${GENERATOR_URL}/generate`);
-      if (data.error) throw new Error(data.error);
+      const data = await generateWritingTopic();
+      if ((data as { error?: string }).error) throw new Error((data as { error: string }).error);
       setTopic(data.topic);
-    } catch {
-      toast.error("Failed to generate topic.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to generate topic.");
     } finally {
       setGenerating(false);
     }
@@ -54,12 +51,8 @@ export function Writing() {
     setLoading(true);
     setResult(null);
     try {
-      const { data } = await axios.post(
-        `${EVALUATOR_URL}/evaluate`,
-        { topic, essay },
-        { headers: { "ngrok-skip-browser-warning": "1" } }
-      );
-      if (data.error) throw new Error(data.error);
+      const data = await evaluateWritingEssay({ topic, essay });
+      if ((data as { error?: string }).error) throw new Error((data as { error: string }).error);
       setResult(data);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Evaluation failed.");

@@ -88,6 +88,40 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
       return c.json({ error: 'Attempt data is missing.' }, 404)
     }
 
+    const filteredTest = filterTestForAssignment(test, assignment.sectionKinds)
+
+    let correctness: Record<string, boolean> | undefined
+    if (attempt.status === 'completed') {
+      correctness = {}
+      for (const section of filteredTest.sections) {
+        for (const question of section.questions) {
+          if (question.correctAnswer == null) continue
+          const correct = question.correctAnswer
+          const response = attempt.responses[question.id]
+          let normalized: unknown = response
+          if (typeof response === 'string' && response.startsWith('[') && response.endsWith(']')) {
+            try { normalized = JSON.parse(response) } catch { /* ignore */ }
+          }
+          let isCorrect = false
+          if (Array.isArray(correct)) {
+            if (Array.isArray(normalized) && normalized.length >= correct.length) {
+              isCorrect = correct.every((v, i) => {
+                const a = (normalized as unknown[])[i]
+                return typeof a === 'string' ? a.trim().toLowerCase() === v.trim().toLowerCase() : a === v
+              })
+            }
+          } else if (typeof correct === 'string') {
+            if (Array.isArray(normalized)) {
+              isCorrect = normalized.length === 1 && String(normalized[0]).trim().toLowerCase() === correct.trim().toLowerCase()
+            } else if (typeof normalized === 'string') {
+              isCorrect = normalized.trim().toLowerCase() === correct.trim().toLowerCase()
+            }
+          }
+          correctness[question.id] = isCorrect
+        }
+      }
+    }
+
     return c.json({
       assignment: {
         id: assignment.id,
@@ -107,8 +141,9 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
         startedAt: attempt.startedAt,
         completedAt: attempt.completedAt,
       },
-      test: filterTestForAssignment(test, assignment.sectionKinds),
+      test: filteredTest,
       responses: attempt.responses,
+      correctness,
     })
   })
 
