@@ -1,6 +1,7 @@
 src-tauri/target
 server/dev.db
 bun.lock
+.git.bak
 #
 build/
 logs

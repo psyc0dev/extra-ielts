@@ -1,8 +1,8 @@
 @echo off
 setlocal EnableDelayedExpansion
 
-if exist ai\extra-ai-evaluator\.git rename ai\extra-ai-evaluator\.git .git.bak >nul
-if exist ai\extra-ai-generator\.git rename ai\extra-ai-generator\.git .git.bak >nul
+if exist ai\extra-ai-evaluator\.git powershell -Command "Rename-Item -Path 'ai\extra-ai-evaluator\.git' -NewName '.git.bak'"
+if exist ai\extra-ai-generator\.git powershell -Command "Rename-Item -Path 'ai\extra-ai-generator\.git' -NewName '.git.bak'"
 
 git add .
 set "files="
@@ -32,5 +32,5 @@ if not defined files (
 git commit -m "!msg!"
 git push origin main
 
-if exist ai\extra-ai-evaluator\.git.bak rename ai\extra-ai-evaluator\.git.bak .git >nul
-if exist ai\extra-ai-generator\.git.bak rename ai\extra-ai-generator\.git.bak .git >nul
+if exist ai\extra-ai-evaluator\.git.bak powershell -Command "Rename-Item -Path 'ai\extra-ai-evaluator\.git.bak' -NewName '.git'"
+if exist ai\extra-ai-generator\.git.bak powershell -Command "Rename-Item -Path 'ai\extra-ai-generator\.git.bak' -NewName '.git'"
