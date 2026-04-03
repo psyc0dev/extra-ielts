@@ -1,10 +1,18 @@
 @echo off
 setlocal EnableDelayedExpansion
 
-if exist ai\extra-ai-evaluator\.git rename ai\extra-ai-evaluator\.git .git.bak
-if exist ai\extra-ai-generator\.git rename ai\extra-ai-generator\.git .git.bak
-
 git add .
+
+REM Check for changes in backend directory
+git diff --cached --name-only | findstr "server/" > nul
+if %errorlevel% equ 0 (
+    echo Backend changes detected. Deploying to Cloudflare...
+    cd backend
+    call npx wrangler deploy
+    cd ..
+)
+
+REM Generate commit message from staged files
 set "files="
 set /a count=0
 
@@ -31,6 +39,3 @@ if not defined files (
 
 git commit -m "!msg!"
 git push origin main
-
-if exist ai\extra-ai-evaluator\.git.bak rename ai\extra-ai-evaluator\.git.bak .git
-if exist ai\extra-ai-generator\.git.bak rename ai\extra-ai-generator\.git.bak .git
