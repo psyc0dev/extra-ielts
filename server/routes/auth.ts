@@ -35,7 +35,7 @@ export const registerAuthRoutes = (api: Hono<AppEnv>) => {
     const secret = getSecret(c)
     const token = await createToken(id, secret)
     setAuthCookie(c, token)
-    return c.json({ token, user: { id, username: body.username, email: body.email ?? null, role: 'admin', avatarUrl: null } })
+    return c.json({ token, user: { id, username: body.username, email: body.email ?? null, role: 'admin', avatarUrl: null } }, 201)
   })
 
   api.post('/auth/login', async (c) => {
@@ -54,12 +54,12 @@ export const registerAuthRoutes = (api: Hono<AppEnv>) => {
     const secret = getSecret(c)
     const token = await createToken(row.id, secret)
     setAuthCookie(c, token)
-    return c.json({ token, user: { id: row.id, username: row.username, email: row.email, role: row.role, avatarUrl: row.avatar_url ?? null } })
+    return c.json({ token, user: { id: row.id, username: row.username, email: row.email, role: row.role, avatarUrl: row.avatar_url ?? null } }, 200)
   })
 
   api.post('/auth/logout', requireAuth, (c) => {
     deleteCookie(c, 'accessToken', { path: '/' })
-    return c.json({ ok: true })
+    return c.json({ ok: true }, 200)
   })
 
   api.get('/auth/me', requireAuth, (c) => {

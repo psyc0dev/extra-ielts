@@ -42,7 +42,7 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
     return c.json({ assignments: assignments.filter(Boolean) })
   })
 
-  api.post('/assignments/:assignmentId/start', requireAuth, async (c) => {
+  api.post('/assignments/:assignmentId/attempts', requireAuth, async (c) => {
     const user = c.get('user')
     const assignmentId = c.req.param('assignmentId')
     const assignment = await c.env.DB.prepare('SELECT * FROM assignments WHERE id = ? AND assigned_to = ?')
@@ -52,13 +52,13 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
     const existing = await c.env.DB.prepare(
       "SELECT id, status FROM attempts WHERE assignment_id = ? AND user_id = ? AND status = 'in-progress' LIMIT 1"
     ).bind(assignmentId, user.id).first<{ id: string; status: string }>()
-    if (existing) return c.json({ attempt: { id: existing.id, status: existing.status } })
+    if (existing) return c.json({ attempt: { id: existing.id, status: existing.status } }, 200)
 
     const id = crypto.randomUUID()
     await c.env.DB.prepare(
       'INSERT INTO attempts (id, assignment_id, test_id, user_id, status, score_total, band, reading_band, listening_band, started_at, completed_at, responses_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(id, assignmentId, assignment.test_id, user.id, 'in-progress', null, null, null, null, nowIso(), null, '{}').run()
-    return c.json({ attempt: { id, status: 'in-progress' } })
+    return c.json({ attempt: { id, status: 'in-progress' } }, 201)
   })
 
   api.get('/assignments/attempts/:attemptId', requireAuth, async (c) => {
@@ -90,7 +90,7 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
     })
   })
 
-  api.post('/assignments/attempts/:attemptId/answers', requireAuth, async (c) => {
+  api.put('/assignments/attempts/:attemptId/answers', requireAuth, async (c) => {
     const user = c.get('user')
     const attempt = await c.env.DB.prepare('SELECT * FROM attempts WHERE id = ?')
       .bind(c.req.param('attemptId')).first<AttemptRow>()
@@ -105,18 +105,21 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
     responses[body.questionId] = body.response
     await c.env.DB.prepare('UPDATE attempts SET responses_json = ? WHERE id = ?')
       .bind(JSON.stringify(responses), attempt.id).run()
-    return c.json({ ok: true })
+    return c.json({ ok: true }, 200)
   })
 
-  api.post('/assignments/attempts/:attemptId/submit', requireAuth, async (c) => {
+  api.patch('/assignments/attempts/:attemptId', requireAuth, async (c) => {
     const user = c.get('user')
     const attempt = await c.env.DB.prepare('SELECT * FROM attempts WHERE id = ?')
       .bind(c.req.param('attemptId')).first<AttemptRow>()
     if (!attempt) return c.json({ error: 'Attempt not found.' }, 404)
     if (attempt.user_id !== user.id && user.role !== 'admin') return c.json({ error: 'Forbidden' }, 403)
 
+    const body = await parseJson<{ status?: string }>(c)
+    if (body?.status !== 'completed') return c.json({ error: 'Only status "completed" is supported.' }, 400)
+
     if (attempt.status === 'completed') {
-      return c.json({ attempt: { id: attempt.id, status: attempt.status, scoreTotal: attempt.score_total ?? 0, band: attempt.band } })
+      return c.json({ attempt: { id: attempt.id, status: attempt.status, scoreTotal: attempt.score_total ?? 0, band: attempt.band } }, 200)
     }
 
     const test = getTestById(attempt.test_id)
@@ -128,10 +131,10 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
       'UPDATE attempts SET status = ?, score_total = ?, band = ?, reading_band = ?, listening_band = ?, completed_at = ? WHERE id = ?'
     ).bind('completed', scored.scoreTotal, scored.band, scored.readingBand, scored.listeningBand, nowIso(), attempt.id).run()
 
-    return c.json({ attempt: { id: attempt.id, status: 'completed', scoreTotal: scored.scoreTotal, band: scored.band } })
+    return c.json({ attempt: { id: attempt.id, status: 'completed', scoreTotal: scored.scoreTotal, band: scored.band } }, 200)
   })
 
-  api.post('/assignments/tests/:testId/start', requireAuth, async (c) => {
+  api.post('/assignments/tests/:testId/attempts', requireAuth, async (c) => {
     const user = c.get('user')
     const test = getTestById(c.req.param('testId'))
     if (!test) return c.json({ error: 'Test not found.' }, 404)
@@ -139,7 +142,7 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
     const existing = await c.env.DB.prepare(
       "SELECT id, status, assignment_id FROM attempts WHERE user_id = ? AND test_id = ? AND status = 'in-progress' LIMIT 1"
     ).bind(user.id, test.id).first<{ id: string; status: string; assignment_id: string }>()
-    if (existing) return c.json({ attempt: { id: existing.id, status: existing.status }, assignmentId: existing.assignment_id })
+    if (existing) return c.json({ attempt: { id: existing.id, status: existing.status }, assignmentId: existing.assignment_id }, 200)
 
     const assignmentId = crypto.randomUUID()
     const sectionKinds = Array.from(new Set(test.sections.map((s) => s.kind)))
@@ -152,6 +155,6 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
       'INSERT INTO attempts (id, assignment_id, test_id, user_id, status, score_total, band, reading_band, listening_band, started_at, completed_at, responses_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(attemptId, assignmentId, test.id, user.id, 'in-progress', null, null, null, null, nowIso(), null, '{}').run()
 
-    return c.json({ attempt: { id: attemptId, status: 'in-progress' }, assignmentId })
+    return c.json({ attempt: { id: attemptId, status: 'in-progress' }, assignmentId }, 201)
   })
 }

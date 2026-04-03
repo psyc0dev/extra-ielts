@@ -21,13 +21,13 @@ async function sendOtpEmail(env: AppEnv['Bindings'], to: string, otp: string) {
 }
 
 export const registerAccountRoutes = (api: Hono<AppEnv>) => {
-  api.post('/account/request-password-reset', async (c) => {
+  api.post('/account/password-reset-requests', async (c) => {
     const body = await parseJson<{ email?: string }>(c)
-    if (!body?.email) return c.json({ ok: true })
+    if (!body?.email) return c.json({ ok: true }, 202)
 
     const user = await c.env.DB.prepare('SELECT id, email FROM users WHERE LOWER(email) = ?')
       .bind(body.email.toLowerCase()).first<{ id: string; email: string }>()
-    if (!user) return c.json({ ok: true })
+    if (!user) return c.json({ ok: true }, 202)
 
     await c.env.DB.prepare('DELETE FROM otp_tokens WHERE expires_at < ?').bind(Date.now()).run()
 
@@ -43,10 +43,10 @@ export const registerAccountRoutes = (api: Hono<AppEnv>) => {
       return c.json({ error: 'Failed to send reset email.' }, 500)
     }
 
-    return c.json({ ok: true })
+    return c.json({ ok: true }, 202)
   })
 
-  api.post('/account/reset-password', async (c) => {
+  api.patch('/account/password', async (c) => {
     const body = await parseJson<{ otp?: string; password?: string }>(c)
     if (!body?.otp || !body.password) return c.json({ error: 'otp and password are required.' }, 400)
 
@@ -58,10 +58,10 @@ export const registerAccountRoutes = (api: Hono<AppEnv>) => {
     await c.env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(passwordHash, entry.user_id).run()
     await c.env.DB.prepare('DELETE FROM otp_tokens WHERE otp = ?').bind(body.otp).run()
 
-    return c.json({ ok: true })
+    return c.json({ ok: true }, 200)
   })
 
-  api.post('/account/avatar', requireAuth, async (c) => {
+  api.put('/account/avatar', requireAuth, async (c) => {
     const body = await parseJson<{ dataUrl?: string }>(c)
     if (!body?.dataUrl) return c.json({ error: 'dataUrl is required.' }, 400)
     if (!body.dataUrl.match(/^data:image\/(png|jpeg|webp);base64,/)) {
@@ -71,7 +71,7 @@ export const registerAccountRoutes = (api: Hono<AppEnv>) => {
 
     const user = c.get('user')
     await c.env.DB.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').bind(body.dataUrl, user.id).run()
-    return c.json({ avatarUrl: body.dataUrl })
+    return c.json({ avatarUrl: body.dataUrl }, 200)
   })
 
   api.delete('/account', requireAuth, async (c) => {
@@ -80,6 +80,6 @@ export const registerAccountRoutes = (api: Hono<AppEnv>) => {
 
     await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(user.id).run()
     deleteCookie(c, 'accessToken', { path: '/' })
-    return c.json({ ok: true })
+    return c.json({ ok: true }, 200)
   })
 }

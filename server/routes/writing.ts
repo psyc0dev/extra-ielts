@@ -4,7 +4,7 @@ import { parseJson, requireAuth } from '../lib/store'
 import axios from 'axios'
 
 export const registerWritingRoutes = (api: Hono<AppEnv>) => {
-  api.post('/writing/generate', requireAuth, async (c) => {
+  api.get('/writing/topic', requireAuth, async (c) => {
     const url = c.env.GENERATOR_URL
     if (!url) return c.json({ error: 'Generator service not configured.' }, 503)
 
@@ -17,7 +17,7 @@ export const registerWritingRoutes = (api: Hono<AppEnv>) => {
     return c.json({ error: 'Failed to generate a valid topic. Please try again.' }, 500)
   })
 
-  api.post('/writing/evaluate', requireAuth, async (c) => {
+  api.post('/writing/evaluations', requireAuth, async (c) => {
     const url = c.env.EVALUATOR_URL
     if (!url) return c.json({ error: 'Evaluator service not configured.' }, 503)
     const body = await parseJson<{ topic?: string; essay?: string }>(c)

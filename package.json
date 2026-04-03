@@ -53,6 +53,7 @@
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
     "hono": "^4.8.0",
+    "hono-rate-limiter": "^0.5.3",
     "input-otp": "^1.4.2",
     "js-cookie": "^3.0.5",
     "lucide-react": "^0.577.0",

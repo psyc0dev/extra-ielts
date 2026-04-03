@@ -7,7 +7,7 @@ REM Check for changes in backend directory
 git diff --cached --name-only | findstr "server/" > nul
 if %errorlevel% equ 0 (
     echo Backend changes detected. Deploying to Cloudflare...
-    cd backend
+    cd server
     call npx wrangler deploy
     cd ..
 )

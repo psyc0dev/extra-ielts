@@ -31,7 +31,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     const passwordHash = await createPasswordHash(body.password)
     await c.env.DB.prepare('INSERT INTO users (id, username, email, role, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)')
       .bind(id, body.username, body.email ?? null, body.role, passwordHash, nowIso()).run()
-    return c.json({ user: { id, username: body.username, email: body.email ?? null, role: body.role, avatarUrl: null } })
+    return c.json({ user: { id, username: body.username, email: body.email ?? null, role: body.role, avatarUrl: null } }, 201)
   })
 
   api.get('/admin/tests', requireAuth, requireAdmin, async (c) => {
@@ -45,14 +45,14 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     return c.json({ tests })
   })
 
-  api.patch('/admin/tests/:testId/published', requireAuth, requireAdmin, async (c) => {
+  api.patch('/admin/tests/:testId', requireAuth, requireAdmin, async (c) => {
     const body = await parseJson<{ published?: boolean }>(c)
     if (typeof body?.published !== 'boolean') return c.json({ error: 'published flag is required.' }, 400)
     const testId = c.req.param('testId')
     if (!getTestById(testId)) return c.json({ error: 'Test not found.' }, 404)
     await c.env.DB.prepare('INSERT INTO tests (id, published) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET published = excluded.published')
       .bind(testId, body.published ? 1 : 0).run()
-    return c.json({ ok: true })
+    return c.json({ ok: true }, 200)
   })
 
   api.get('/admin/assignments', requireAuth, requireAdmin, async (c) => {
@@ -94,7 +94,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     const id = crypto.randomUUID()
     await c.env.DB.prepare('INSERT INTO assignments (id, type, test_id, section_kinds_json, assigned_to, assigned_by, due_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .bind(id, body.type, body.testId, JSON.stringify(sectionKinds), body.assignedTo, user.id, body.dueAt ?? null, nowIso()).run()
-    return c.json({ assignment: { id } })
+    return c.json({ assignment: { id } }, 201)
   })
 
   api.get('/admin/groups', requireAuth, requireAdmin, async (c) => {
@@ -113,7 +113,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     if (!body?.name) return c.json({ error: 'Group name is required.' }, 400)
     const id = crypto.randomUUID()
     await c.env.DB.prepare('INSERT INTO groups (id, name, created_at) VALUES (?, ?, ?)').bind(id, body.name, nowIso()).run()
-    return c.json({ group: { id, name: body.name } })
+    return c.json({ group: { id, name: body.name } }, 201)
   })
 
   api.delete('/admin/groups/:groupId', requireAuth, requireAdmin, async (c) => {
@@ -121,7 +121,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     const exists = await c.env.DB.prepare('SELECT 1 FROM groups WHERE id = ?').bind(groupId).first()
     if (!exists) return c.json({ error: 'Group not found.' }, 404)
     await c.env.DB.prepare('DELETE FROM groups WHERE id = ?').bind(groupId).run()
-    return c.json({ ok: true })
+    return c.json({ ok: true }, 200)
   })
 
   api.post('/admin/groups/:groupId/members', requireAuth, requireAdmin, async (c) => {
@@ -133,16 +133,16 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     const user = await c.env.DB.prepare('SELECT 1 FROM users WHERE id = ?').bind(body.userId).first()
     if (!user) return c.json({ error: 'User not found.' }, 404)
     await c.env.DB.prepare('INSERT OR IGNORE INTO group_members (group_id, user_id) VALUES (?, ?)').bind(groupId, body.userId).run()
-    return c.json({ ok: true })
+    return c.json({ ok: true }, 201)
   })
 
   api.delete('/admin/groups/:groupId/members/:userId', requireAuth, requireAdmin, async (c) => {
     await c.env.DB.prepare('DELETE FROM group_members WHERE group_id = ? AND user_id = ?')
       .bind(c.req.param('groupId'), c.req.param('userId')).run()
-    return c.json({ ok: true })
+    return c.json({ ok: true }, 200)
   })
 
-  api.post('/admin/groups/:groupId/assign', requireAuth, requireAdmin, async (c) => {
+  api.post('/admin/groups/:groupId/assignments', requireAuth, requireAdmin, async (c) => {
     const user = c.get('user')
     const groupId = c.req.param('groupId')
     const group = await c.env.DB.prepare('SELECT 1 FROM groups WHERE id = ?').bind(groupId).first()
@@ -162,7 +162,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
         .bind(id, body.type, body.testId, JSON.stringify(sectionKinds), user_id, user.id, body.dueAt ?? null, nowIso()).run()
       count++
     }
-    return c.json({ count })
+    return c.json({ count }, 201)
   })
 
   api.get('/admin/users/:userId/stats', requireAuth, requireAdmin, async (c) => {
