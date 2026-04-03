@@ -267,7 +267,23 @@ export function Homework({ onStartTest, onStopTest, timerActive }: {
             {sk ? (
               Array.from({ length: 3 }).map((_, i) => <HomeworkCardSkeleton key={i} />)
             ) : assignments.length === 0 ? (
-              <div className="flex items-center justify-center py-10 text-xs text-muted-foreground">{en.homework.empty}</div>
+              <Card className="rounded-xl border-neutral-800 bg-neutral-900">
+                <CardContent className="px-4 py-3 flex flex-col gap-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex flex-col gap-1.5 flex-1">
+                      <span className="text-xs font-medium text-neutral-400">No homework assigned</span>
+                      <span className="text-[10px] text-neutral-600">{en.homework.empty}</span>
+                    </div>
+                    <BookOpen weight="bold" className="size-4 text-neutral-700 shrink-0 mt-0.5" />
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <div className="flex gap-1.5">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-neutral-800/50 text-neutral-600">No score yet</span>
+                    </div>
+                    <span className="text-[10px] text-neutral-700">—</span>
+                  </div>
+                </CardContent>
+              </Card>
             ) : (
               assignments.map((a) => (
                 <HomeworkCard key={a.id} assignment={a} status={(a.attempt?.status ?? "not-started") as Status} onOpen={open} />

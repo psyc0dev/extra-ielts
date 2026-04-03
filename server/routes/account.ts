@@ -2,25 +2,22 @@ import type { Hono } from 'hono'
 import { deleteCookie } from 'hono/cookie'
 import type { AppEnv } from '../lib/types'
 import { createPasswordHash, nowIso, parseJson, requireAuth } from '../lib/store'
+import axios from 'axios'
 
 async function sendOtpEmail(env: AppEnv['Bindings'], to: string, otp: string) {
   const apiKey = env.RESEND_API_KEY
   if (!apiKey) throw new Error('RESEND_API_KEY is not configured.')
   const from = env.RESEND_FROM ?? 'Extra IELTS <onboarding@resend.dev>'
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
+  await axios.post(
+    'https://api.resend.com/emails',
+    {
       from,
       to: [to],
-      subject: 'Your Extra IELTS password reset code',
+      subject: 'Your extra IELTS password reset code',
       html: `<p>Your password reset code is:</p><h2 style="letter-spacing:8px;font-size:32px">${otp}</h2><p>This code expires in 15 minutes. If you did not request this, ignore this email.</p>`,
-    }),
-  })
-  if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`Resend error: ${err}`)
-  }
+    },
+    { headers: { Authorization: `Bearer ${apiKey}` } }
+  )
 }
 
 export const registerAccountRoutes = (api: Hono<AppEnv>) => {
@@ -32,7 +29,6 @@ export const registerAccountRoutes = (api: Hono<AppEnv>) => {
       .bind(body.email.toLowerCase()).first<{ id: string; email: string }>()
     if (!user) return c.json({ ok: true })
 
-    // Clean expired OTPs
     await c.env.DB.prepare('DELETE FROM otp_tokens WHERE expires_at < ?').bind(Date.now()).run()
 
     const otp = String(Math.floor(100000 + Math.random() * 900000))
@@ -65,14 +61,12 @@ export const registerAccountRoutes = (api: Hono<AppEnv>) => {
     return c.json({ ok: true })
   })
 
-  // Avatar stored as base64 data URL directly in D1
   api.post('/account/avatar', requireAuth, async (c) => {
     const body = await parseJson<{ dataUrl?: string }>(c)
     if (!body?.dataUrl) return c.json({ error: 'dataUrl is required.' }, 400)
     if (!body.dataUrl.match(/^data:image\/(png|jpeg|webp);base64,/)) {
       return c.json({ error: 'Invalid image format. Use PNG, JPEG, or WebP.' }, 400)
     }
-    // Limit to ~500KB base64
     if (body.dataUrl.length > 700_000) return c.json({ error: 'Image too large. Max ~500KB.' }, 400)
 
     const user = c.get('user')

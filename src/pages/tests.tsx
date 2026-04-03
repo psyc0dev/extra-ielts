@@ -302,7 +302,21 @@ export function Tests({ onStartTest, onStopTest, timerActive }: {
                 {sk ? (
                   Array.from({ length: 4 }).map((_, i) => <TestCardSkeleton key={i} />)
                 ) : filtered.length === 0 ? (
-                  <div className="flex items-center justify-center py-10 text-xs text-muted-foreground">{en.tests.noMatch}</div>
+                  <Card className="rounded-xl border-neutral-800 bg-neutral-900">
+                    <CardContent className="px-4 py-3 flex flex-col gap-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex flex-col gap-1.5 flex-1">
+                          <span className="text-xs font-medium text-neutral-400">No tests available</span>
+                          <span className="text-[10px] text-neutral-600">{en.tests.noMatch}</span>
+                        </div>
+                        <BookOpen weight="bold" className="size-4 text-neutral-700 shrink-0 mt-0.5" />
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-neutral-800/50 text-neutral-600">{en.tests.details.noScore}</span>
+                        <span className="text-[10px] text-neutral-700">—</span>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ) : (
                   filtered.map((test) => <TestCard key={test.id} test={test} onOpen={open} />)
                 )}

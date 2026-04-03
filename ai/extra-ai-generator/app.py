@@ -1,4 +1,5 @@
 import warnings
+import random
 import torch
 import outlines
 from fastapi import FastAPI
@@ -20,15 +21,17 @@ model = outlines.from_transformers(_hf_model, tokenizer)
 class TopicResponse(BaseModel):
     topic: str = Field(description="A complete IELTS Writing Task 2 exam question.")
 
+QUESTION_TYPES = [
+    "Opinion: a statement about a current issue, ending with 'To what extent do you agree or disagree?'",
+    "Discussion: two contrasting views on a topic, ending with 'Discuss both views and give your own opinion.'",
+    "Advantages and Disadvantages: a trend or development, ending with 'What are the advantages and disadvantages of this?'",
+    "Problem and Solution: a social or global problem, ending with 'What are the causes of this problem and what measures could be taken to solve it?'",
+    "Two-Part Question: a situation or trend followed by two distinct questions about it.",
+]
+
 SYSTEM_PROMPT = (
-    "You are an IELTS Writing Task 2 examiner. Generate one realistic exam-style Task 2 question. "
-    "The question must be one of these types: "
-    "Opinion: the question asks the reader to agree or disagree with a statement; "
-    "Discussion: the question presents two opposing views and asks the reader to discuss both; "
-    "Advantages/Disadvantages: the question asks about the advantages and disadvantages of something; "
-    "Problem/Solution: the question asks about the causes of a problem and possible solutions; "
-    "Two-Part Question: the question asks two separate questions about the same topic. "
-    "Output only the question text. No title, no label, no explanation."
+    "You are an IELTS Writing Task 2 examiner. Write one complete, realistic exam-style Task 2 question. "
+    "Write only the question text. No labels, no headings, no explanations."
 )
 
 app = FastAPI()
@@ -42,12 +45,13 @@ app.add_middleware(
 
 @app.post("/generate")
 def generate():
+    question_type = random.choice(QUESTION_TYPES)
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": "Generate an IELTS Writing Task 2 question."},
+        {"role": "user", "content": f"Write a Task 2 question of this type: {question_type}"},
     ]
     prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    raw = model(prompt, TopicResponse, max_new_tokens=120, temperature=0.9, do_sample=True, repetition_penalty=1.1)
+    raw = model(prompt, TopicResponse, max_new_tokens=150, temperature=1.1, do_sample=True, repetition_penalty=1.3)
     result = TopicResponse.model_validate_json(raw) if isinstance(raw, str) else raw
     return {"topic": result.topic}
 

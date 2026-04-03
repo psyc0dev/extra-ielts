@@ -3,6 +3,7 @@ import { generateWritingTopic, evaluateWritingEssay } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Sparkle, ArrowClockwise, PaperPlaneTilt } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -84,7 +85,13 @@ export function Writing() {
           </Button>
         </CardHeader>
         <CardContent className="px-4 pb-4">
-          {topic ? (
+          {generating ? (
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-3.5 w-full" />
+              <Skeleton className="h-3.5 w-5/6" />
+              <Skeleton className="h-3.5 w-4/6" />
+            </div>
+          ) : topic ? (
             <p className="text-sm leading-relaxed text-neutral-200">{topic}</p>
           ) : (
             <p className="text-sm text-muted-foreground italic">Click "Generate Topic" to get a writing prompt.</p>
