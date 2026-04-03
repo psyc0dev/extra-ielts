@@ -219,7 +219,7 @@ export async function listAssignments(type: "task" | "homework") {
 }
 
 export async function startAssignment(assignmentId: string) {
-  return apiFetch<{ attempt: { id: string; status: string } }>(`/assignments/${assignmentId}/start`, {
+  return apiFetch<{ attempt: { id: string; status: string } }>(`/assignments/${assignmentId}/attempts`, {
     method: "POST",
   });
 }
@@ -230,7 +230,7 @@ export async function getAttempt(attemptId: string) {
 
 export async function saveAnswer(attemptId: string, questionId: string, response: string | null) {
   return apiFetch<{ ok: boolean }>(`/assignments/attempts/${attemptId}/answers`, {
-    method: "POST",
+    method: "PUT",
     body: JSON.stringify({ questionId, response }),
   });
 }
@@ -238,8 +238,8 @@ export async function saveAnswer(attemptId: string, questionId: string, response
 
 export async function submitAttempt(attemptId: string) {
   return apiFetch<{ attempt: { id: string; status: string; scoreTotal: number; band: number | null } }>(
-    `/assignments/attempts/${attemptId}/submit`,
-    { method: "POST" }
+    `/assignments/attempts/${attemptId}`,
+    { method: "PATCH", body: JSON.stringify({ status: "completed" }) }
   );
 }
 
@@ -248,9 +248,9 @@ export async function submitAttempt(attemptId: string) {
  */
 export function forceSubmitAttempt(attemptId: string) {
   const token = getToken();
-  const url = `${API_BASE}/assignments/attempts/${attemptId}/submit`;
+  const url = `${API_BASE}/assignments/attempts/${attemptId}`;
   
-  axios.post(url, null, {
+  axios.patch(url, { status: "completed" }, {
     headers: {
       Authorization: token ? `Bearer ${token}` : "",
       "Content-Type": "application/json",
@@ -291,7 +291,7 @@ export async function adminCreateAssignment(payload: {
 }
 
 export async function adminToggleTestPublished(testId: string, published: boolean) {
-  return apiFetch<{ ok: boolean }>(`/admin/tests/${testId}/published`, {
+  return apiFetch<{ ok: boolean }>(`/admin/tests/${testId}`, {
     method: "PATCH",
     body: JSON.stringify({ published }),
   });
@@ -328,29 +328,29 @@ export async function adminRemoveGroupMember(groupId: string, userId: string) {
 }
 
 export async function adminAssignToGroup(groupId: string, payload: { type: "task" | "homework"; testId: string; sectionKinds: ("listening" | "reading")[]; dueAt?: string | null }) {
-  return apiFetch<{ count: number }>(`/admin/groups/${groupId}/assign`, {
+  return apiFetch<{ count: number }>(`/admin/groups/${groupId}/assignments`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
 export async function requestPasswordReset(email: string) {
-  return apiFetch<{ ok: boolean }>('/account/request-password-reset', {
+  return apiFetch<{ ok: boolean }>('/account/password-reset-requests', {
     method: 'POST',
     body: JSON.stringify({ email }),
   })
 }
 
 export async function resetPassword(otp: string, password: string) {
-  return apiFetch<{ ok: boolean }>('/account/reset-password', {
-    method: 'POST',
+  return apiFetch<{ ok: boolean }>('/account/password', {
+    method: 'PATCH',
     body: JSON.stringify({ otp, password }),
   })
 }
 
 export async function uploadAvatar(dataUrl: string) {
   return apiFetch<{ avatarUrl: string }>('/account/avatar', {
-    method: 'POST',
+    method: 'PUT',
     body: JSON.stringify({ dataUrl }),
   })
 }
@@ -360,7 +360,7 @@ export async function deleteAccount() {
 }
 
 export async function generateWritingTopic() {
-  return apiFetch<{ topic: string; error?: string }>('/writing/generate', { method: 'POST' })
+  return apiFetch<{ topic: string; error?: string }>('/writing/topic')
 }
 
 export async function evaluateWritingEssay(payload: { topic: string; essay: string }) {
@@ -376,11 +376,11 @@ export async function evaluateWritingEssay(payload: { topic: string; essay: stri
       lexical_resource: { score: number; label: string; comment: string }
       grammatical_range_and_accuracy: { score: number; label: string; comment: string }
     }
-  }>('/writing/evaluate', { method: 'POST', body: JSON.stringify(payload) })
+  }>('/writing/evaluations', { method: 'POST', body: JSON.stringify(payload) })
 }
 
 export async function startTest(testId: string) {
-  return apiFetch<{ attempt: { id: string; status: string }; assignmentId: string }>(`/assignments/tests/${testId}/start`, {
+  return apiFetch<{ attempt: { id: string; status: string }; assignmentId: string }>(`/assignments/tests/${testId}/attempts`, {
     method: "POST",
   });
 }
