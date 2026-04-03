@@ -19,18 +19,20 @@ _hf_model = AutoModelForCausalLM.from_pretrained(MODEL_ID, quantization_config=b
 model = outlines.from_transformers(_hf_model, tokenizer)
 
 class TopicResponse(BaseModel):
-    topic: str = Field(description="A complete IELTS Writing Task 2 exam question.")
+    topic: str = Field(min_length=60, description="A complete IELTS Writing Task 2 exam question ending with a question mark or instruction.")
 
 QUESTION_TYPES = [
-    "Opinion: a statement about a current issue, ending with 'To what extent do you agree or disagree?'",
-    "Discussion: two contrasting views on a topic, ending with 'Discuss both views and give your own opinion.'",
-    "Advantages and Disadvantages: a trend or development, ending with 'What are the advantages and disadvantages of this?'",
-    "Problem and Solution: a social or global problem, ending with 'What are the causes of this problem and what measures could be taken to solve it?'",
-    "Two-Part Question: a situation or trend followed by two distinct questions about it.",
+    ("Opinion", "To what extent do you agree or disagree?"),
+    ("Discussion", "Discuss both views and give your own opinion."),
+    ("Advantages and Disadvantages", "What are the advantages and disadvantages of this?"),
+    ("Problem and Solution", "What are the causes of this problem and what measures could be taken to solve it?"),
+    ("Two-Part Question", None),
 ]
 
 SYSTEM_PROMPT = (
     "You are an IELTS Writing Task 2 examiner. Write one complete, realistic exam-style Task 2 question. "
+    "The output must be a full question — not a title, not a heading, not a topic label. "
+    "It must contain a statement or context followed by a direct question or instruction to the candidate. "
     "Write only the question text. No labels, no headings, no explanations."
 )
 
@@ -45,10 +47,22 @@ app.add_middleware(
 
 @app.post("/generate")
 def generate():
-    question_type = random.choice(QUESTION_TYPES)
+    qtype, closing = random.choice(QUESTION_TYPES)
+    if closing:
+        user_msg = (
+            f"Write a Task 2 {qtype} question. "
+            f"Write a statement or context about any real-world topic, then end with: '{closing}'. "
+            f"Example format: 'Some people believe that [statement]. {closing}'"
+        )
+    else:
+        user_msg = (
+            "Write a Task 2 Two-Part Question. "
+            "Write a statement or context about any real-world topic, then ask two separate questions. "
+            "Example format: 'In many countries, [situation]. Why is this happening? What can be done to address it?'"
+        )
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"Write a Task 2 question of this type: {question_type}"},
+        {"role": "user", "content": user_msg},
     ]
     prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     raw = model(prompt, TopicResponse, max_new_tokens=150, temperature=1.1, do_sample=True, repetition_penalty=1.3)
