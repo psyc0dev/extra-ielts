@@ -18,56 +18,91 @@ bnb_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.
 _hf_model = AutoModelForCausalLM.from_pretrained(MODEL_ID, quantization_config=bnb_config, device_map="auto")
 model = outlines.from_transformers(_hf_model, tokenizer)
 
-class TopicResponse(BaseModel):
-    topic: str = Field(min_length=60, description="A complete IELTS Writing Task 2 exam question ending with a question mark or instruction.")
+# Regex: allows letters, spaces, common punctuation — blocks digits followed by ) or ., brackets, braces
+SENTENCE_PATTERN = r"^[A-Za-z ,'\-\(\)]+[A-Za-z ,'\-\(\)\.]*[\.?!]$"
+
+class QuestionSchema(BaseModel):
+    context: str = Field(
+        pattern=SENTENCE_PATTERN,
+        min_length=20,
+        max_length=200,
+        description="One or two sentences describing a real-world situation or trend."
+    )
+    question: str = Field(
+        pattern=SENTENCE_PATTERN,
+        min_length=10,
+        max_length=120,
+        description="The direct question or instruction to the candidate."
+    )
 
 QUESTION_TYPES = [
-    ("Opinion", "To what extent do you agree or disagree?"),
-    ("Discussion", "Discuss both views and give your own opinion."),
-    ("Advantages and Disadvantages", "What are the advantages and disadvantages of this?"),
-    ("Problem and Solution", "What are the causes of this problem and what measures could be taken to solve it?"),
-    ("Two-Part Question", None),
+    (
+        "Opinion",
+        "To what extent do you agree or disagree?",
+        "Some people think that governments should spend money on building new railway lines rather than repairing existing ones. To what extent do you agree or disagree?"
+    ),
+    (
+        "Discussion",
+        "Discuss both views and give your own opinion.",
+        "Some people believe that children should be taught to compete, while others think that cooperation is more important. Discuss both views and give your own opinion."
+    ),
+    (
+        "Advantages and Disadvantages",
+        "What are the advantages and disadvantages of this?",
+        "In many countries, mobile phones are used to pay for things. Does this development have more advantages or more disadvantages?"
+    ),
+    (
+        "Problem and Solution",
+        "What are the causes of this problem and what measures could be taken to solve it?",
+        "In many cities, the number of cars on the road is increasing rapidly. What are the causes of this problem and what measures could be taken to solve it?"
+    ),
+    (
+        "Two-Part Question",
+        None,
+        "Many people choose to travel abroad to learn a foreign language instead of studying in their home country. Why do people do this? Do you think it is a positive or negative development?"
+    ),
 ]
 
 SYSTEM_PROMPT = (
-    "You are an IELTS Writing Task 2 examiner. Write one complete, realistic exam-style Task 2 question. "
-    "The output must be a full question — not a title, not a heading, not a topic label. "
-    "It must contain a statement or context followed by a direct question or instruction to the candidate. "
-    "Write only the question text. No labels, no headings, no explanations."
+    "You are an IELTS Writing Task 2 examiner. "
+    "Generate a realistic Task 2 exam question by filling two fields: "
+    "'context': one or two sentences presenting a real-world situation, trend, or statement. "
+    "'question': the direct instruction or question for the candidate. "
+    "Write naturally, like a real exam question."
 )
 
 app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 @app.post("/generate")
 def generate():
-    qtype, closing = random.choice(QUESTION_TYPES)
+    qtype, closing, example = random.choice(QUESTION_TYPES)
     if closing:
         user_msg = (
-            f"Write a Task 2 {qtype} question. "
-            f"Write a statement or context about any real-world topic, then end with: '{closing}'. "
-            f"Example format: 'Some people believe that [statement]. {closing}'"
+            f"Generate a Task 2 {qtype} question.\n"
+            f"Example: \"{example}\"\n"
+            f"The 'question' field must end with: \"{closing}\"\n"
+            f"Use a completely different topic than the example."
         )
     else:
         user_msg = (
-            "Write a Task 2 Two-Part Question. "
-            "Write a statement or context about any real-world topic, then ask two separate questions. "
-            "Example format: 'In many countries, [situation]. Why is this happening? What can be done to address it?'"
+            f"Generate a Task 2 Two-Part Question.\n"
+            f"Example: \"{example}\"\n"
+            f"The 'question' field must contain two separate questions.\n"
+            f"Use a completely different topic than the example."
         )
+
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_msg},
     ]
     prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    raw = model(prompt, TopicResponse, max_new_tokens=150, temperature=1.1, do_sample=True, repetition_penalty=1.3)
-    result = TopicResponse.model_validate_json(raw) if isinstance(raw, str) else raw
-    return {"topic": result.topic}
+    try:
+        raw = model(prompt, QuestionSchema, max_new_tokens=300, temperature=1.1, do_sample=True, repetition_penalty=1.3)
+        result = QuestionSchema.model_validate_json(raw) if isinstance(raw, str) else raw
+        return {"topic": f"{result.context} {result.question}"}
+    except Exception as e:
+        return {"error": f"Generation failed: {e}"}
 
 if __name__ == "__main__":
     import asyncio
