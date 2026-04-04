@@ -1,4 +1,4 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
 use tauri::Manager;
 
 fn main() {
@@ -9,6 +9,13 @@ fn main() {
             window.eval("
                 document.addEventListener('contextmenu', (e) => e.preventDefault());
             ").unwrap();
+
+            #[cfg(target_os = "linux")]
+            {
+                if std::env::var("DISPLAY").is_err() && std::env::var("WAYLAND_DISPLAY").is_err() {
+                    let _ = window.set_transparent(false);
+                }
+            }
 
             Ok(())
         })

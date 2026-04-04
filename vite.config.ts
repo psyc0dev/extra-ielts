@@ -67,31 +67,21 @@ export default defineConfig(({ mode }) => {
               if (
                 id.includes('node_modules/react/') ||
                 id.includes('node_modules/react-dom/') ||
-                id.includes('node_modules/scheduler/') ||
-                id.includes('react-router')
+                id.includes('node_modules/scheduler/')
               ) {
                 return 'react-core'
               }
               if (
                 id.includes('@radix-ui') ||
-                id.includes('@floating-ui') ||
-                id.includes('@base-ui') ||
-                id.includes('@heroui') ||
-                id.includes('@mui') ||
-                id.includes('@emotion') ||
                 id.includes('motion') ||
-                id.includes('framer-motion') ||
                 id.includes('class-variance-authority') ||
                 id.includes('clsx') ||
                 id.includes('tailwind-merge')
               ) {
                 return 'ui-vendor'
               }
-              if (id.includes('lucide-react') || id.includes('react-icons')) {
+              if (id.includes('lucide-react')) {
                 return 'icons'
-              }
-              if (id.includes('@lottiefiles') || id.includes('dotlottie')) {
-                return 'lottie'
               }
               return 'vendor'
             }

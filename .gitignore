@@ -2,6 +2,8 @@ src-tauri/target
 server/dev.db
 bun.lock
 .git.bak
+commit.bat
+run.bat
 #
 build/
 logs
