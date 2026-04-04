@@ -89,7 +89,6 @@ export function Writing() {
             <div className="flex flex-col gap-2">
               <Skeleton className="h-3.5 w-full" />
               <Skeleton className="h-3.5 w-5/6" />
-              <Skeleton className="h-3.5 w-4/6" />
             </div>
           ) : topic ? (
             <p className="text-sm leading-relaxed text-neutral-200">{topic}</p>
