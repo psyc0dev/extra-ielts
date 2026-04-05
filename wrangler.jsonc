@@ -14,7 +14,7 @@
   ],
   "vars": {
     "CORS_ORIGIN": "*",
-    "EVALUATOR_URL": "https://82c6-35-197-62-23.ngrok-free.app",
+    "EVALUATOR_URL": "https://sadly-legible-jaybird.ngrok-free.app",
     "GENERATOR_URL": "https://extra-corporation-extra-ai-generator.hf.space",
     "RESEND_FROM": "extra IELTS <onboarding@resend.dev>"
   }

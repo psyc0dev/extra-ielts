@@ -7,7 +7,7 @@
     "build": "vite build",
     "tauri": "tauri",
     "dev:api": "bun run server/bun.ts",
-    "dev:all": "bunx concurrently --kill-others \"bun dev:api\" \"bun dev\" \"bun tauri dev\"",
+    "dev:all": "bunx concurrently --kill-others \"bun dev\" \"bun tauri dev\"",
     "deploy": "wrangler deploy",
     "d1:migrate:local": "wrangler d1 migrations apply extra-db --local",
     "d1:migrate:remote": "wrangler d1 migrations apply extra-db --remote"
@@ -16,6 +16,7 @@
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
+    "@lottiefiles/dotlottie-react": "^0.18.9",
     "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -55,7 +56,7 @@
     "hono-rate-limiter": "^0.5.3",
     "input-otp": "^1.4.2",
     "js-cookie": "^3.0.5",
-    "lucide-react": "^0.577.0",
+    "lucide-react": "^1.7.0",
     "motion": "^12.38.0",
     "radix-ui": "^1.4.3",
     "react": "^19.0.0",

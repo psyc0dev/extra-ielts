@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { DotLottieReact } from "@lottiefiles/dotlottie-react";
+import loadingLottie from "@/assets/loading.lottie";
+import { CopyButton } from "@/components/animate-ui/components/buttons/copy";
 import { generateWritingTopic, evaluateWritingEssay } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -80,9 +83,12 @@ export function Writing() {
       <Card className="rounded-xl border-neutral-800 bg-neutral-900">
         <CardHeader className="px-4 pt-4 pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-semibold">Topic</CardTitle>
-          <Button variant="outline" size="sm" onClick={generateTopic} disabled={generating} className="gap-1.5 text-xs h-7">
-            <Sparkle weight="bold" className="size-3.5" /> {generating ? "Generating..." : "Generate Topic"}
-          </Button>
+          <div className="flex items-center gap-1">
+            {topic && <CopyButton content={topic} variant="ghost" size="sm" />}
+            <Button variant="outline" size="sm" onClick={generateTopic} disabled={generating} className="gap-1.5 text-xs h-7">
+              <Sparkle weight="bold" className="size-3.5" /> {generating ? "Generating..." : "Generate Topic"}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="px-4 pb-4">
           {generating ? (
@@ -98,7 +104,12 @@ export function Writing() {
         </CardContent>
       </Card>
 
-      <Card className="rounded-xl border-neutral-800 bg-neutral-900">
+      <Card className="relative rounded-xl border-neutral-800 bg-neutral-900">
+        {loading && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-neutral-900/80 backdrop-blur-sm">
+            <DotLottieReact src={loadingLottie} autoplay loop style={{ width: 120, height: 120, filter: "invert(1)" }} />
+          </div>
+        )}
         <CardHeader className="px-4 pt-4 pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-semibold">Your Essay</CardTitle>
           <span className="text-xs text-muted-foreground">{wordCount} words</span>
@@ -106,9 +117,13 @@ export function Writing() {
         <CardContent className="px-4 pb-4 flex flex-col gap-3">
           <Textarea
             placeholder="Write your essay here..."
-            className="min-h-52 resize-none bg-neutral-950 border-neutral-700 text-sm leading-relaxed"
+            className="min-h-52 resize-none overflow-hidden bg-neutral-950 border-neutral-700 text-sm leading-relaxed"
             value={essay}
-            onChange={(e) => setEssay(e.target.value)}
+            onChange={(e) => {
+              setEssay(e.target.value);
+              e.target.style.height = "auto";
+              e.target.style.height = e.target.scrollHeight + "px";
+            }}
           />
           <div className="flex justify-end gap-2">
             {result && (

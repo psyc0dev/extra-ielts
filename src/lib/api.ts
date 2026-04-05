@@ -364,19 +364,34 @@ export async function generateWritingTopic() {
 }
 
 export async function evaluateWritingEssay(payload: { topic: string; essay: string }) {
-  return apiFetch<{
-    word_count: number
-    penalty: number
-    overall: number
-    overall_label: string
-    error?: string
-    criteria: {
-      task_response: { score: number; label: string; comment: string }
-      coherence_and_cohesion: { score: number; label: string; comment: string }
-      lexical_resource: { score: number; label: string; comment: string }
-      grammatical_range_and_accuracy: { score: number; label: string; comment: string }
-    }
-  }>('/writing/evaluations', { method: 'POST', body: JSON.stringify(payload) })
+  const token = getToken();
+  try {
+    const { data } = await axios<{
+      word_count: number
+      penalty: number
+      overall: number
+      overall_label: string
+      error?: string
+      criteria: {
+        task_response: { score: number; label: string; comment: string }
+        coherence_and_cohesion: { score: number; label: string; comment: string }
+        lexical_resource: { score: number; label: string; comment: string }
+        grammatical_range_and_accuracy: { score: number; label: string; comment: string }
+      }
+    }>(`${API_BASE}/writing/evaluations`, {
+      method: 'POST',
+      data: JSON.stringify(payload),
+      headers: {
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    return data;
+  } catch (err) {
+    const message = axios.isAxiosError(err) ? (err.response?.data?.error ?? "Request failed") : "Request failed";
+    throw new Error(message);
+  }
 }
 
 export async function startTest(testId: string) {

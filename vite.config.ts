@@ -14,6 +14,7 @@ const __dirname = path.dirname(__filename)
 
 export default defineConfig(({ mode }) => {
   return {
+    assetsInclude: ['**/*.lottie'],
     server: {
       port: 1420,
       strictPort: true,

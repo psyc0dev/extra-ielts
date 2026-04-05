@@ -214,13 +214,8 @@ function AppBody() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
 
-  useEffect(() => {
-    const id = window.setTimeout(() => setShowSplash(false), 2500);
-    return () => window.clearTimeout(id);
-  }, []);
-
-  if (loading || showSplash) {
-    return <LoadingScreen label={en.app.loading} />;
+  if (showSplash) {
+    return <LoadingScreen onComplete={() => setShowSplash(false)} />;
   }
 
   return (
