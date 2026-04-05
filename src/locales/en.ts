@@ -247,12 +247,6 @@
       cancel: "Cancel",
       confirm: "Sign out",
     },
-    changePassword: {
-      title: "Change password?",
-      description: "This will log you out of all devices. You'll need to sign in again with your new password.",
-      cancel: "Cancel",
-      confirm: "Continue",
-    },
     notifications: {
       push: "Push Notifications",
       pushSub: "Receive reminders for upcoming tests",
@@ -459,7 +453,63 @@
     hero: {
       badge: "AI Evaluation",
       title: "Writing Practice",
-      subtitle: "Generate a topic, write your essay, and get instant AI feedback on your band score.",
+      subtitle: "Generate a topic, write your essay, and get instant AI feedback on your band score."
+    },
+    criteriaCard: {
+      title: "Assessment Criteria",
+      criteria: [
+        {
+          key: "TR",
+          label: "Task Response",
+          task: "2",
+          summary: "How fully the candidate responds to the prompt, develops a position and supports ideas with evidence (min. 250 words).",
+          points: [
+            "Respond fully to all parts of the task.",
+            "Extend and support main ideas adequately.",
+            "Keep ideas relevant to the task.",
+            "Clearly open the discourse, establish a position and formulate conclusions.",
+            "Use an appropriate format for the response.",
+          ],
+        },
+        {
+          key: "CC",
+          label: "Coherence & Cohesion",
+          task: "2",
+          summary: "Overall organisation and logical development: how information, ideas and language are linked.",
+          points: [
+            "Organise information and ideas logically with clear progression.",
+            "Use paragraphing appropriately for topic organisation.",
+            "Sequence ideas logically within and across paragraphs.",
+            "Use reference and substitution flexibly (e.g. pronouns, definite articles).",
+            "Use discourse markers to mark stages and signal relationships between ideas.",
+          ],
+        },
+        {
+          key: "LR",
+          label: "Lexical Resource",
+          task: "2",
+          summary: "Range of vocabulary used and the accuracy and appropriacy of that use for the specific task.",
+          points: [
+            "Use a wide range of general words and synonyms to avoid repetition.",
+            "Use vocabulary that is adequate, appropriate and topic-specific.",
+            "Show precision in word choice and expression.",
+            "Control collocations, idiomatic expressions and sophisticated phrasing.",
+            "Minimise errors in spelling and word formation.",
+          ],
+        },
+        {
+          key: "GRA",
+          label: "Grammatical Range & Accuracy",
+          task: "2",
+          summary: "Range and accurate use of grammatical structures at sentence level.",
+          points: [
+            "Use a range of simple, compound and complex sentence structures.",
+            "Write simple, compound and complex sentences accurately.",
+            "Minimise grammatical errors and their communicative impact.",
+            "Use punctuation accurately and appropriately.",
+          ],
+        },
+      ],
     },
     topicCard: {
       title: "Topic",

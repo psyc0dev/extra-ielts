@@ -83,6 +83,45 @@ export function Writing() {
 
       <Card className="rounded-xl border-neutral-800 bg-neutral-900">
         <CardHeader className="px-4 pt-4 pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-semibold">{en.writing.criteriaCard.title}</CardTitle>
+          <a
+            href="https://ielts.org/cdn/Guides/ielts-writing-key-assessment-criteria.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
+          >
+            {en.writing.criteriaCard.title}
+          </a>
+        </CardHeader>
+        <CardContent className="px-4 pb-4 flex flex-col gap-2">
+          {en.writing.criteriaCard.criteria.map((c) => (
+            <details key={c.key} className="group rounded-lg border border-neutral-800 bg-neutral-950">
+              <summary className="flex cursor-pointer items-center justify-between gap-3 px-3 py-2.5 list-none">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-violet-400 bg-violet-400/10 px-1.5 py-0.5 rounded shrink-0">{c.key}</span>
+                  <span className="text-xs font-semibold text-neutral-200">{c.label}</span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-neutral-500 text-xs group-open:rotate-180 transition-transform">▾</span>
+                </div>
+              </summary>
+              <div className="px-3 pb-3 flex flex-col gap-2">
+                <p className="text-[11px] text-neutral-400 leading-relaxed">{c.summary}</p>
+                <ul className="flex flex-col gap-1">
+                  {c.points.map((point, i) => (
+                    <li key={i} className="flex items-start gap-1.5 text-[11px] text-neutral-500">
+                      <span className="text-violet-500 mt-0.5 shrink-0">▸</span>{point}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </details>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-xl border-neutral-800 bg-neutral-900">
+        <CardHeader className="px-4 pt-4 pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-semibold">{en.writing.topicCard.title}</CardTitle>
           <div className="flex items-center gap-1">
             {topic && <CopyButton content={topic} variant="ghost" size="sm" />}
