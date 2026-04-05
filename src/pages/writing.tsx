@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Sparkle, ArrowClockwise, PaperPlaneTilt } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import en from "@/locales/en";
 
 type CriterionScore = { score: number; label: string; comment: string };
 type EvalResult = {
@@ -41,7 +42,7 @@ export function Writing() {
       if (data.error) throw new Error(data.error);
       setTopic(data.topic);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to generate topic.");
+      toast.error(err instanceof Error ? err.message : en.writing.errors.generateFailed);
     } finally {
       setGenerating(false);
     }
@@ -49,7 +50,7 @@ export function Writing() {
 
   const evaluate = async () => {
     if (!topic.trim() || !essay.trim()) {
-      toast.error("Please enter a topic and write your essay.");
+      toast.error(en.writing.errors.missingInput);
       return;
     }
     setLoading(true);
@@ -59,7 +60,7 @@ export function Writing() {
       if (data.error) throw new Error(data.error);
       setResult(data);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Evaluation failed.");
+      toast.error(err instanceof Error ? err.message : en.writing.errors.evaluationFailed);
     } finally {
       setLoading(false);
     }
@@ -73,20 +74,20 @@ export function Writing() {
         <div className="absolute inset-0 opacity-40 [background:radial-gradient(circle_at_top_right,rgba(139,92,246,0.25),transparent_55%)]" />
         <div className="relative flex flex-wrap items-center justify-between gap-4">
           <div className="space-y-1">
-            <Badge variant="outline" className="border-violet-400/40 text-violet-200 -ml-1">AI Evaluation</Badge>
-            <h1 className="text-xl font-display tracking-wide">Writing Practice</h1>
-            <p className="text-xs text-muted-foreground max-w-lg">Generate a topic, write your essay, and get instant AI feedback on your band score.</p>
+            <Badge variant="outline" className="border-violet-400/40 text-violet-200 -ml-1">{en.writing.hero.badge}</Badge>
+            <h1 className="text-xl font-display tracking-wide">{en.writing.hero.title}</h1>
+            <p className="text-xs text-muted-foreground max-w-lg">{en.writing.hero.subtitle}</p>
           </div>
         </div>
       </div>
 
       <Card className="rounded-xl border-neutral-800 bg-neutral-900">
         <CardHeader className="px-4 pt-4 pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-semibold">Topic</CardTitle>
+          <CardTitle className="text-sm font-semibold">{en.writing.topicCard.title}</CardTitle>
           <div className="flex items-center gap-1">
             {topic && <CopyButton content={topic} variant="ghost" size="sm" />}
             <Button variant="outline" size="sm" onClick={generateTopic} disabled={generating} className="gap-1.5 text-xs h-7">
-              <Sparkle weight="bold" className="size-3.5" /> {generating ? "Generating..." : "Generate Topic"}
+              <Sparkle weight="bold" className="size-3.5" /> {generating ? en.writing.topicCard.generating : en.writing.topicCard.generateButton}
             </Button>
           </div>
         </CardHeader>
@@ -99,7 +100,7 @@ export function Writing() {
           ) : topic ? (
             <p className="text-sm leading-relaxed text-neutral-200">{topic}</p>
           ) : (
-            <p className="text-sm text-muted-foreground italic">Click "Generate Topic" to get a writing prompt.</p>
+            <p className="text-sm text-muted-foreground italic">{en.writing.topicCard.placeholder}</p>
           )}
         </CardContent>
       </Card>
@@ -111,12 +112,12 @@ export function Writing() {
           </div>
         )}
         <CardHeader className="px-4 pt-4 pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-semibold">Your Essay</CardTitle>
-          <span className="text-xs text-muted-foreground">{wordCount} words</span>
+          <CardTitle className="text-sm font-semibold">{en.writing.essayCard.title}</CardTitle>
+          <span className="text-xs text-muted-foreground">{wordCount} {en.writing.essayCard.wordsSuffix}</span>
         </CardHeader>
         <CardContent className="px-4 pb-4 flex flex-col gap-3">
           <Textarea
-            placeholder="Write your essay here..."
+            placeholder={en.writing.essayCard.placeholder}
             className="min-h-52 resize-none overflow-hidden bg-neutral-950 border-neutral-700 text-sm leading-relaxed"
             value={essay}
             onChange={(e) => {
@@ -128,12 +129,12 @@ export function Writing() {
           <div className="flex justify-end gap-2">
             {result && (
               <Button variant="ghost" size="sm" onClick={() => { setEssay(""); setResult(null); }} className="gap-1.5 text-xs">
-                <ArrowClockwise weight="bold" className="size-3.5" /> Reset
+                <ArrowClockwise weight="bold" className="size-3.5" /> {en.writing.essayCard.reset}
               </Button>
             )}
             <Button size="sm" onClick={evaluate} disabled={loading} className="gap-1.5 text-xs">
               <PaperPlaneTilt weight="bold" className="size-3.5" />
-              {loading ? "Evaluating..." : "Evaluate"}
+              {loading ? en.writing.essayCard.evaluating : en.writing.essayCard.evaluate}
             </Button>
           </div>
         </CardContent>
@@ -142,14 +143,14 @@ export function Writing() {
       {result && (
         <Card className="rounded-xl border-neutral-800 bg-neutral-900">
           <CardHeader className="px-4 pt-4 pb-3 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-semibold">Evaluation Results</CardTitle>
+            <CardTitle className="text-sm font-semibold">{en.writing.resultsCard.title}</CardTitle>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">{result.word_count} words</span>
+              <span className="text-xs text-muted-foreground">{en.writing.resultsCard.wordCount(result.word_count)}</span>
               {result.penalty > 0 && (
-                <span className="text-xs text-amber-400">−{result.penalty} penalty</span>
+                <span className="text-xs text-amber-400">{en.writing.resultsCard.penalty(result.penalty)}</span>
               )}
               <Badge variant="outline" className="border-violet-400/40 text-violet-200 text-xs">
-                Overall {result.overall} · {result.overall_label}
+                {en.writing.resultsCard.overall(result.overall, result.overall_label)}
               </Badge>
             </div>
           </CardHeader>

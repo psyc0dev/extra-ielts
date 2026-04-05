@@ -47,7 +47,7 @@ function LegalRow({ label, description, kind }: {
         </div>
         <LegalDialog kind={kind} trigger={
           <div className="grid place-items-center h-12">
-            <Button type="button" variant="secondary" size="sm">{en.settings.legal.open}</Button>
+            <Button type="button" variant="secondary" size="sm" className="mt-3">{en.settings.legal.open}</Button>
           </div>
         } />
       </div>
@@ -71,24 +71,24 @@ function ChangePasswordDialog({ open, onClose }: { open: boolean; onClose: () =>
     try {
       await requestPasswordReset(email.trim());
       setStep("otp");
-      toast.success("If this email is registered, a reset code has been sent.");
+      toast.success(en.settings.changePassword.toasts.sent);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to send code.");
+      toast.error(err instanceof Error ? err.message : en.settings.changePassword.toasts.sendFailed);
     } finally {
       setLoading(false);
     }
   };
 
   const handleReset = async () => {
-    if (password !== confirm) { toast.error("Passwords do not match."); return; }
-    if (password.length < 6) { toast.error("Password must be at least 6 characters."); return; }
+    if (password !== confirm) { toast.error(en.settings.changePassword.toasts.passwordMismatch); return; }
+    if (password.length < 6) { toast.error(en.settings.changePassword.toasts.passwordTooShort); return; }
     setLoading(true);
     try {
       await resetPassword(otp.trim(), password);
-      toast.success("Password changed successfully.");
+      toast.success(en.settings.changePassword.toasts.success);
       handleClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Invalid or expired code.");
+      toast.error(err instanceof Error ? err.message : en.settings.changePassword.toasts.invalidCode);
     } finally {
       setLoading(false);
     }
@@ -98,31 +98,31 @@ function ChangePasswordDialog({ open, onClose }: { open: boolean; onClose: () =>
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
       <DialogContent className="border-neutral-800 bg-neutral-950 max-w-sm">
         <DialogHeader>
-          <DialogTitle className="text-sm">Change Password</DialogTitle>
+          <DialogTitle className="text-sm">{en.settings.changePassword.title}</DialogTitle>
         </DialogHeader>
         {step === "email" ? (
           <>
-            <p className="text-xs text-muted-foreground">Enter your account email and we'll send you a 6-digit reset code.</p>
-            <Input type="email" placeholder="Your email address" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <p className="text-xs text-muted-foreground">{en.settings.changePassword.emailStep.description}</p>
+            <Input type="email" placeholder={en.settings.changePassword.emailStep.emailPlaceholder} value={email} onChange={(e) => setEmail(e.target.value)} />
             <DialogFooter>
-              <Button variant="outline" size="sm" className="border-neutral-700" onClick={handleClose}>Cancel</Button>
+              <Button variant="outline" size="sm" className="border-neutral-700" onClick={handleClose}>{en.settings.changePassword.emailStep.cancel}</Button>
               <Button size="sm" disabled={loading || !email.trim()} onClick={handleSendOtp}>
-                {loading ? "Sending..." : "Send Code"}
+                {loading ? en.settings.changePassword.emailStep.sending : en.settings.changePassword.emailStep.sendCode}
               </Button>
             </DialogFooter>
           </>
         ) : (
           <>
-            <p className="text-xs text-muted-foreground">Enter the 6-digit code sent to <span className="text-white">{email}</span> and your new password.</p>
+            <p className="text-xs text-muted-foreground">{en.settings.changePassword.otpStep.description(email)}</p>
             <div className="flex flex-col gap-3">
-              <Input placeholder="6-digit code" value={otp} onChange={(e) => setOtp(e.target.value)} maxLength={6} />
-              <Input type="password" placeholder="New password" value={password} onChange={(e) => setPassword(e.target.value)} />
-              <Input type="password" placeholder="Confirm new password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+              <Input placeholder={en.settings.changePassword.otpStep.codePlaceholder} value={otp} onChange={(e) => setOtp(e.target.value)} maxLength={6} />
+              <Input type="password" placeholder={en.settings.changePassword.otpStep.newPasswordPlaceholder} value={password} onChange={(e) => setPassword(e.target.value)} />
+              <Input type="password" placeholder={en.settings.changePassword.otpStep.confirmPasswordPlaceholder} value={confirm} onChange={(e) => setConfirm(e.target.value)} />
             </div>
             <DialogFooter>
-              <Button variant="outline" size="sm" className="border-neutral-700" onClick={() => setStep("email")}>Back</Button>
+              <Button variant="outline" size="sm" className="border-neutral-700" onClick={() => setStep("email")}>{en.settings.changePassword.otpStep.back}</Button>
               <Button size="sm" disabled={loading || !otp || !password || !confirm} onClick={handleReset}>
-                {loading ? "Saving..." : "Set New Password"}
+                {loading ? en.settings.changePassword.otpStep.saving : en.settings.changePassword.otpStep.setNewPassword}
               </Button>
             </DialogFooter>
           </>
@@ -144,10 +144,10 @@ function EditProfileDialog({ open, onClose, user, onUserUpdate }: {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
-      toast.error("Only PNG, JPEG, or WebP images are allowed.");
+      toast.error(en.settings.editProfile.toasts.invalidType);
       return;
     }
-    if (file.size > 2 * 1024 * 1024) { toast.error("Image must be under 2MB."); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error(en.settings.editProfile.toasts.tooLarge); return; }
     const reader = new FileReader();
     reader.onload = (ev) => {
       const result = ev.target?.result as string;
@@ -163,10 +163,10 @@ function EditProfileDialog({ open, onClose, user, onUserUpdate }: {
     try {
       const res = await uploadAvatar(dataUrl);
       onUserUpdate({ ...user, avatarUrl: res.avatarUrl });
-      toast.success("Avatar updated.");
+      toast.success(en.settings.editProfile.toasts.updated);
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to upload avatar.");
+      toast.error(err instanceof Error ? err.message : en.settings.editProfile.toasts.uploadFailed);
     } finally {
       setLoading(false);
     }
@@ -176,7 +176,7 @@ function EditProfileDialog({ open, onClose, user, onUserUpdate }: {
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="border-neutral-800 bg-neutral-950 max-w-sm">
         <DialogHeader>
-          <DialogTitle className="text-sm">Edit Profile</DialogTitle>
+          <DialogTitle className="text-sm">{en.settings.editProfile.title}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col items-center gap-4">
           <div
@@ -188,13 +188,13 @@ function EditProfileDialog({ open, onClose, user, onUserUpdate }: {
               : user.username[0]?.toUpperCase()
             }
           </div>
-          <p className="text-xs text-muted-foreground">Click avatar to upload a new image (PNG, JPEG, WebP · max 2MB)</p>
+          <p className="text-xs text-muted-foreground">{en.settings.editProfile.avatarHint}</p>
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleFile} />
         </div>
         <DialogFooter>
-          <Button variant="outline" size="sm" className="border-neutral-700" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" size="sm" className="border-neutral-700" onClick={onClose}>{en.settings.editProfile.cancel}</Button>
           <Button size="sm" disabled={loading} onClick={handleSave}>
-            {loading ? "Saving..." : "Save"}
+            {loading ? en.settings.editProfile.saving : en.settings.editProfile.save}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -224,7 +224,7 @@ export function Settings({ onSignOut, user, onUserUpdate, settings, onSettingsCh
       await deleteAccount();
       onSignOut();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete account.");
+      toast.error(err instanceof Error ? err.message : en.settings.danger.dialog.deleteFailed);
       setDeletingAccount(false);
     }
   };
@@ -359,7 +359,7 @@ export function Settings({ onSignOut, user, onUserUpdate, settings, onSettingsCh
                         disabled={deletingAccount}
                         onClick={handleDeleteAccount}
                       >
-                        {deletingAccount ? "Deleting..." : s.danger.dialog.confirm}
+                        {deletingAccount ? en.settings.danger.deleting : s.danger.dialog.confirm}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>

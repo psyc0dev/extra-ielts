@@ -111,7 +111,12 @@ export function Dashboard() {
               <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-2">{card.icon} {card.label}</CardTitle>
             </CardHeader>
             <CardContent className="px-4 pb-4">
-              {sk ? <><Skeleton className="h-8 w-12" /><Skeleton className="h-2.5 w-24 mt-2" /></> : (
+              {sk ? (
+                <div className="flex flex-col gap-1">
+                  <Skeleton className="h-8 w-10" />
+                  <Skeleton className="h-2.5 w-16" />
+                </div>
+              ) : (
                 <><span className="text-3xl font-bold">{card.value}</span><p className="text-xs text-muted-foreground mt-1">{card.sub}</p></>
               )}
             </CardContent>
@@ -124,29 +129,40 @@ export function Dashboard() {
           <CardHeader className="px-4 pt-4 pb-3">
             <CardTitle className="text-sm font-semibold">{en.dashboard.skillBreakdown.title}</CardTitle>
           </CardHeader>
-          <CardContent className="px-4 pb-4 flex flex-col gap-4">
+          <CardContent className="px-4 pb-4 flex flex-col gap-3">
             {sk ? (
               Array.from({ length: 2 }).map((_, i) => (
-                <div key={i} className="flex flex-col gap-1">
-                  <div className="flex justify-between"><Skeleton className="h-3 w-16" /><Skeleton className="h-3 w-8" /></div>
-                  <Skeleton className="h-1.5 w-full" />
+                <div key={i} className="rounded-lg border border-neutral-800 bg-neutral-950/50 p-3 flex items-center gap-4">
+                  <Skeleton className="size-12 rounded-lg shrink-0" />
+                  <div className="flex-1 flex flex-col gap-1.5">
+                    <div className="flex justify-between">
+                      <Skeleton className="h-3 w-16" />
+                      <Skeleton className="h-3 w-8" />
+                    </div>
+                    <Skeleton className="h-1.5 w-full rounded-full" />
+                  </div>
                 </div>
               ))
             ) : (
               [
-                { key: "listening", label: en.dashboard.skillBreakdown.skills.listening, band: avgListeningBand, color: "bg-sky-500" },
-                { key: "reading", label: en.dashboard.skillBreakdown.skills.reading, band: avgReadingBand, color: "bg-emerald-500" },
+                { key: "listening", label: en.dashboard.skillBreakdown.skills.listening, band: avgListeningBand, color: "bg-sky-500", trackColor: "bg-sky-500/15", textColor: "text-sky-400" },
+                { key: "reading", label: en.dashboard.skillBreakdown.skills.reading, band: avgReadingBand, color: "bg-emerald-500", trackColor: "bg-emerald-500/15", textColor: "text-emerald-400" },
               ].map((entry) => (
-                <div key={entry.key} className="flex flex-col gap-1">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">{entry.label}</span>
-                    <span className="font-semibold">{entry.band ?? en.common.na}</span>
+                <div key={entry.key} className="rounded-lg border border-neutral-800 bg-neutral-950/50 p-3 flex items-center gap-4">
+                  <div className={`flex items-center justify-center rounded-lg size-12 shrink-0 ${entry.trackColor}`}>
+                    <span className={`text-xl font-bold ${entry.textColor}`}>{entry.band ?? "—"}</span>
                   </div>
-                  <Progress value={entry.band != null ? (entry.band / 9) * 100 : 0} className="h-1.5" indicatorClassName={entry.color} />
+                  <div className="flex-1 flex flex-col gap-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="font-medium">{entry.label}</span>
+                      <span className="text-muted-foreground">{entry.band != null ? `${Math.round((entry.band / 9) * 100)}%` : en.common.na}</span>
+                    </div>
+                    <Progress value={entry.band != null ? (entry.band / 9) * 100 : 0} className="h-1.5" indicatorClassName={entry.color} />
+                  </div>
                 </div>
               ))
             )}
-            <p className="text-[10px] text-muted-foreground">{en.dashboard.skillBreakdown.note}</p>
+            <p className="ml-2 text-[12px] text-muted-foreground">{en.dashboard.skillBreakdown.note}</p>
           </CardContent>
         </Card>
 
@@ -160,13 +176,22 @@ export function Dashboard() {
           <CardContent className="px-4 pb-4 flex flex-col gap-3">
             {sk ? (
               Array.from({ length: 2 }).map((_, i) => (
-                <div key={i} className="rounded-lg border border-neutral-800 px-3 py-3 flex flex-col gap-1.5">
-                  <Skeleton className="h-3 w-3/4" />
-                  <Skeleton className="h-2.5 w-1/2" />
+                <div key={i} className="rounded-lg border border-neutral-800 px-3 py-3 flex items-center justify-between gap-3">
+                  <div className="flex flex-col gap-1 flex-1">
+                    <Skeleton className="h-3.5 w-3/4" />
+                    <Skeleton className="h-2.5 w-1/4" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                    <Skeleton className="h-6 w-16 rounded-md" />
+                  </div>
                 </div>
               ))
             ) : upcomingHomework.length === 0 ? (
-              <div className="text-xs text-muted-foreground py-6">{en.dashboard.upcomingHomework.empty}</div>
+              <div className="mt-4 flex flex-col items-center justify-center gap-2 py-8 text-center">
+                <ClockCountdown weight="duotone" className="size-8 text-muted-foreground/40" />
+                <p className="text-xs text-muted-foreground">{en.dashboard.upcomingHomework.empty}</p>
+              </div>
             ) : (
               upcomingHomework.map((hw) => (
                 <div key={hw.id} className="flex items-center justify-between gap-3 rounded-lg border border-neutral-800 px-3 py-3 text-xs transition-colors hover:border-emerald-500/50 cursor-pointer" onClick={() => setPage("Homework", hw.id)}>
@@ -200,12 +225,21 @@ export function Dashboard() {
           {sk ? (
             Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="flex items-center justify-between py-3 border-b border-neutral-800 last:border-0">
-                <div className="flex flex-col gap-1"><Skeleton className="h-3 w-32" /><Skeleton className="h-2.5 w-20 mt-0.5" /></div>
-                <div className="flex items-center gap-3"><Skeleton className="h-4 w-8" /><Skeleton className="h-5 w-16 rounded-full" /></div>
+                <div className="flex flex-col gap-0.5">
+                  <Skeleton className="h-3 w-36" />
+                  <Skeleton className="h-2.5 w-20 mt-0.5" />
+                </div>
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-4 w-6" />
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                </div>
               </div>
             ))
           ) : recentTests.length === 0 ? (
-            <div className="text-xs text-muted-foreground py-6">{en.dashboard.recentTests.empty}</div>
+            <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
+              <Trophy weight="duotone" className="size-8 text-muted-foreground/40" />
+              <p className="text-xs text-muted-foreground">{en.dashboard.recentTests.empty}</p>
+            </div>
           ) : (
             recentTests.map((test, i) => (
               <div key={i} className="flex items-center justify-between py-3 border-b border-neutral-800 last:border-0 cursor-pointer hover:bg-neutral-800/40 rounded px-1 -mx-1 transition-colors" onClick={() => setPage("Tests")}>

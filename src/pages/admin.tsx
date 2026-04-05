@@ -285,7 +285,7 @@ export function Admin() {
                       <TableHead>{en.admin.users.table.username}</TableHead>
                       <TableHead>{en.admin.users.table.email}</TableHead>
                       <TableHead>{en.admin.users.table.role}</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
+                      <TableHead className="text-right">{en.admin.groupDetails.tableHeaders.action}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -294,7 +294,7 @@ export function Admin() {
                         {Array.from({ length: 4 }).map((__, j) => <TableCell key={j}><Skeleton className="h-3 w-full" /></TableCell>)}
                       </TableRow>
                     )) : visibleUsers.length === 0 ? (
-                      <TableRow><TableCell colSpan={4} className="text-center text-xs text-muted-foreground py-8">No users found.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={4} className="text-center text-xs text-muted-foreground py-8">{en.admin.users.notFound}</TableCell></TableRow>
                     ) : visibleUsers.map((user) => (
                       <UserRow key={user.id} user={user} onView={(target) => { setSelectedUser(target); setSection("user-details"); }} />
                     ))}
@@ -332,7 +332,7 @@ export function Admin() {
                         {Array.from({ length: 5 }).map((__, j) => <TableCell key={j}><Skeleton className="h-3 w-full" /></TableCell>)}
                       </TableRow>
                     )) : visibleTests.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center text-xs text-muted-foreground py-8">No tests found.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center text-xs text-muted-foreground py-8">{en.admin.tests.notFound}</TableCell></TableRow>
                     ) : visibleTests.map((test) => (
                       <TableRow key={test.id}>
                         <TableCell className="font-medium">{test.title}</TableCell>
@@ -389,7 +389,7 @@ export function Admin() {
                         {Array.from({ length: 4 }).map((__, j) => <TableCell key={j}><Skeleton className="h-3 w-full" /></TableCell>)}
                       </TableRow>
                     )) : visibleAssignments.length === 0 ? (
-                      <TableRow><TableCell colSpan={4} className="text-center text-xs text-muted-foreground py-8">No assignments found.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={4} className="text-center text-xs text-muted-foreground py-8">{en.admin.assignments.notFound}</TableCell></TableRow>
                     ) : visibleAssignments.map((assignment) => (
                       <TableRow key={assignment.id}>
                         <TableCell>{testMap.get(assignment.testId) ?? assignment.testId}</TableCell>
@@ -474,7 +474,7 @@ function UserRow({ user, onView }: { user: ApiUser; onView: (user: ApiUser) => v
       <TableCell className="text-right">
         {user.role === "student" ? (
           <Button size="sm" variant="outline" className="h-7 text-xs border-neutral-700" onClick={() => onView(user)}>
-            View stats
+            {en.admin.users.viewStats}
           </Button>
         ) : (
           <span className="text-xs text-muted-foreground">{en.common.na}</span>
@@ -539,19 +539,45 @@ function UserDetailsPage({
     <Card className="border-neutral-800 bg-neutral-900">
       <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <CardTitle className="text-xs font-semibold">User stats</CardTitle>
+          <CardTitle className="text-xs font-semibold">{en.admin.userDetails.title}</CardTitle>
           <div className="text-xs text-muted-foreground mt-1">{user.username} � {user.email ?? en.common.na}</div>
         </div>
         <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onBack}>
-          Back to users
+          {en.admin.userDetails.backButton}
         </Button>
       </CardHeader>
       <CardContent>
         {user.role !== "student" && (
-          <div className="text-xs text-muted-foreground">No stats available for admins.</div>
+          <div className="text-xs text-muted-foreground">{en.admin.userDetails.noStatsForAdmin}</div>
         )}
         {user.role === "student" && loading && (
-          <div className="text-xs text-muted-foreground">{en.admin.stats.loading}</div>
+          <div className="flex flex-col gap-5">
+            {[0, 1].map((i) => (
+              <div key={i} className="flex flex-col gap-3">
+                <Skeleton className="h-2.5 w-20" />
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  {Array.from({ length: 4 }).map((_, j) => (
+                    <div key={j} className="flex flex-col gap-0.5 px-3 py-2 rounded-lg bg-neutral-900 border border-neutral-800">
+                      <Skeleton className="h-2 w-16" />
+                      <Skeleton className="h-4 w-10 mt-0.5" />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-col gap-2">
+                  {Array.from({ length: 2 }).map((_, j) => (
+                    <div key={j} className="flex items-center justify-between rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2">
+                      <Skeleton className="h-3 w-32" />
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="h-3 w-8" />
+                        <Skeleton className="h-3 w-8" />
+                        <Skeleton className="h-3 w-12" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
         {user.role === "student" && !loading && stats && (
           <div className="flex flex-col gap-5">
@@ -638,26 +664,26 @@ function GroupDetailsPage({
     <Card className="border-neutral-800 bg-neutral-900">
       <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <CardTitle className="text-xs font-semibold">Group stats</CardTitle>
-          <div className="text-xs text-muted-foreground mt-1">{group.name} � {group.members.length} members</div>
+          <CardTitle className="text-xs font-semibold">{en.admin.groupDetails.title}</CardTitle>
+          <div className="text-xs text-muted-foreground mt-1">{en.admin.groupDetails.membersCount(group.name, group.members.length)}</div>
         </div>
         <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onBack}>
-          Back to groups
+          {en.admin.groupDetails.backButton}
         </Button>
       </CardHeader>
       <CardContent>
         {group.members.length === 0 ? (
-          <div className="text-xs text-muted-foreground">No members yet.</div>
+          <div className="text-xs text-muted-foreground">{en.admin.groupDetails.noMembers}</div>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Student</TableHead>
-                <TableHead>Tests done</TableHead>
-                <TableHead>Tests avg band</TableHead>
-                <TableHead>Assignments done</TableHead>
-                <TableHead>Assignments avg band</TableHead>
-                <TableHead className="text-right">Action</TableHead>
+                <TableHead>{en.admin.groupDetails.tableHeaders.student}</TableHead>
+                <TableHead>{en.admin.groupDetails.tableHeaders.testsDone}</TableHead>
+                <TableHead>{en.admin.groupDetails.tableHeaders.testsAvgBand}</TableHead>
+                <TableHead>{en.admin.groupDetails.tableHeaders.assignmentsDone}</TableHead>
+                <TableHead>{en.admin.groupDetails.tableHeaders.assignmentsAvgBand}</TableHead>
+                <TableHead className="text-right">{en.admin.groupDetails.tableHeaders.action}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -670,13 +696,13 @@ function GroupDetailsPage({
                 return (
                 <TableRow key={member.id}>
                   <TableCell className="font-medium">{member.username}</TableCell>
-                  <TableCell className="text-muted-foreground">{loading ? en.admin.stats.loading : testsDone}</TableCell>
-                  <TableCell>{loading ? en.admin.stats.loading : testsAvg}</TableCell>
-                  <TableCell>{loading ? en.admin.stats.loading : assignmentsDone}</TableCell>
-                  <TableCell>{loading ? en.admin.stats.loading : assignmentsAvg}</TableCell>
+                  <TableCell className="text-muted-foreground">{loading ? <Skeleton className="h-3 w-10" /> : testsDone}</TableCell>
+                  <TableCell>{loading ? <Skeleton className="h-3 w-8" /> : testsAvg}</TableCell>
+                  <TableCell>{loading ? <Skeleton className="h-3 w-10" /> : assignmentsDone}</TableCell>
+                  <TableCell>{loading ? <Skeleton className="h-3 w-8" /> : assignmentsAvg}</TableCell>
                   <TableCell className="text-right">
                     <Button size="sm" variant="outline" className="h-7 text-xs border-neutral-700" onClick={() => onViewUser(member.id)}>
-                      View stats
+                      {en.admin.users.viewStats}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -1112,7 +1138,7 @@ function GroupCard({
         <div className="flex items-center gap-2">
           <AssignGroupHomeworkDialog group={group} tests={tests} />
           <Button size="sm" variant="outline" className="h-7 text-xs border-neutral-700" onClick={onView}>
-            View details
+            {en.admin.groupDetails.viewDetails}
           </Button>
           <Button
             size="sm"

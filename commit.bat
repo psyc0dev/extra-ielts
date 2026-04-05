@@ -3,8 +3,8 @@ setlocal EnableDelayedExpansion
 
 git add .
 
-REM Check for changes in backend directory
-git diff --cached --name-only | findstr "server/" > nul
+REM Check for changes in backend directory or wrangler config
+git diff --cached --name-only | findstr /r "server/ wrangler\.jsonc" > nul
 if %errorlevel% equ 0 (
     echo Backend changes detected. Deploying to Cloudflare...
     cd server

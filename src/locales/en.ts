@@ -103,6 +103,7 @@
     },
     bookHeader: (num: string) => `Cambridge IELTS ${num} - Academic`,
     noMatch: "No tests match the current filter.",
+    noAvailable: "No tests available",
     loading: "Loading tests...",
     submitted: "Test submitted",
     errors: {
@@ -157,6 +158,8 @@
       tasks: (done: number, total: number) => `${done}/${total} tasks`,
     },
     empty: "All caught up!",
+    emptyTitle: "No homework assigned",
+    emptyScoreYet: "No score yet",
     loading: "Loading homework...",
     submitted: "Homework submitted",
     expired: "Expired",
@@ -198,6 +201,46 @@
         signOut: "Sign out",
       },
     },
+    changePassword: {
+      title: "Change Password",
+      emailStep: {
+        description: "Enter your account email and we'll send you a 6-digit reset code.",
+        emailPlaceholder: "Your email address",
+        cancel: "Cancel",
+        sendCode: "Send Code",
+        sending: "Sending...",
+      },
+      otpStep: {
+        description: (email: string) => `Enter the 6-digit code sent to ${email} and your new password.`,
+        codePlaceholder: "6-digit code",
+        newPasswordPlaceholder: "New password",
+        confirmPasswordPlaceholder: "Confirm new password",
+        back: "Back",
+        setNewPassword: "Set New Password",
+        saving: "Saving...",
+      },
+      toasts: {
+        sent: "If this email is registered, a reset code has been sent.",
+        sendFailed: "Failed to send code.",
+        passwordMismatch: "Passwords do not match.",
+        passwordTooShort: "Password must be at least 6 characters.",
+        success: "Password changed successfully.",
+        invalidCode: "Invalid or expired code.",
+      },
+    },
+    editProfile: {
+      title: "Edit Profile",
+      avatarHint: "Click avatar to upload a new image (PNG, JPEG, WebP · max 2MB)",
+      cancel: "Cancel",
+      save: "Save",
+      saving: "Saving...",
+      toasts: {
+        updated: "Avatar updated.",
+        uploadFailed: "Failed to upload avatar.",
+        invalidType: "Only PNG, JPEG, or WebP images are allowed.",
+        tooLarge: "Image must be under 2MB.",
+      },
+    },
     signOut: {
       title: "Sign out?",
       description: "You'll need to log in again to access your account.",
@@ -231,11 +274,13 @@
       deleteAccount: "Delete account",
       deleteAccountSub: "Permanently delete your account and all data",
       deleteButton: "Delete",
+      deleting: "Deleting...",
       dialog: {
         title: "Delete account?",
         description: "This action cannot be undone. All your data, tests, and homework will be permanently deleted.",
         cancel: "Cancel",
         confirm: "Delete account",
+        deleteFailed: "Failed to delete account.",
       },
     },
   },
@@ -410,6 +455,39 @@
     closeSubmitting: "Close (submitting test)",
   },
 
+  writing: {
+    hero: {
+      badge: "AI Evaluation",
+      title: "Writing Practice",
+      subtitle: "Generate a topic, write your essay, and get instant AI feedback on your band score.",
+    },
+    topicCard: {
+      title: "Topic",
+      generateButton: "Generate Topic",
+      generating: "Generating...",
+      placeholder: 'Click "Generate Topic" to get a writing prompt.',
+    },
+    essayCard: {
+      title: "Your Essay",
+      wordsSuffix: "words",
+      placeholder: "Write your essay here...",
+      reset: "Reset",
+      evaluate: "Evaluate",
+      evaluating: "Evaluating...",
+    },
+    resultsCard: {
+      title: "Evaluation Results",
+      overall: (score: number, label: string) => `Overall ${score} · ${label}`,
+      wordCount: (n: number) => `${n} words`,
+      penalty: (n: number) => `−${n} penalty`,
+    },
+    errors: {
+      generateFailed: "Failed to generate topic.",
+      missingInput: "Please enter a topic and write your essay.",
+      evaluationFailed: "Evaluation failed.",
+    },
+  },
+
   admin: {
     errors: {
       updateFailed: "Failed to update",
@@ -450,6 +528,8 @@
       title: "Users",
       new: "New User",
       search: "Search users...",
+      notFound: "No users found.",
+      viewStats: "View stats",
       table: {
         username: "Username",
         email: "Email",
@@ -474,6 +554,7 @@
     },
     title: "Tests",
       minutesSuffix: "min",
+      notFound: "No tests found.",
       table: {
         title: "Title",
         duration: "Duration",
@@ -491,6 +572,7 @@
       title: "Homework Assignments",
       new: "New Homework",
       createTitle: "Create Homework",
+      notFound: "No assignments found.",
       test: "Test",
       sections: "Sections",
       assignTo: "Assign To",
@@ -548,6 +630,26 @@
       recent: "Recent",
       noData: "No data",
       loading: "Loading...",
+    },
+    userDetails: {
+      title: "User stats",
+      backButton: "Back to users",
+      noStatsForAdmin: "No stats available for admins.",
+    },
+    groupDetails: {
+      title: "Group stats",
+      backButton: "Back to groups",
+      membersCount: (name: string, n: number) => `${name}  ${n} member${n !== 1 ? "s" : ""}`,
+      noMembers: "No members yet.",
+      viewDetails: "View details",
+      tableHeaders: {
+        student: "Student",
+        testsDone: "Tests done",
+        testsAvgBand: "Tests avg band",
+        assignmentsDone: "Assignments done",
+        assignmentsAvgBand: "Assignments avg band",
+        action: "Action",
+      },
     },
     toasts: {
       userCreated: "User created",

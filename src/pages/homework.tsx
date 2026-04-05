@@ -68,12 +68,14 @@ function HomeworkCardSkeleton() {
     <Card className="rounded-xl border-neutral-800 bg-neutral-900">
       <CardContent className="px-4 py-3 flex flex-col gap-2.5">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex flex-col gap-1.5 flex-1">
+          <div className="flex flex-col gap-1 flex-1">
             <Skeleton className="h-3 w-2/3" />
             <Skeleton className="h-2.5 w-1/2" />
             <Skeleton className="h-2.5 w-1/3" />
           </div>
-          <Skeleton className="h-5 w-16 rounded-full" />
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
+            <Skeleton className="h-5 w-16 rounded-full" />
+          </div>
         </div>
         <div className="flex justify-between items-center">
           <div className="flex gap-1.5">
@@ -128,7 +130,7 @@ function HomeworkCard({ assignment, status, onOpen }: { assignment: AssignmentSu
         <div className="flex items-center justify-between">
           <div className="flex gap-1.5 flex-wrap">
             {assignment.sectionKinds.map((kind) => (
-              <ScorePill key={kind} label={kind} score={assignment.attempt?.status === "completed" ? (assignment.attempt?.band ?? null) : null} />
+              <ScorePill key={kind} label={kind} score={assignment.attempt?.status === "completed" ? (kind === "listening" ? (assignment.attempt?.listeningBand ?? null) : kind === "reading" ? (assignment.attempt?.readingBand ?? null) : (assignment.attempt?.band ?? null)) : null} />
             ))}
           </div>
           <Button size="xs" variant={status === "not-started" ? "outline" : "ghost"} className="shrink-0 gap-1" disabled={isPastDue} onClick={() => onOpen(assignment)}>
@@ -271,14 +273,14 @@ export function Homework({ onStartTest, onStopTest, timerActive }: {
                 <CardContent className="px-4 py-3 flex flex-col gap-2.5">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex flex-col gap-1.5 flex-1">
-                      <span className="text-xs font-medium text-neutral-400">No homework assigned</span>
+                      <span className="text-xs font-medium text-neutral-400">{en.homework.emptyTitle}</span>
                       <span className="text-[10px] text-neutral-600">{en.homework.empty}</span>
                     </div>
                     <BookOpen weight="bold" className="size-4 text-neutral-700 shrink-0 mt-0.5" />
                   </div>
                   <div className="flex justify-between items-center">
                     <div className="flex gap-1.5">
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-neutral-800/50 text-neutral-600">No score yet</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-neutral-800/50 text-neutral-600">{en.homework.emptyScoreYet}</span>
                     </div>
                     <span className="text-[10px] text-neutral-700">—</span>
                   </div>

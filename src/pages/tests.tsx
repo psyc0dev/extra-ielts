@@ -282,7 +282,14 @@ export function Tests({ onStartTest, onStopTest, timerActive }: {
                     <span className="text-[10px] text-muted-foreground">
                       {key === "completed" ? en.tests.summary.completed : key === "avgBand" ? en.tests.summary.avgBand : en.tests.summary.progress}
                     </span>
-                    {sk ? <Skeleton className="h-7 w-12 mt-0.5" /> : key === "completed" ? (
+                    {sk ? (
+                      key === "progress" ? (
+                        <div className="flex flex-col gap-1 mt-0.5">
+                          <Skeleton className="h-3 w-8" />
+                          <Skeleton className="h-1.5 w-full rounded-full" />
+                        </div>
+                      ) : <Skeleton className="h-7 w-12 mt-0.5" />
+                    ) : key === "completed" ? (
                       <span className="text-xl font-bold">{completed}<span className="text-sm text-muted-foreground">/{tests.length}</span></span>
                     ) : key === "avgBand" ? (
                       <span className="text-xl font-bold flex items-center gap-1"><Trophy weight="bold" className="size-3.5 text-amber-400" />{avgBand ?? en.common.na}</span>
@@ -306,7 +313,7 @@ export function Tests({ onStartTest, onStopTest, timerActive }: {
                     <CardContent className="px-4 py-3 flex flex-col gap-2.5">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex flex-col gap-1.5 flex-1">
-                          <span className="text-xs font-medium text-neutral-400">No tests available</span>
+                          <span className="text-xs font-medium text-neutral-400">{en.tests.noAvailable}</span>
                           <span className="text-[10px] text-neutral-600">{en.tests.noMatch}</span>
                         </div>
                         <BookOpen weight="bold" className="size-4 text-neutral-700 shrink-0 mt-0.5" />
