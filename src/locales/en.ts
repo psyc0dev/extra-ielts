@@ -457,6 +457,7 @@
     },
     criteriaCard: {
       title: "Assessment Criteria",
+      viewPDF: "View PDF",
       criteria: [
         {
           key: "TR",

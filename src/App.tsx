@@ -214,19 +214,35 @@ function AppBody() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
 
-  if (showSplash) {
-    return <LoadingScreen onComplete={() => setShowSplash(false)} />;
-  }
-
   return (
     <>
       <Toaster />
+      <AnimatePresence>
+        {showSplash && (
+          <motion.div
+            key="splash"
+            className="absolute inset-0 z-50"
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            <LoadingScreen onComplete={() => setShowSplash(false)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
       <div
         className="dark flex flex-col h-screen font-sans bg-neutral-900 text-white overflow-hidden"
         style={{ clipPath: isFullscreen ? "none" : "inset(0 round 6px)", transition: "clip-path 0.3s ease" }}
       >
+      <AnimatePresence mode="wait">
       {!user ? (
-        <div className="flex flex-col flex-1">
+        <motion.div
+          key="login"
+          className="flex flex-col flex-1"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+        >
           <div data-tauri-drag-region className="flex h-9 items-center justify-end select-none border-b border-neutral-800">
             <WindowControls onFullscreen={setIsFullscreen} />
           </div>
@@ -246,21 +262,31 @@ function AppBody() {
               />
             </div>
           </div>
-        </div>
+        </motion.div>
       ) : (
-        <NavProvider>
-          <TooltipProvider>
-            <AppShell
-              onSignOut={logoutUser}
-              user={user}
-              onUserUpdate={(updated) => refreshUser().catch(() => undefined)}
-              isFullscreen={isFullscreen}
-              setIsFullscreen={setIsFullscreen}
-              isAdmin={user.role === "admin"}
-            />
-          </TooltipProvider>
-        </NavProvider>
+        <motion.div
+          key="app"
+          className="flex flex-col flex-1 min-h-0"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <NavProvider>
+            <TooltipProvider>
+              <AppShell
+                onSignOut={logoutUser}
+                user={user}
+                onUserUpdate={(updated) => refreshUser().catch(() => undefined)}
+                isFullscreen={isFullscreen}
+                setIsFullscreen={setIsFullscreen}
+                isAdmin={user.role === "admin"}
+              />
+            </TooltipProvider>
+          </NavProvider>
+        </motion.div>
       )}
+      </AnimatePresence>
       </div>
     </>
   );

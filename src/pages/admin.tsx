@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDelayedLoading } from "@/hooks/use-delayed-loading";
@@ -229,6 +230,15 @@ export function Admin() {
             </div>
           </div>
 
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={section}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.15, ease: "easeInOut" }}
+              className="flex flex-col gap-4"
+            >
           {section === "overview" && (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
               {sk ? (
@@ -459,6 +469,8 @@ export function Admin() {
               }}
             />
           )}
+            </motion.div>
+          </AnimatePresence>
         </section>
       </div>
     </div>

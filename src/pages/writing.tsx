@@ -3,6 +3,7 @@ import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import loadingLottie from "@/assets/loading.lottie";
 import { CopyButton } from "@/components/animate-ui/components/buttons/copy";
 import { generateWritingTopic, evaluateWritingEssay } from "@/lib/api";
+import { open } from "@tauri-apps/plugin-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -84,14 +85,12 @@ export function Writing() {
       <Card className="rounded-xl border-neutral-800 bg-neutral-900">
         <CardHeader className="px-4 pt-4 pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-semibold">{en.writing.criteriaCard.title}</CardTitle>
-          <a
-            href="https://ielts.org/cdn/Guides/ielts-writing-key-assessment-criteria.pdf"
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={() => open("https://ielts.org/cdn/Guides/ielts-writing-key-assessment-criteria.pdf")}
             className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
           >
-            {en.writing.criteriaCard.title}
-          </a>
+            {en.writing.criteriaCard.viewPDF}
+          </button>
         </CardHeader>
         <CardContent className="px-4 pb-4 flex flex-col gap-2">
           {en.writing.criteriaCard.criteria.map((c) => (

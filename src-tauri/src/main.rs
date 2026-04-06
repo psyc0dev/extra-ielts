@@ -20,6 +20,7 @@ fn main() {
             Ok(())
         })
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_shell::init())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

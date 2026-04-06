@@ -168,6 +168,29 @@ html {
   html {
     @apply font-sans;
   }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="option"],
+  [role="menuitem"],
+  [role="tab"],
+  [role="checkbox"],
+  [role="switch"],
+  [role="combobox"],
+  [role="listbox"],
+  label,
+  select,
+  summary {
+    cursor: pointer;
+  }
+  input,
+  textarea {
+    cursor: text;
+  }
+  :disabled,
+  [aria-disabled="true"],
+  [data-disabled] {
+    cursor: not-allowed !important;
+  }
 }
 
 @keyframes toast-enter {
