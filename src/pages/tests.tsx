@@ -245,7 +245,7 @@ export function Tests({ onStartTest, onStopTest, timerActive }: {
       ) : (
         <motion.div key="list" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15, ease: "easeInOut" }}>
           <div className="p-5 flex flex-col gap-4 font-body">
-            <div className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-[linear-gradient(135deg,rgba(6,95,70,0.2),rgba(15,23,42,0.9))] p-4">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0, ease: 'easeOut' as const }} className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-[linear-gradient(135deg,rgba(6,95,70,0.2),rgba(15,23,42,0.9))] p-4">
               <div className="absolute inset-0 opacity-50 [background:radial-gradient(circle_at_top_right,rgba(59,130,246,0.2),transparent_55%)]" />
               <div className="relative flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-col gap-1">
@@ -255,9 +255,9 @@ export function Tests({ onStartTest, onStopTest, timerActive }: {
                 </div>
                 <div className="text-xs text-muted-foreground">{en.tests.summary.progress}: {tests.length ? Math.round((completed / tests.length) * 100) : 0}%</div>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="flex items-center justify-between">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.06, ease: 'easeOut' as const }} className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <BookOpen weight="bold" className="size-4 text-muted-foreground" />
                 <span className="text-sm font-semibold">{en.tests.title}</span>
@@ -273,9 +273,9 @@ export function Tests({ onStartTest, onStopTest, timerActive }: {
                   <SelectItem value="completed" className="text-xs">{en.tests.filter.completed}</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </motion.div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.12, ease: 'easeOut' as const }} className="grid grid-cols-3 gap-3">
               {["completed", "avgBand", "progress"].map((key) => (
                 <Card key={key} className="rounded-xl border-neutral-800 bg-neutral-900">
                   <CardContent className="px-3 py-2.5 flex flex-col gap-0.5">
@@ -302,33 +302,41 @@ export function Tests({ onStartTest, onStopTest, timerActive }: {
                   </CardContent>
                 </Card>
               ))}
-            </div>
+            </motion.div>
 
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.18, ease: 'easeOut' as const }}>
             <ScrollArea className="w-full" type="scroll">
               <div className="grid gap-3">
-                {sk ? (
-                  Array.from({ length: 4 }).map((_, i) => <TestCardSkeleton key={i} />)
-                ) : filtered.length === 0 ? (
-                  <Card className="rounded-xl border-neutral-800 bg-neutral-900">
-                    <CardContent className="px-4 py-3 flex flex-col gap-2.5">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex flex-col gap-1.5 flex-1">
-                          <span className="text-xs font-medium text-neutral-400">{en.tests.noAvailable}</span>
-                          <span className="text-[10px] text-neutral-600">{en.tests.noMatch}</span>
-                        </div>
-                        <BookOpen weight="bold" className="size-4 text-neutral-700 shrink-0 mt-0.5" />
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-neutral-800/50 text-neutral-600">{en.tests.details.noScore}</span>
-                        <span className="text-[10px] text-neutral-700">—</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  filtered.map((test) => <TestCard key={test.id} test={test} onOpen={open} />)
-                )}
+                <AnimatePresence mode="wait" initial={false}>
+                  {sk ? (
+                    <motion.div key="sk" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="grid gap-3">
+                      {Array.from({ length: 4 }).map((_, i) => <TestCardSkeleton key={i} />)}
+                    </motion.div>
+                  ) : (
+                    <motion.div key="content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} className="grid gap-3">
+                      {filtered.length === 0 ? (
+                        <Card className="rounded-xl border-neutral-800 bg-neutral-900">
+                          <CardContent className="px-4 py-3 flex flex-col gap-2.5">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex flex-col gap-1.5 flex-1">
+                                <span className="text-xs font-medium text-neutral-400">{en.tests.noAvailable}</span>
+                                <span className="text-[10px] text-neutral-600">{en.tests.noMatch}</span>
+                              </div>
+                              <BookOpen weight="bold" className="size-4 text-neutral-700 shrink-0 mt-0.5" />
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-neutral-800/50 text-neutral-600">{en.tests.details.noScore}</span>
+                              <span className="text-[10px] text-neutral-700">—</span>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ) : filtered.map((test) => <TestCard key={test.id} test={test} onOpen={open} />)}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </ScrollArea>
+            </motion.div>
 
             <TestDialog test={selected} open={dialogOpen} onClose={() => setDialogOpen(false)} onStart={handleStart} timerActive={timerActive} />
           </div>

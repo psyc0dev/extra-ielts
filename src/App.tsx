@@ -12,6 +12,7 @@ import {
 import WindowControls from "./components/WindowControls";
 import { NavProvider, useNav } from "./hooks/use-nav";
 import { Dashboard, Tests, Homework, Settings, Admin, Writing } from "./pages/index";
+import NotFound from "./pages/not-found";
 import { LoginForm } from "@/components/ui/loginform";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
@@ -110,7 +111,7 @@ function PageContent({
             transition={{ duration: 0.15, ease: "easeInOut" }}
             className="absolute inset-0 overflow-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
-            {pages[page]}
+            {pages[page] ?? <NotFound />}
           </motion.div>
         </AnimatePresence>
       </div>

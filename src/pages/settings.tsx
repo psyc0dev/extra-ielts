@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { motion } from "motion/react";
 import type { ApiUser, UserSettings } from "@/lib/api";
 import { requestPasswordReset, resetPassword, deleteAccount, uploadAvatar } from "@/lib/api";
 import { Switch } from "@/components/ui/switch";
@@ -14,7 +15,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Gear } from "@phosphor-icons/react";
+import { Gear, UploadSimple } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import en from "@/locales/en";
 import { LegalDialog } from "@/components/ui/legaldialog";
@@ -180,13 +181,16 @@ function EditProfileDialog({ open, onClose, user, onUserUpdate }: {
         </DialogHeader>
         <div className="flex flex-col items-center gap-4">
           <div
-            className="w-20 h-20 rounded-full bg-neutral-700 flex items-center justify-center text-2xl font-semibold overflow-hidden cursor-pointer border-2 border-neutral-600 hover:border-neutral-400 transition-colors"
+            className="relative w-20 h-20 rounded-full bg-neutral-700 flex items-center justify-center text-2xl font-semibold overflow-hidden cursor-pointer border-2 border-neutral-600 hover:border-neutral-400 transition-colors group"
             onClick={() => fileRef.current?.click()}
           >
             {preview
               ? <img src={preview} alt="avatar" className="w-full h-full object-cover" />
               : user.username[0]?.toUpperCase()
             }
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <UploadSimple weight="bold" className="size-6 text-white" />
+            </div>
           </div>
           <p className="text-xs text-muted-foreground">{en.settings.editProfile.avatarHint}</p>
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleFile} />
@@ -232,23 +236,31 @@ export function Settings({ onSignOut, user, onUserUpdate, settings, onSettingsCh
   const s = en.settings;
 
   return (
-    <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-6 h-full content-start">
+    <motion.div
+      className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-6 h-full content-start"
+      initial="hidden"
+      animate="visible"
+      variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
+    >
       <ChangePasswordDialog open={changePasswordOpen} onClose={() => setChangePasswordOpen(false)} />
       <EditProfileDialog open={editProfileOpen} onClose={() => setEditProfileOpen(false)} user={user} onUserUpdate={onUserUpdate} />
 
-      <div className="flex flex-col gap-6">
+      <motion.div variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0, transition: { duration: 0.25 } } }} className="flex flex-col gap-6">
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">{s.sections.account}</h2>
           <div className="rounded-xl border border-neutral-800 px-4">
             <div className="flex items-center gap-4 py-4">
               <div
-                className="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center text-sm font-semibold shrink-0 overflow-hidden cursor-pointer"
+                className="relative w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center text-sm font-semibold shrink-0 overflow-hidden cursor-pointer group"
                 onClick={() => setEditProfileOpen(true)}
               >
                 {user.avatarUrl
                   ? <img src={user.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
                   : user.username[0]?.toUpperCase()
                 }
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                  <UploadSimple weight="bold" className="size-3.5 text-white" />
+                </div>
               </div>
               <div className="flex flex-col gap-0.5">
                 <span className="text-sm font-medium">{user.username}</span>
@@ -322,9 +334,9 @@ export function Settings({ onSignOut, user, onUserUpdate, settings, onSettingsCh
             <LegalRow label={s.legal.policy} description={s.legal.policySub} kind="policy" />
           </div>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="flex flex-col gap-6">
+      <motion.div variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0, transition: { duration: 0.25 } } }} className="flex flex-col gap-6">
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">{s.sections.notifications}</h2>
           <div className="rounded-xl border border-neutral-800 px-4">
@@ -368,7 +380,7 @@ export function Settings({ onSignOut, user, onUserUpdate, settings, onSettingsCh
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -244,10 +245,16 @@ export function Homework({ onStartTest, onStopTest, timerActive }: {
     );
   }
 
+  const fade = (i: number) => ({
+    initial: { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.25, delay: i * 0.06, ease: 'easeOut' as const },
+  });
+
   return (
     <TooltipProvider>
       <div className="p-5 flex flex-col gap-4 font-body">
-        <div className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-[linear-gradient(135deg,rgba(30,64,175,0.25),rgba(10,10,10,0.9))] p-4">
+        <motion.div {...fade(0)} className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-[linear-gradient(135deg,rgba(30,64,175,0.25),rgba(10,10,10,0.9))] p-4">
           <div className="absolute inset-0 opacity-40 [background:radial-gradient(circle_at_bottom_left,rgba(251,191,36,0.2),transparent_60%)]" />
           <div className="relative flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-col gap-1">
@@ -257,42 +264,50 @@ export function Homework({ onStartTest, onStopTest, timerActive }: {
             </div>
             <div className="text-xs text-muted-foreground">{assignments.length} {en.homework.hero.totalSuffix}</div>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="flex items-center gap-2">
+        <motion.div {...fade(1)} className="flex items-center gap-2">
           <BookOpen weight="bold" className="size-4 text-muted-foreground" />
           <span className="text-sm font-semibold">{en.homework.title}</span>
-        </div>
+        </motion.div>
 
+        <motion.div {...fade(2)}>
         <ScrollArea className="w-full" type="scroll">
           <div className="grid gap-3">
-            {sk ? (
-              Array.from({ length: 3 }).map((_, i) => <HomeworkCardSkeleton key={i} />)
-            ) : assignments.length === 0 ? (
-              <Card className="rounded-xl border-neutral-800 bg-neutral-900">
-                <CardContent className="px-4 py-3 flex flex-col gap-2.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex flex-col gap-1.5 flex-1">
-                      <span className="text-xs font-medium text-neutral-400">{en.homework.emptyTitle}</span>
-                      <span className="text-[10px] text-neutral-600">{en.homework.empty}</span>
-                    </div>
-                    <BookOpen weight="bold" className="size-4 text-neutral-700 shrink-0 mt-0.5" />
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <div className="flex gap-1.5">
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-neutral-800/50 text-neutral-600">{en.homework.emptyScoreYet}</span>
-                    </div>
-                    <span className="text-[10px] text-neutral-700">—</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              assignments.map((a) => (
-                <HomeworkCard key={a.id} assignment={a} status={(a.attempt?.status ?? "not-started") as Status} onOpen={open} />
-              ))
-            )}
+            <AnimatePresence mode="wait" initial={false}>
+              {sk ? (
+                <motion.div key="sk" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="grid gap-3">
+                  {Array.from({ length: 4 }).map((_, i) => <HomeworkCardSkeleton key={i} />)}
+                </motion.div>
+              ) : (
+                <motion.div key="content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} className="grid gap-3">
+                  {assignments.length === 0 ? (
+                    <Card className="rounded-xl border-neutral-800 bg-neutral-900">
+                      <CardContent className="px-4 py-3 flex flex-col gap-2.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex flex-col gap-1.5 flex-1">
+                            <span className="text-xs font-medium text-neutral-400">{en.homework.emptyTitle}</span>
+                            <span className="text-[10px] text-neutral-600">{en.homework.empty}</span>
+                          </div>
+                          <BookOpen weight="bold" className="size-4 text-neutral-700 shrink-0 mt-0.5" />
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <div className="flex gap-1.5">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-neutral-800/50 text-neutral-600">{en.homework.emptyScoreYet}</span>
+                          </div>
+                          <span className="text-[10px] text-neutral-700">—</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ) : assignments.map((a) => (
+                    <HomeworkCard key={a.id} assignment={a} status={(a.attempt?.status ?? "not-started") as Status} onOpen={open} />
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </ScrollArea>
+        </motion.div>
       </div>
 
       <HomeworkDialog

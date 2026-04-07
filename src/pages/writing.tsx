@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import loadingLottie from "@/assets/loading.lottie";
 import { CopyButton } from "@/components/animate-ui/components/buttons/copy";
@@ -26,6 +27,59 @@ type EvalResult = {
     grammatical_range_and_accuracy: CriterionScore;
   };
 };
+
+type CriteriaItem = typeof en.writing.criteriaCard.criteria[number];
+
+function CriteriaAccordion({ c }: { c: CriteriaItem }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-lg border border-neutral-800 bg-neutral-950 overflow-hidden">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-3 px-3 py-2.5 cursor-pointer"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold text-violet-400 bg-violet-400/10 px-1.5 py-0.5 rounded shrink-0">{c.key}</span>
+          <span className="text-xs font-semibold text-neutral-200">{c.label}</span>
+        </div>
+        <motion.span
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+          className="text-neutral-500 text-xs shrink-0"
+        >▾</motion.span>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            key="content"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: 'easeInOut' }}
+            className="overflow-hidden"
+          >
+            <div className="px-3 pb-3 flex flex-col gap-2">
+              <p className="text-[11px] text-neutral-400 leading-relaxed">{c.summary}</p>
+              <ul className="flex flex-col gap-1">
+                {c.points.map((point, i) => (
+                  <motion.li
+                    key={i}
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.04, duration: 0.2 }}
+                    className="flex items-start gap-1.5 text-[11px] text-neutral-500"
+                  >
+                    <span className="text-violet-500 mt-0.5 shrink-0">▸</span>{point}
+                  </motion.li>
+                ))}
+              </ul>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 export function Writing() {
   const [topic, setTopic] = useState("");
@@ -71,7 +125,10 @@ export function Writing() {
 
   return (
     <div className="p-5 flex flex-col gap-4 font-body">
-      <div className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-[linear-gradient(135deg,rgba(22,22,22,0.9),rgba(30,20,50,0.95))] p-5">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, delay: 0, ease: 'easeOut' }}
+        className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-[linear-gradient(135deg,rgba(22,22,22,0.9),rgba(30,20,50,0.95))] p-5">
         <div className="absolute inset-0 opacity-40 [background:radial-gradient(circle_at_top_right,rgba(139,92,246,0.25),transparent_55%)]" />
         <div className="relative flex flex-wrap items-center justify-between gap-4">
           <div className="space-y-1">
@@ -80,8 +137,9 @@ export function Writing() {
             <p className="text-xs text-muted-foreground max-w-lg">{en.writing.hero.subtitle}</p>
           </div>
         </div>
-      </div>
+      </motion.div>
 
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.06, ease: 'easeOut' }}>
       <Card className="rounded-xl border-neutral-800 bg-neutral-900">
         <CardHeader className="px-4 pt-4 pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-semibold">{en.writing.criteriaCard.title}</CardTitle>
@@ -94,31 +152,13 @@ export function Writing() {
         </CardHeader>
         <CardContent className="px-4 pb-4 flex flex-col gap-2">
           {en.writing.criteriaCard.criteria.map((c) => (
-            <details key={c.key} className="group rounded-lg border border-neutral-800 bg-neutral-950">
-              <summary className="flex cursor-pointer items-center justify-between gap-3 px-3 py-2.5 list-none">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold text-violet-400 bg-violet-400/10 px-1.5 py-0.5 rounded shrink-0">{c.key}</span>
-                  <span className="text-xs font-semibold text-neutral-200">{c.label}</span>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-neutral-500 text-xs group-open:rotate-180 transition-transform">▾</span>
-                </div>
-              </summary>
-              <div className="px-3 pb-3 flex flex-col gap-2">
-                <p className="text-[11px] text-neutral-400 leading-relaxed">{c.summary}</p>
-                <ul className="flex flex-col gap-1">
-                  {c.points.map((point, i) => (
-                    <li key={i} className="flex items-start gap-1.5 text-[11px] text-neutral-500">
-                      <span className="text-violet-500 mt-0.5 shrink-0">▸</span>{point}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </details>
+            <CriteriaAccordion key={c.key} c={c} />
           ))}
         </CardContent>
       </Card>
+      </motion.div>
 
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.12, ease: 'easeOut' }}>
       <Card className="rounded-xl border-neutral-800 bg-neutral-900">
         <CardHeader className="px-4 pt-4 pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-semibold">{en.writing.topicCard.title}</CardTitle>
@@ -142,7 +182,9 @@ export function Writing() {
           )}
         </CardContent>
       </Card>
+      </motion.div>
 
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.18, ease: 'easeOut' }}>
       <Card className="relative rounded-xl border-neutral-800 bg-neutral-900">
         {loading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-neutral-900/80 backdrop-blur-sm">
@@ -177,8 +219,10 @@ export function Writing() {
           </div>
         </CardContent>
       </Card>
+      </motion.div>
 
       {result && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
         <Card className="rounded-xl border-neutral-800 bg-neutral-900">
           <CardHeader className="px-4 pt-4 pb-3 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-semibold">{en.writing.resultsCard.title}</CardTitle>
@@ -206,6 +250,7 @@ export function Writing() {
             ))}
           </CardContent>
         </Card>
+        </motion.div>
       )}
     </div>
   );
