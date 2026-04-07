@@ -3,6 +3,24 @@ import { getCookie } from 'hono/cookie'
 import { sign, verify } from 'hono/jwt'
 import type { ApiUser, AppEnv, User } from './types'
 
+export class MemoryStore {
+  private hits = new Map<string, { count: number; resetAt: number }>()
+  constructor(private windowMs: number) {}
+  init(_options: { windowMs: number }) {}
+  async increment(key: string) {
+    const now = Date.now()
+    const entry = this.hits.get(key)
+    if (!entry || now >= entry.resetAt) {
+      this.hits.set(key, { count: 1, resetAt: now + this.windowMs })
+      return { totalHits: 1, resetTime: new Date(now + this.windowMs) }
+    }
+    entry.count++
+    return { totalHits: entry.count, resetTime: new Date(entry.resetAt) }
+  }
+  async decrement(key: string) { const e = this.hits.get(key); if (e && e.count > 0) e.count-- }
+  async resetKey(key: string) { this.hits.delete(key) }
+}
+
 export const nowIso = () => new Date().toISOString()
 
 export const toApiUser = (user: User): ApiUser => ({
@@ -24,11 +42,19 @@ export const createToken = async (userId: string, secret: string) => {
 }
 
 const hashPassword = async (password: string, salt: string) => {
-  const data = new TextEncoder().encode(`${salt}:${password}`)
-  const buffer = await crypto.subtle.digest('SHA-256', data)
-  return Array.from(new Uint8Array(buffer))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  )
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt: new TextEncoder().encode(salt), iterations: 100_000, hash: 'SHA-256' },
+    keyMaterial,
+    256
+  )
+  return Array.from(new Uint8Array(bits)).map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
 export const createPasswordHash = async (password: string) => {
@@ -54,6 +80,15 @@ export const parseJson = async <T>(c: { req: { json: () => Promise<T> } }) => {
     return await c.req.json()
   } catch {
     return null
+  }
+}
+
+export const jsonParse = <T>(str: string, fallback: T): T => {
+  try {
+    const parsed = JSON.parse(str)
+    return parsed as T
+  } catch {
+    return fallback
   }
 }
 

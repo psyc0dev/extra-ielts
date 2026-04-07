@@ -1,8 +1,9 @@
 import type { Hono } from 'hono'
 import { deleteCookie, setCookie } from 'hono/cookie'
+import { rateLimiter } from 'hono-rate-limiter'
 import { sign } from 'hono/jwt'
 import type { AppEnv } from '../lib/types'
-import { createPasswordHash, createToken, nowIso, parseJson, requireAuth, toApiUser, verifyPassword } from '../lib/store'
+import { createPasswordHash, createToken, nowIso, parseJson, requireAuth, toApiUser, verifyPassword, MemoryStore } from '../lib/store'
 
 const getSecret = (c: { env: { JWT_SECRET?: string } }) => {
   const s = c.env?.JWT_SECRET ?? process.env.JWT_SECRET
@@ -10,8 +11,16 @@ const getSecret = (c: { env: { JWT_SECRET?: string } }) => {
   return s
 }
 
+const authLimiter = rateLimiter({
+  windowMs: 15 * 60_000,
+  limit: 10,
+  store: new MemoryStore(15 * 60_000),
+  keyGenerator: (c) => c.req.header('x-forwarded-for') ?? 'unknown',
+  message: { error: 'Too many attempts. Please try again later.' },
+})
+
 const setAuthCookie = (c: Parameters<typeof setCookie>[0], token: string) =>
-  setCookie(c, 'accessToken', token, { path: '/', secure: true, httpOnly: false, maxAge: 60 * 60 * 24 * 7, sameSite: 'Lax' })
+  setCookie(c, 'accessToken', token, { path: '/', secure: true, httpOnly: true, maxAge: 60 * 60 * 24 * 7, sameSite: 'Strict' })
 
 export const registerAuthRoutes = (api: Hono<AppEnv>) => {
   api.get('/auth/bootstrap', async (c) => {
@@ -19,7 +28,7 @@ export const registerAuthRoutes = (api: Hono<AppEnv>) => {
     return c.json({ needsBootstrap: (row?.count ?? 0) === 0 })
   })
 
-  api.post('/auth/bootstrap', async (c) => {
+  api.post('/auth/bootstrap', authLimiter, async (c) => {
     const row = await c.env.DB.prepare('SELECT COUNT(*) as count FROM users').first<{ count: number }>()
     if ((row?.count ?? 0) > 0) return c.json({ error: 'Bootstrap already completed.' }, 400)
 
@@ -38,7 +47,7 @@ export const registerAuthRoutes = (api: Hono<AppEnv>) => {
     return c.json({ token, user: { id, username: body.username, email: body.email ?? null, role: 'admin', avatarUrl: null } }, 201)
   })
 
-  api.post('/auth/login', async (c) => {
+  api.post('/auth/login', authLimiter, async (c) => {
     const body = await parseJson<{ identifier?: string; password?: string }>(c)
     if (!body?.identifier || !body.password) return c.json({ error: 'Identifier and password are required.' }, 400)
 

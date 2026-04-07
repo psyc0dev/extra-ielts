@@ -1,5 +1,6 @@
 import type { Hono } from 'hono'
 import type { AppEnv } from '../lib/types'
+import { requireAuth, requireAdmin } from '../lib/store'
 
 export const registerHealthRoutes = (api: Hono<AppEnv>) => {
   api.get('/health', (c) => {
@@ -10,7 +11,7 @@ export const registerHealthRoutes = (api: Hono<AppEnv>) => {
     })
   })
 
-  api.get('/db/health', async (c) => {
+  api.get('/db/health', requireAuth, requireAdmin, async (c) => {
     const db = c.env?.DB
     if (!db) {
       return c.json({ error: 'D1 binding "DB" not configured.' }, 501)

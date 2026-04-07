@@ -1,6 +1,6 @@
 import type { Hono } from 'hono'
 import type { AppEnv } from '../lib/types'
-import { computeCorrectness, filterTestForAssignment, getAssignmentDurationMinutes, nowIso, parseJson, requireAuth, scoreAttempt } from '../lib/store'
+import { computeCorrectness, filterTestForAssignment, getAssignmentDurationMinutes, nowIso, parseJson, jsonParse, requireAuth, scoreAttempt } from '../lib/store'
 import { getTestById } from '../lib/tests'
 
 type AttemptRow = { id: string; assignment_id: string; test_id: string; user_id: string; status: string; score_total: number | null; band: number | null; reading_band: number | null; listening_band: number | null; started_at: string; completed_at: string | null; responses_json: string }
@@ -28,7 +28,7 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
     const assignments = await Promise.all((rows.results ?? []).map(async (row) => {
       const test = getTestById(row.test_id)
       if (!test) return null
-      const sectionKinds = JSON.parse(row.section_kinds_json) as Array<'listening' | 'reading'>
+      const sectionKinds = jsonParse<Array<'listening' | 'reading'>>(row.section_kinds_json, [])
       const attempt = await c.env.DB.prepare(
         'SELECT * FROM attempts WHERE assignment_id = ? AND user_id = ? ORDER BY started_at DESC LIMIT 1'
       ).bind(row.id, user.id).first<AttemptRow>()
@@ -73,9 +73,9 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
     const test = getTestById(attempt.test_id)
     if (!assignment || !test) return c.json({ error: 'Attempt data is missing.' }, 404)
 
-    const sectionKinds = JSON.parse(assignment.section_kinds_json) as Array<'listening' | 'reading'>
+    const sectionKinds = jsonParse<Array<'listening' | 'reading'>>(assignment.section_kinds_json, [])
     const filteredTest = filterTestForAssignment(test, sectionKinds)
-    const responses = JSON.parse(attempt.responses_json) as Record<string, unknown>
+    const responses = jsonParse<Record<string, unknown>>(attempt.responses_json, {})
     const correctness = attempt.status === 'completed' ? computeCorrectness(responses, filteredTest) : undefined
 
     return c.json({
@@ -101,7 +101,7 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
     const body = await parseJson<{ questionId?: string; response?: unknown }>(c)
     if (!body?.questionId) return c.json({ error: 'questionId is required.' }, 400)
 
-    const responses = JSON.parse(attempt.responses_json) as Record<string, unknown>
+    const responses = jsonParse<Record<string, unknown>>(attempt.responses_json, {})
     responses[body.questionId] = body.response
     await c.env.DB.prepare('UPDATE attempts SET responses_json = ? WHERE id = ?')
       .bind(JSON.stringify(responses), attempt.id).run()
@@ -125,7 +125,7 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
     const test = getTestById(attempt.test_id)
     if (!test) return c.json({ error: 'Test not found.' }, 404)
 
-    const responses = JSON.parse(attempt.responses_json) as Record<string, unknown>
+    const responses = jsonParse<Record<string, unknown>>(attempt.responses_json, {})
     const scored = scoreAttempt(responses, test)
     await c.env.DB.prepare(
       'UPDATE attempts SET status = ?, score_total = ?, band = ?, reading_band = ?, listening_band = ?, completed_at = ? WHERE id = ?'

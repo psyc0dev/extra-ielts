@@ -10,43 +10,22 @@ import { registerSettingsRoutes } from './routes/settings'
 import { registerTestRoutes } from './routes/tests'
 import { registerWritingRoutes } from './routes/writing'
 import { registerAccountRoutes } from './routes/account'
-
-class MemoryStore {
-  private hits = new Map<string, { count: number; resetAt: number }>()
-
-  constructor(private windowMs: number) {}
-
-  init(_options: { windowMs: number }) {}
-
-  async increment(key: string) {
-    const now = Date.now()
-    const entry = this.hits.get(key)
-
-    if (!entry || now >= entry.resetAt) {
-      this.hits.set(key, { count: 1, resetAt: now + this.windowMs })
-      return { totalHits: 1, resetTime: new Date(now + this.windowMs) }
-    }
-
-    entry.count++
-    return { totalHits: entry.count, resetTime: new Date(entry.resetAt) }
-  }
-
-  async decrement(key: string) {
-    const entry = this.hits.get(key)
-    if (entry && entry.count > 0) entry.count--
-  }
-
-  async resetKey(key: string) {
-    this.hits.delete(key)
-  }
-}
+import { MemoryStore } from './lib/store'
 
 export const createApp = () => {
   const app = new Hono<AppEnv>()
   const api = new Hono<AppEnv>()
 
+  const ALLOWED_ORIGINS = [
+    'tauri://localhost',
+    'https://tauri.localhost',
+  ]
+
   api.use('*', cors({
-    origin: (_origin, c) => c.env?.CORS_ORIGIN ?? '*',
+    origin: (origin, c) => {
+      const allowed = c.env?.CORS_ORIGIN ? c.env.CORS_ORIGIN.split(',').map((s: string) => s.trim()) : ALLOWED_ORIGINS
+      return allowed.includes(origin) ? origin : allowed[0]
+    },
     allowMethods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
   }))

@@ -1,8 +1,17 @@
 import type { Hono } from 'hono'
 import { deleteCookie } from 'hono/cookie'
+import { rateLimiter } from 'hono-rate-limiter'
 import type { AppEnv } from '../lib/types'
-import { createPasswordHash, nowIso, parseJson, requireAuth } from '../lib/store'
+import { createPasswordHash, nowIso, parseJson, requireAuth, MemoryStore } from '../lib/store'
 import axios from 'axios'
+
+const resetLimiter = rateLimiter({
+  windowMs: 15 * 60_000,
+  limit: 5,
+  store: new MemoryStore(15 * 60_000),
+  keyGenerator: (c) => c.req.header('x-forwarded-for') ?? 'unknown',
+  message: { error: 'Too many attempts. Please try again later.' },
+})
 
 async function sendOtpEmail(env: AppEnv['Bindings'], to: string, otp: string) {
   const apiKey = env.RESEND_API_KEY
@@ -21,7 +30,7 @@ async function sendOtpEmail(env: AppEnv['Bindings'], to: string, otp: string) {
 }
 
 export const registerAccountRoutes = (api: Hono<AppEnv>) => {
-  api.post('/account/password-reset-requests', async (c) => {
+  api.post('/account/password-reset-requests', resetLimiter, async (c) => {
     const body = await parseJson<{ email?: string }>(c)
     if (!body?.email) return c.json({ ok: true }, 202)
 
@@ -31,10 +40,11 @@ export const registerAccountRoutes = (api: Hono<AppEnv>) => {
 
     await c.env.DB.prepare('DELETE FROM otp_tokens WHERE expires_at < ?').bind(Date.now()).run()
 
+    const ip = c.req.header('x-forwarded-for') ?? 'unknown'
     const otp = String(Math.floor(100000 + Math.random() * 900000))
     const expiresAt = Date.now() + 15 * 60 * 1000
-    await c.env.DB.prepare('INSERT OR REPLACE INTO otp_tokens (otp, user_id, expires_at) VALUES (?, ?, ?)')
-      .bind(otp, user.id, expiresAt).run()
+    await c.env.DB.prepare('INSERT OR REPLACE INTO otp_tokens (otp, user_id, expires_at, ip) VALUES (?, ?, ?, ?)')
+      .bind(otp, user.id, expiresAt, ip).run()
 
     try {
       await sendOtpEmail(c.env, user.email, otp)
@@ -46,13 +56,15 @@ export const registerAccountRoutes = (api: Hono<AppEnv>) => {
     return c.json({ ok: true }, 202)
   })
 
-  api.patch('/account/password', async (c) => {
+  api.patch('/account/password', resetLimiter, async (c) => {
     const body = await parseJson<{ otp?: string; password?: string }>(c)
     if (!body?.otp || !body.password) return c.json({ error: 'otp and password are required.' }, 400)
 
-    const entry = await c.env.DB.prepare('SELECT user_id, expires_at FROM otp_tokens WHERE otp = ?')
-      .bind(body.otp).first<{ user_id: string; expires_at: number }>()
+    const ip = c.req.header('x-forwarded-for') ?? 'unknown'
+    const entry = await c.env.DB.prepare('SELECT user_id, expires_at, ip FROM otp_tokens WHERE otp = ?')
+      .bind(body.otp).first<{ user_id: string; expires_at: number; ip: string }>()
     if (!entry || entry.expires_at < Date.now()) return c.json({ error: 'Invalid or expired code.' }, 400)
+    if (entry.ip !== ip) return c.json({ error: 'Invalid or expired code.' }, 400)
 
     const passwordHash = await createPasswordHash(body.password)
     await c.env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(passwordHash, entry.user_id).run()

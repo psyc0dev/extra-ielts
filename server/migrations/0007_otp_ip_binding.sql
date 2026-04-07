@@ -1,0 +1,1 @@
+ALTER TABLE otp_tokens ADD COLUMN ip TEXT;

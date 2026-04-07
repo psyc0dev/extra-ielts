@@ -31,13 +31,16 @@ export const obfuscationConfig = {
 
   transformObjectKeys: true,
   numbersToExpressions: true,
-  unicodeEscapeSequence: false,
-  simplify: false,
+  unicodeEscapeSequence: true,
+  simplify: true,
+
+  renameProperties: true,
+  renamePropertiesMode: 'safe',
 
   optionsPreset: 'high-obfuscation',
   log: false,
 
-  seed: 1337,
+  seed: 0,
   sourceMap: false,
 
   ignoreImports: true,

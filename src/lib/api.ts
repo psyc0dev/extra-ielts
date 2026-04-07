@@ -145,11 +145,15 @@ function getToken() {
 
 export function setToken(token: string | null) {
   if (token) {
-    Cookies.set(TOKEN_KEY, token, { expires: 7, path: "/" });
+    Cookies.set(TOKEN_KEY, token, { expires: 7, path: "/", sameSite: 'strict' });
   } else {
     Cookies.remove(TOKEN_KEY, { path: "/" });
   }
 }
+
+let _isAdmin = false;
+export function setIsAdmin(v: boolean) { _isAdmin = v; }
+export function getIsAdmin() { return _isAdmin; }
 
 async function apiFetch<T>(path: string, options: RequestInit = {}) {
   const token = getToken();

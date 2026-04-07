@@ -1,5 +1,5 @@
 ﻿import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { bootstrapAdmin, getBootstrapStatus, getMe, login, logout, setToken, type ApiUser } from "@/lib/api";
+import { bootstrapAdmin, getBootstrapStatus, getMe, login, logout, setToken, setIsAdmin, type ApiUser } from "@/lib/api";
 
 const AuthContext = createContext<{
   user: ApiUser | null;
@@ -20,9 +20,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await getMe();
       setUser(res.user);
+      setIsAdmin(res.user.role === 'admin');
     } catch {
       setUser(null);
       setToken(null);
+      setIsAdmin(false);
     }
   }, []);
 
@@ -45,12 +47,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const res = await login({ identifier, password });
     setToken(res.token);
     setUser(res.user);
+    setIsAdmin(res.user.role === 'admin');
   }, []);
 
   const bootstrap = useCallback(async (payload: { username: string; email?: string; password: string }) => {
     const res = await bootstrapAdmin(payload);
     setToken(res.token);
     setUser(res.user);
+    setIsAdmin(res.user.role === 'admin');
     setNeedsBootstrap(false);
   }, []);
 
@@ -60,6 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setToken(null);
       setUser(null);
+      setIsAdmin(false);
     }
   }, []);
 

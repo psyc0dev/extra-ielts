@@ -1,6 +1,6 @@
 import type { Hono } from 'hono'
 import type { AppEnv, Role } from '../lib/types'
-import { createPasswordHash, nowIso, parseJson, requireAdmin, requireAuth, toApiUser } from '../lib/store'
+import { createPasswordHash, nowIso, parseJson, jsonParse, requireAdmin, requireAuth, toApiUser } from '../lib/store'
 import { getTestById, getTests } from '../lib/tests'
 
 type UserRow = { id: string; username: string; email: string | null; role: string; password_hash: string; avatar_url: string | null }
@@ -72,7 +72,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     return c.json({
       assignments: (rows.results ?? []).map((r) => ({
         id: r.id, type: r.type, testId: r.test_id,
-        sectionKinds: JSON.parse(r.section_kinds_json),
+        sectionKinds: jsonParse<string[]>(r.section_kinds_json, []),
         assignedTo: r.assigned_to, assignedToName: userMap.get(r.assigned_to) ?? 'Unknown',
         assignedBy: r.assigned_by, assignedByName: userMap.get(r.assigned_by) ?? 'Unknown',
         dueAt: r.due_at, createdAt: r.created_at,
