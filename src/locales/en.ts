@@ -622,6 +622,14 @@
         published: "Published",
         draft: "Draft",
       },
+      new: "Upload JSON",
+      edit: "Edit",
+      dialog: {
+        editTitle: "Edit Test",
+        titleLabel: "Title",
+        duration: "Duration (minutes)",
+        save: "Save",
+      },
     },
     assignments: {
       title: "Homework Assignments",

@@ -290,6 +290,24 @@ export async function adminCreateAssignment(payload: {
   });
 }
 
+export async function adminGetTest(testId: string) {
+  return apiFetch<{ test: TestDetail }>(`/admin/tests/${testId}`);
+}
+
+export async function adminUploadTest(testData: TestDetail) {
+  return apiFetch<{ test: { id: string } }>("/admin/tests", {
+    method: "POST",
+    body: JSON.stringify({ title: testData.title, durationMinutes: testData.durationMinutes, sections: testData.sections }),
+  });
+}
+
+export async function adminUpdateTest(testId: string, payload: { title?: string; durationMinutes?: number; sections?: TestDetail['sections']; published?: boolean }) {
+  return apiFetch<{ ok: boolean }>(`/admin/tests/${testId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function adminToggleTestPublished(testId: string, published: boolean) {
   return apiFetch<{ ok: boolean }>(`/admin/tests/${testId}`, {
     method: "PATCH",

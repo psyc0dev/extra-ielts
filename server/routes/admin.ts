@@ -2,16 +2,11 @@ import type { Hono } from 'hono'
 import type { AppEnv, Role } from '../lib/types'
 import { CreateUserBodySchema, TestPublishedBodySchema, CreateAssignmentBodySchema, GroupAssignmentBodySchema, GroupNameBodySchema, GroupMemberBodySchema } from '../lib/schemas'
 import { createPasswordHash, nowIso, zParse, jsonParse, requireAdmin, requireAuth, toApiUser } from '../lib/store'
-import { getTestById, getTests } from '../lib/tests'
+import { getTestById, getDbTests } from '../lib/tests'
 
 type UserRow = { id: string; username: string; email: string | null; role: string; password_hash: string; avatar_url: string | null }
 type AssignmentRow = { id: string; type: string; test_id: string; section_kinds_json: string; assigned_to: string; assigned_by: string; due_at: string | null; created_at: string }
 type AttemptRow = { id: string; assignment_id: string; test_id: string; user_id: string; status: string; score_total: number | null; band: number | null; reading_band: number | null; listening_band: number | null; started_at: string; completed_at: string | null }
-
-const getPublishedOverrides = async (db: D1Database) => {
-  const rows = await db.prepare('SELECT id, published FROM tests').all<{ id: string; published: number }>()
-  return new Map((rows.results ?? []).map((r) => [r.id, r.published === 1]))
-}
 
 export const registerAdminRoutes = (api: Hono<AppEnv>) => {
   api.get('/admin/users', requireAuth, requireAdmin, async (c) => {
@@ -35,23 +30,55 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
   })
 
   api.get('/admin/tests', requireAuth, requireAdmin, async (c) => {
-    const overrides = await getPublishedOverrides(c.env.DB)
-    const tests = getTests(overrides).map((t) => ({
+    const tests = await getDbTests(c.env.DB)
+    return c.json({ tests: tests.map((t) => ({
       id: t.id, title: t.title, durationMinutes: t.durationMinutes, published: t.published ?? false,
       sectionsCount: t.sections.length,
       questionsCount: t.sections.reduce((n, s) => n + s.questions.length, 0),
       attempt: null,
-    }))
-    return c.json({ tests })
+    })) })
+  })
+
+  api.get('/admin/tests/:testId', requireAuth, requireAdmin, async (c) => {
+    const test = await getTestById(c.env.DB, c.req.param('testId'))
+    if (!test) return c.json({ error: 'Test not found.' }, 404)
+    return c.json({ test })
+  })
+
+  api.post('/admin/tests', requireAuth, requireAdmin, async (c) => {
+    const body = await c.req.json<{ title: string; durationMinutes: number; sections: unknown[] }>()
+    if (!body.title?.trim()) return c.json({ error: 'Title is required.' }, 400)
+    const id = crypto.randomUUID()
+    const testData = { id, title: body.title, durationMinutes: body.durationMinutes ?? 120, sections: body.sections ?? [] }
+    await c.env.DB.prepare('INSERT INTO tests (id, published, data_json) VALUES (?, 0, ?)')
+      .bind(id, JSON.stringify(testData)).run()
+    return c.json({ test: { id } }, 201)
+  })
+
+  api.put('/admin/tests/:testId', requireAuth, requireAdmin, async (c) => {
+    const testId = c.req.param('testId')
+    const existing = await getTestById(c.env.DB, testId)
+    if (!existing) return c.json({ error: 'Test not found.' }, 404)
+    const body = await c.req.json<{ title?: string; durationMinutes?: number; sections?: unknown[]; published?: boolean }>()
+    const updated = {
+      ...existing,
+      title: body.title ?? existing.title,
+      durationMinutes: body.durationMinutes ?? existing.durationMinutes,
+      sections: body.sections ?? existing.sections,
+    }
+    const published = body.published !== undefined ? (body.published ? 1 : 0) : (existing.published ? 1 : 0)
+    await c.env.DB.prepare('UPDATE tests SET published = ?, data_json = ? WHERE id = ?')
+      .bind(published, JSON.stringify(updated), testId).run()
+    return c.json({ ok: true }, 200)
   })
 
   api.patch('/admin/tests/:testId', requireAuth, requireAdmin, async (c) => {
     const { data, error } = await zParse(TestPublishedBodySchema, c)
     if (error) return error
     const testId = c.req.param('testId')
-    if (!getTestById(testId)) return c.json({ error: 'Test not found.' }, 404)
-    await c.env.DB.prepare('INSERT INTO tests (id, published) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET published = excluded.published')
-      .bind(testId, data.published ? 1 : 0).run()
+    if (!await getTestById(c.env.DB, testId)) return c.json({ error: 'Test not found.' }, 404)
+    await c.env.DB.prepare('UPDATE tests SET published = ? WHERE id = ?')
+      .bind(data.published ? 1 : 0, testId).run()
     return c.json({ ok: true }, 200)
   })
 
@@ -84,7 +111,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     const user = c.get('user')
     const { data, error } = await zParse(CreateAssignmentBodySchema, c)
     if (error) return error
-    const test = getTestById(data.testId)
+    const test = await getTestById(c.env.DB, data.testId)
     if (!test) return c.json({ error: 'Test not found.' }, 404)
     const assignedUser = await c.env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(data.assignedTo).first()
     if (!assignedUser) return c.json({ error: 'Assigned user not found.' }, 404)
@@ -148,7 +175,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     if (!group) return c.json({ error: 'Group not found.' }, 404)
     const { data, error } = await zParse(GroupAssignmentBodySchema, c)
     if (error) return error
-    const test = getTestById(data.testId)
+    const test = await getTestById(c.env.DB, data.testId)
     if (!test) return c.json({ error: 'Test not found.' }, 404)
 
     const sectionKinds = data.sectionKinds?.length ? data.sectionKinds : Array.from(new Set(test.sections.map((s) => s.kind)))

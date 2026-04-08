@@ -2,7 +2,7 @@ import type { Hono } from 'hono'
 import type { AppEnv } from '../lib/types'
 import { AnswerBodySchema, SubmitAttemptBodySchema } from '../lib/schemas'
 import { zParse, computeCorrectness, filterTestForAssignment, getAssignmentDurationMinutes, nowIso, jsonParse, requireAuth, scoreAttempt } from '../lib/store'
-import { getTestById } from '../lib/tests'
+import { getTestById, getDbTests } from '../lib/tests'
 
 type AttemptRow = { id: string; assignment_id: string; test_id: string; user_id: string; status: string; score_total: number | null; band: number | null; reading_band: number | null; listening_band: number | null; started_at: string; completed_at: string | null; responses_json: string }
 type AssignmentRow = { id: string; type: string; test_id: string; section_kinds_json: string; assigned_to: string; assigned_by: string; due_at: string | null; created_at: string }
@@ -27,7 +27,7 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
       : await c.env.DB.prepare(query).bind(user.id).all<AssignmentRow>()
 
     const assignments = await Promise.all((rows.results ?? []).map(async (row) => {
-      const test = getTestById(row.test_id)
+      const test = await getTestById(c.env.DB, row.test_id)
       if (!test) return null
       const sectionKinds = jsonParse<Array<'listening' | 'reading'>>(row.section_kinds_json, [])
       const attempt = await c.env.DB.prepare(
@@ -71,7 +71,8 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
 
     const assignment = await c.env.DB.prepare('SELECT * FROM assignments WHERE id = ?')
       .bind(attempt.assignment_id).first<AssignmentRow>()
-    const test = getTestById(attempt.test_id)
+    const dbTests = await getDbTests(c.env.DB)
+    const test = dbTests.find((t) => t.id === attempt.test_id) ?? null
     if (!assignment || !test) return c.json({ error: 'Attempt data is missing.' }, 404)
 
     const sectionKinds = jsonParse<Array<'listening' | 'reading'>>(assignment.section_kinds_json, [])
@@ -123,7 +124,7 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
       return c.json({ attempt: { id: attempt.id, status: attempt.status, scoreTotal: attempt.score_total ?? 0, band: attempt.band } }, 200)
     }
 
-    const test = getTestById(attempt.test_id)
+    const test = await getTestById(c.env.DB, attempt.test_id)
     if (!test) return c.json({ error: 'Test not found.' }, 404)
 
     const responses = jsonParse<Record<string, unknown>>(attempt.responses_json, {})
@@ -137,7 +138,7 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
 
   api.post('/assignments/tests/:testId/attempts', requireAuth, async (c) => {
     const user = c.get('user')
-    const test = getTestById(c.req.param('testId'))
+    const test = await getTestById(c.env.DB, c.req.param('testId'))
     if (!test) return c.json({ error: 'Test not found.' }, 404)
 
     const existing = await c.env.DB.prepare(

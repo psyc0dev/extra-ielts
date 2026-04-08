@@ -1,12 +1,7 @@
 import type { Hono } from 'hono'
 import type { AppEnv } from '../lib/types'
 import { requireAuth } from '../lib/store'
-import { getTestById, getTests } from '../lib/tests'
-
-const getPublishedOverrides = async (db: D1Database): Promise<Map<string, boolean>> => {
-  const rows = await db.prepare('SELECT id, published FROM tests').all<{ id: string; published: number }>()
-  return new Map((rows.results ?? []).map((r) => [r.id, r.published === 1]))
-}
+import { getTestById, getDbTests } from '../lib/tests'
 
 const getLatestAttempt = async (db: D1Database, userId: string, testId: string) => {
   return db.prepare(
@@ -18,9 +13,9 @@ export const registerTestRoutes = (api: Hono<AppEnv>) => {
   api.get('/tests', requireAuth, async (c) => {
     const user = c.get('user')
     const isAdmin = user.role === 'admin'
-    const overrides = await getPublishedOverrides(c.env.DB)
-    const tests = await Promise.all(
-      getTests(overrides)
+    const tests = await getDbTests(c.env.DB)
+    const result = await Promise.all(
+      tests
         .filter((t) => isAdmin || t.published)
         .map(async (t) => {
           const attempt = await getLatestAttempt(c.env.DB, user.id, t.id)
@@ -37,13 +32,12 @@ export const registerTestRoutes = (api: Hono<AppEnv>) => {
           }
         })
     )
-    return c.json({ tests })
+    return c.json({ tests: result })
   })
 
   api.get('/tests/:testId', requireAuth, async (c) => {
     const user = c.get('user')
-    const overrides = await getPublishedOverrides(c.env.DB)
-    const test = getTestById(c.req.param('testId'), overrides)
+    const test = await getTestById(c.env.DB, c.req.param('testId'))
     if (!test) return c.json({ error: 'Test not found.' }, 404)
 
     const isAdmin = user.role === 'admin'

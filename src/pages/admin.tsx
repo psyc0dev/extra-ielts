@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,9 +29,13 @@ import {
   adminRemoveGroupMember,
   adminAssignToGroup,
   adminGetStudentStats,
+  adminGetTest,
+  adminUploadTest,
+  adminUpdateTest,
   type AdminAssignment,
   type ApiUser,
   type TestSummary,
+  type TestDetail,
   type Group,
   type StudentStats,
 } from "@/lib/api";
@@ -69,6 +73,8 @@ export function Admin() {
   const [groupQuery, setGroupQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<ApiUser | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+
+  const [editingTest, setEditingTest] = useState<TestSummary | null>(null);
 
   const loadAll = useCallback(async () => {
     const [usersRes, testsRes, homeworkRes, groupsRes] = await Promise.all([
@@ -183,6 +189,18 @@ export function Admin() {
               <div className="text-xs text-muted-foreground">{en.admin.subtitle}</div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              {section === "tests" && (
+                <UploadTestButton
+                  onUpload={async (testData) => {
+                    const res = await adminUploadTest(testData);
+                    setTests((prev) => [
+                      { id: res.test.id, title: testData.title, durationMinutes: testData.durationMinutes, sectionsCount: testData.sections.length, questionsCount: testData.sections.reduce((n, s) => n + s.questions.length, 0), published: false },
+                      ...prev,
+                    ]);
+                    toast.success("Test uploaded");
+                  }}
+                />
+              )}
               {section === "users" && (
                 <CreateUserDialog
                   onCreate={async (payload) => {
@@ -321,6 +339,7 @@ export function Admin() {
           )}
 
           {section === "tests" && (
+            <>
             <Card className="border-neutral-800 bg-neutral-900">
               <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <CardTitle className="text-xs font-semibold">{en.admin.tests.title}</CardTitle>
@@ -340,15 +359,16 @@ export function Admin() {
                       <TableHead>{en.admin.tests.table.sections}</TableHead>
                       <TableHead>{en.admin.tests.table.status}</TableHead>
                       <TableHead>{en.admin.tests.table.published}</TableHead>
+                      <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {sk ? Array.from({ length: 4 }).map((_, i) => (
                       <TableRow key={i}>
-                        {Array.from({ length: 5 }).map((__, j) => <TableCell key={j}><Skeleton className="h-3 w-full" /></TableCell>)}
+                        {Array.from({ length: 6 }).map((__, j) => <TableCell key={j}><Skeleton className="h-3 w-full" /></TableCell>)}
                       </TableRow>
                     )) : visibleTests.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center text-xs text-muted-foreground py-8">{en.admin.tests.notFound}</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-8">{en.admin.tests.notFound}</TableCell></TableRow>
                     ) : visibleTests.map((test) => (
                       <TableRow key={test.id}>
                         <TableCell className="font-medium">{test.title}</TableCell>
@@ -370,12 +390,33 @@ export function Admin() {
                             onCheckedChange={(checked) => togglePublished(test.id, checked)}
                           />
                         </TableCell>
+                        <TableCell>
+                          <Button size="sm" variant="outline" className="h-7 text-xs border-neutral-700" onClick={() => setEditingTest(test)}>
+                            {en.admin.tests.edit}
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </CardContent>
             </Card>
+            {editingTest && (
+              <EditTestDialog
+                test={editingTest}
+                onClose={() => setEditingTest(null)}
+                onSave={async (payload) => {
+                  await adminUpdateTest(editingTest.id, payload);
+                  setTests((prev) => prev.map((t) => t.id === editingTest.id
+                    ? { ...t, title: payload.title ?? t.title, durationMinutes: payload.durationMinutes ?? t.durationMinutes, sectionsCount: payload.sections?.length ?? t.sectionsCount }
+                    : t
+                  ));
+                  toast.success("Test updated");
+                  setEditingTest(null);
+                }}
+              />
+            )}
+            </>
           )}
 
           {section === "assignments" && (
@@ -1354,5 +1395,104 @@ function TestSelect({ tests, value, onChange }: { tests: TestSummary[]; value: s
         </Command>
       </PopoverContent>
     </Popover>
+  );
+}
+
+function UploadTestButton({ onUpload }: {
+  onUpload: (testData: TestDetail) => Promise<void>;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text) as TestDetail;
+      if (!data.title || !Array.isArray(data.sections)) { toast.error("Invalid test JSON."); return; }
+      await onUpload(data);
+    } catch { toast.error("Failed to parse JSON file."); }
+    e.target.value = "";
+  };
+  return (
+    <>
+      <input ref={inputRef} type="file" accept=".json" className="hidden" onChange={handleFile} />
+      <Button size="sm" className="gap-1" onClick={() => inputRef.current?.click()}>
+        <Plus weight="bold" className="size-3" /> Upload JSON
+      </Button>
+    </>
+  );
+}
+
+function EditTestDialog({ test, onClose, onSave }: {
+  test: TestSummary;
+  onClose: () => void;
+  onSave: (payload: { title?: string; durationMinutes?: number; sections?: TestDetail['sections'] }) => Promise<void>;
+}) {
+  const [title, setTitle] = useState(test.title);
+  const [duration, setDuration] = useState(String(test.durationMinutes));
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [pendingSections, setPendingSections] = useState<TestDetail['sections'] | null>(null);
+
+  const handleDownload = async () => {
+    try {
+      const res = await adminGetTest(test.id);
+      const blob = new Blob([JSON.stringify(res.test, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `${test.title.replace(/\s+/g, "-").toLowerCase()}.json`;
+      a.click(); URL.revokeObjectURL(url);
+    } catch { toast.error("Failed to download test."); }
+  };
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text) as TestDetail;
+      if (!Array.isArray(data.sections)) { toast.error("Invalid test JSON."); return; }
+      setPendingSections(data.sections);
+      if (data.title) setTitle(data.title);
+      if (data.durationMinutes) setDuration(String(data.durationMinutes));
+      toast.success(`Loaded ${data.sections.length} sections from file`);
+    } catch { toast.error("Failed to parse JSON file."); }
+    e.target.value = "";
+  };
+
+  return (
+    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="border-neutral-800 bg-neutral-950 max-w-lg">
+        <DialogHeader><DialogTitle className="text-sm">{en.admin.tests.dialog.editTitle}</DialogTitle></DialogHeader>
+        <FieldGroup>
+          <Field>
+            <FieldLabel>{en.admin.tests.dialog.titleLabel}</FieldLabel>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+          </Field>
+          <Field>
+            <FieldLabel>{en.admin.tests.dialog.duration}</FieldLabel>
+            <Input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} min={1} />
+          </Field>
+          <Field>
+            <FieldLabel>Sections</FieldLabel>
+            <div className="flex items-center gap-2">
+              <Button type="button" size="sm" variant="outline" className="h-7 text-xs border-neutral-700" onClick={handleDownload}>
+                Download JSON
+              </Button>
+              <input ref={inputRef} type="file" accept=".json" className="hidden" onChange={handleFile} />
+              <Button type="button" size="sm" variant="outline" className="h-7 text-xs border-neutral-700" onClick={() => inputRef.current?.click()}>
+                Upload JSON
+              </Button>
+              {pendingSections && <span className="text-xs text-emerald-400">{pendingSections.length} sections loaded</span>}
+            </div>
+          </Field>
+        </FieldGroup>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={async () => {
+            await onSave({ title: title.trim() || undefined, durationMinutes: Number(duration) || undefined, sections: pendingSections ?? undefined });
+          }}>{en.admin.tests.dialog.save}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

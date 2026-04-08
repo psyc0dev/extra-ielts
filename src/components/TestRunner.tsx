@@ -60,6 +60,10 @@ export function TestRunner({
   const activeSection = sections.find((s) => s.id === activeSectionId) ?? sections[0];
   const questions = activeSection?.questions ?? [];
 
+  useEffect(() => {
+    setListeningPhase("idle");
+  }, [activeSectionId]);
+
   const answeredCount = useMemo(
     () => Object.values(answers).filter((v) => v !== null && v !== "").length,
     [answers]

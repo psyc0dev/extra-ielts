@@ -31,7 +31,7 @@ export function ListeningSection({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {!readOnly && <ListeningPlayer audioUrl={audioUrl} phase={phase} onPhaseChange={onPhaseChange} />}
+      {!readOnly && <ListeningPlayer key={audioUrl} audioUrl={audioUrl} phase={phase} onPhaseChange={onPhaseChange} />}
       <AnimatePresence mode="wait">
         {questionsVisible ? (
           <motion.div
@@ -85,7 +85,13 @@ function ListeningPlayer({ audioUrl, phase, onPhaseChange }: {
 
   const VolumeIcon = muted || volume === 0 ? SpeakerSlash : volume < 0.4 ? SpeakerNone : volume < 0.75 ? SpeakerLow : SpeakerHigh;
 
-  useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current); }, []);
+  useEffect(() => {
+    const audio = audioRef.current;
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (audio) { audio.pause(); audio.src = ""; audio.load(); }
+    };
+  }, []);
 
   useEffect(() => {
     const audio = audioRef.current;
