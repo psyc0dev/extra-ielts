@@ -16,14 +16,8 @@ export const createApp = () => {
   const app = new Hono<AppEnv>()
   const api = new Hono<AppEnv>()
 
-  const ALLOWED_ORIGINS = [
-    'tauri://localhost',
-    'https://tauri.localhost',
-    'http://localhost:1420',
-  ]
-
   const getAllowed = (c: { env?: { CORS_ORIGIN?: string } }) =>
-    c.env?.CORS_ORIGIN ? c.env.CORS_ORIGIN.split(',').map((s) => s.trim()) : ALLOWED_ORIGINS
+    c.env?.CORS_ORIGIN ? c.env.CORS_ORIGIN.split(',').map((s) => s.trim()) : []
 
   api.use('*', cors({
     origin: (origin, c) => {

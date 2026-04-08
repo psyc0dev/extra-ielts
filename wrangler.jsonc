@@ -13,7 +13,7 @@
     }
   ],
   "vars": {
-    "CORS_ORIGIN": "tauri://localhost,https://tauri.localhost",
+    "CORS_ORIGIN": "tauri://localhost,https://tauri.localhost,http://localhost:1420",
     "EVALUATOR_URL": "https://sadly-legible-jaybird.ngrok-free.app",
     "GENERATOR_URL": "https://extra-corporation-extra-ai-generator.hf.space",
     "RESEND_FROM": "extra IELTS <onboarding@resend.dev>"
