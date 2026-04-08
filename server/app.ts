@@ -28,7 +28,7 @@ export const createApp = () => {
   api.use('*', cors({
     origin: (origin, c) => {
       const allowed = getAllowed(c)
-      return allowed.includes(origin) ? origin : allowed[0]
+      return allowed.includes(origin) ? origin : null
     },
     allowMethods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
