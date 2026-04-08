@@ -21,14 +21,25 @@ export const createApp = () => {
     'https://tauri.localhost',
   ]
 
+  const getAllowed = (c: { env?: { CORS_ORIGIN?: string } }) =>
+    c.env?.CORS_ORIGIN ? c.env.CORS_ORIGIN.split(',').map((s) => s.trim()) : ALLOWED_ORIGINS
+
   api.use('*', cors({
     origin: (origin, c) => {
-      const allowed = c.env?.CORS_ORIGIN ? c.env.CORS_ORIGIN.split(',').map((s: string) => s.trim()) : ALLOWED_ORIGINS
+      const allowed = getAllowed(c)
       return allowed.includes(origin) ? origin : allowed[0]
     },
     allowMethods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
   }))
+
+  api.use('*', async (c, next) => {
+    const method = c.req.method
+    if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return next()
+    const origin = c.req.header('origin')
+    if (origin && !getAllowed(c).includes(origin)) return c.json({ error: 'Forbidden' }, 403)
+    return next()
+  })
 
   api.use('*', rateLimiter({
     windowMs: 60_000,

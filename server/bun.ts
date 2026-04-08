@@ -1,5 +1,5 @@
 import { serveStatic } from 'hono/bun'
-import { join } from 'node:path'
+import { join, resolve, normalize } from 'node:path'
 import { Database } from 'bun:sqlite'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createApp } from './app'
@@ -28,10 +28,10 @@ for (const file of readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).
 // Minimal D1Database shim over bun:sqlite
 const makeD1 = (db: Database): D1Database => ({
   prepare: (sql: string) => {
-    let boundValues: unknown[] = []
+    let boundValues: import('bun:sqlite').SQLQueryBindings[] = []
     const stmt = () => db.prepare(sql)
     const api = {
-      bind: (...values: unknown[]) => { boundValues = values; return api },
+      bind: (...values: import('bun:sqlite').SQLQueryBindings[]) => { boundValues = values; return api },
       first: async <T>() => stmt().get(...boundValues) as T | null,
       all: async <T>() => ({ results: stmt().all(...boundValues) as T[], success: true, meta: {} }),
       run: async () => { stmt().run(...boundValues); return { success: true, meta: {} } },
@@ -50,6 +50,10 @@ const staticMiddleware = serveStatic({ root: staticRoot })
 app.use('*', async (c, next) => {
   if (c.req.path.startsWith('/api/') || c.req.path === '/api') return next()
   if (c.req.method !== 'GET' && c.req.method !== 'HEAD') return next()
+  const safePath = normalize(c.req.path).replace(/^(\.\.[/\\])+/, '')
+  // amazonq-ignore-next-line
+  const resolvedPath = resolve(staticRoot, safePath.replace(/^\//, ''))
+  if (!resolvedPath.startsWith(staticRoot)) return c.text('Forbidden', 403)
   return staticMiddleware(c, async () => {
     const indexFile = Bun.file(join(staticRoot, 'index.html'))
     c.res = (await indexFile.exists()) ? c.html(await indexFile.text()) : c.text('Not Found', 404)
