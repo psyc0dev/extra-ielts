@@ -51,19 +51,17 @@ export default function WindowControls({ onFullscreen }: { onFullscreen?: (v: bo
     };
   }, []);
 
-  const appWindow = windowRef.current;
-
   return (
     <div className="flex self-stretch">
       <button
-        onClick={() => appWindow?.minimize()}
+        onClick={() => windowRef.current?.minimize()}
         className="w-8 h-full flex items-center justify-center text-foreground/60 hover:bg-white/15 hover:text-foreground transition-all"
         aria-label={en.windowControls.minimize}
       >
         <Minus size={14} strokeWidth={1.5} />
       </button>
       <button
-        onClick={async () => { const next = !isFullscreen; await appWindow?.setFullscreen(next); setIsFullscreen(next); onFullscreen?.(next); }}
+        onClick={async () => { const next = !isFullscreen; await windowRef.current?.setFullscreen(next); setIsFullscreen(next); onFullscreen?.(next); }}
         className="w-8 h-full flex items-center justify-center text-foreground/60 hover:bg-white/15 hover:text-foreground transition-all"
         aria-label={isFullscreen ? en.windowControls.restore : en.windowControls.maximize}
       >
@@ -76,7 +74,7 @@ export default function WindowControls({ onFullscreen }: { onFullscreen?: (v: bo
             forceSubmitAttempt(attemptId);
             await new Promise(r => setTimeout(r, 300));
           }
-          await appWindow?.destroy();
+          await windowRef.current?.destroy();
         }}
         className={`w-8 h-full flex items-center justify-center text-foreground/60 hover:bg-red-600 hover:text-white transition-all ${isFullscreen ? 'rounded-none' : ''}`}
         aria-label={timerActive ? en.windowControls.closeSubmitting : en.windowControls.close}
