@@ -8,7 +8,7 @@
       "kind": "listening",
       "title": "Listening Part 1",
       "durationMinutes": 60,
-      "audioUrl": "AUDIO_PART_1_URL",
+      "audioUrl": "https://www.dropbox.com/scl/fi/esta1jlhjwynkcgrp2v5q/undertale_100.-MEGALOVANIA.mp3?rlkey=kdvqgpqckt7dync3xxyij5w4g&st=pqq2tf9o&raw=1",
       "questions": [
         {
           "id": "l-001",
@@ -122,7 +122,7 @@
       "id": "s1a2b3c4-d5e6-f789-0abc-def123456789-L2",
       "kind": "listening",
       "title": "Listening Part 2",
-      "audioUrl": "AUDIO_PART_2_URL",
+      "audioUrl": "https://www.dropbox.com/scl/fi/esta1jlhjwynkcgrp2v5q/undertale_100.-MEGALOVANIA.mp3?rlkey=kdvqgpqckt7dync3xxyij5w4g&st=pqq2tf9o&raw=1",
       "questions": [
         {
           "id": "l-011",
@@ -224,7 +224,7 @@
       "id": "s1a2b3c4-d5e6-f789-0abc-def123456789-L3",
       "kind": "listening",
       "title": "Listening Part 3",
-      "audioUrl": "AUDIO_PART_3_URL",
+      "audioUrl": "https://www.dropbox.com/scl/fi/esta1jlhjwynkcgrp2v5q/undertale_100.-MEGALOVANIA.mp3?rlkey=kdvqgpqckt7dync3xxyij5w4g&st=pqq2tf9o&raw=1",
       "questions": [
         {
           "id": "l-021",
