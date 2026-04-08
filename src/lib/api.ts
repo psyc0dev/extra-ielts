@@ -139,7 +139,7 @@ import axios from "axios";
 const API_BASE = import.meta.env.VITE_API_BASE_URL;
 const TOKEN_KEY = "accessToken";
 
-function getToken() {
+export function getToken() {
   return Cookies.get(TOKEN_KEY);
 }
 

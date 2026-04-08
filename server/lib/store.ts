@@ -133,6 +133,7 @@ export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
     token = auth.slice(7).trim()
   }
   if (!token) token = getCookie(c, 'accessToken') ?? null
+  if (!token) token = c.req.query('token') ?? null
   if (!token) return c.json({ error: 'Unauthorized' }, 401)
 
   try {

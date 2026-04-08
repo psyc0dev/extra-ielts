@@ -45,6 +45,17 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     return c.json({ test })
   })
 
+  api.get('/admin/tests/:testId/download', requireAuth, requireAdmin, async (c) => {
+    const test = await getTestById(c.env.DB, c.req.param('testId'))
+    if (!test) return c.json({ error: 'Test not found.' }, 404)
+    const safeTitle = (test.title ?? test.id).replace(/[^a-z0-9]+/gi, '-').toLowerCase()
+    const filename = (safeTitle ? safeTitle : test.id) + '.json'
+    return c.body(JSON.stringify(test, null, 2), 200, {
+      'Content-Type': 'application/json',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    })
+  })
+
   api.post('/admin/tests', requireAuth, requireAdmin, async (c) => {
     const body = await c.req.json<{ title: string; durationMinutes: number; sections: unknown[] }>()
     if (!body.title?.trim()) return c.json({ error: 'Title is required.' }, 400)

@@ -15,6 +15,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Calendar } from "@/components/ui/calendar";
+import { open } from "@tauri-apps/plugin-shell";
 import {
   adminCreateAssignment,
   adminCreateUser,
@@ -29,9 +30,8 @@ import {
   adminRemoveGroupMember,
   adminAssignToGroup,
   adminGetStudentStats,
-  adminGetTest,
   adminUploadTest,
-  adminUpdateTest,
+  getToken,
   type AdminAssignment,
   type ApiUser,
   type TestSummary,
@@ -56,6 +56,7 @@ import {
   CaretDown
 } from "@phosphor-icons/react";
 import en from "@/locales/en";
+import { invoke } from "@tauri-apps/api/core";
 
 type AdminSection = "overview" | "users" | "tests" | "assignments" | "groups" | "user-details" | "group-details";
 
@@ -74,7 +75,6 @@ export function Admin() {
   const [selectedUser, setSelectedUser] = useState<ApiUser | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
 
-  const [editingTest, setEditingTest] = useState<TestSummary | null>(null);
 
   const loadAll = useCallback(async () => {
     const [usersRes, testsRes, homeworkRes, groupsRes] = await Promise.all([
@@ -135,6 +135,26 @@ export function Admin() {
     }
   }, []);
 
+  const handleDownloadTest = useCallback(async (test: TestSummary) => {
+    try {
+      const token = getToken();
+      if (!token) {
+        toast.error("Missing auth token.");
+        return;
+      }
+      const base = import.meta.env.VITE_API_BASE_URL;
+      const url = `${base}/admin/tests/${test.id}/download?token=${encodeURIComponent(token)}`;
+      const isTauri = typeof window !== "undefined" && Boolean((window as typeof window & { __TAURI__?: unknown }).__TAURI__);
+      if (isTauri) {
+        await open(url);
+      } else {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to download test.");
+    }
+  }, []);
+
   const navItems: { id: AdminSection; label: string; description: string; icon: ReactNode }[] = [
     { id: "overview", label: en.admin.sections.overview, description: en.admin.sections.overviewSub, icon: <Gauge weight="bold" className="size-4" /> },
     { id: "users", label: en.admin.sections.users, description: en.admin.sections.usersSub, icon: <UsersThree weight="bold" className="size-4" /> },
@@ -142,6 +162,8 @@ export function Admin() {
     { id: "assignments", label: en.admin.sections.assignments, description: en.admin.sections.assignmentsSub, icon: <ClipboardText weight="bold" className="size-4" /> },
     { id: "groups", label: en.admin.sections.groups, description: en.admin.sections.groupsSub, icon: <Users weight="bold" className="size-4" /> },
   ];
+
+  const activeNavId = section;
 
   return (
     <div className="p-4 md:p-6 h-full">
@@ -161,7 +183,7 @@ export function Admin() {
                 key={item.id}
                 onClick={() => setSection(item.id)}
                 className={`w-full text-left rounded-xl border px-3 py-2.5 transition-colors ${
-                  section === item.id
+                  activeNavId === item.id
                     ? "border-emerald-700/60 bg-emerald-900/20 text-white"
                     : "border-neutral-800 hover:bg-neutral-900/60 text-muted-foreground"
                 }`}
@@ -190,16 +212,18 @@ export function Admin() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {section === "tests" && (
-                <UploadTestButton
-                  onUpload={async (testData) => {
-                    const res = await adminUploadTest(testData);
-                    setTests((prev) => [
-                      { id: res.test.id, title: testData.title, durationMinutes: testData.durationMinutes, sectionsCount: testData.sections.length, questionsCount: testData.sections.reduce((n, s) => n + s.questions.length, 0), published: false },
-                      ...prev,
-                    ]);
-                    toast.success("Test uploaded");
-                  }}
-                />
+                <div className="flex items-center gap-2">
+                  <UploadTestButton
+                    onUpload={async (testData) => {
+                      const res = await adminUploadTest(testData);
+                      setTests((prev) => [
+                        { id: res.test.id, title: testData.title, durationMinutes: testData.durationMinutes, sectionsCount: testData.sections.length, questionsCount: testData.sections.reduce((n, s) => n + s.questions.length, 0), published: false },
+                        ...prev,
+                      ]);
+                      toast.success("Test uploaded");
+                    }}
+                  />
+                </div>
               )}
               {section === "users" && (
                 <CreateUserDialog
@@ -359,7 +383,7 @@ export function Admin() {
                       <TableHead>{en.admin.tests.table.sections}</TableHead>
                       <TableHead>{en.admin.tests.table.status}</TableHead>
                       <TableHead>{en.admin.tests.table.published}</TableHead>
-                      <TableHead></TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -390,9 +414,9 @@ export function Admin() {
                             onCheckedChange={(checked) => togglePublished(test.id, checked)}
                           />
                         </TableCell>
-                        <TableCell>
-                          <Button size="sm" variant="outline" className="h-7 text-xs border-neutral-700" onClick={() => setEditingTest(test)}>
-                            {en.admin.tests.edit}
+                        <TableCell className="text-right">
+                          <Button size="sm" variant="outline" className="h-7 text-xs border-neutral-700" onClick={() => handleDownloadTest(test)}>
+                            Download JSON
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -401,21 +425,6 @@ export function Admin() {
                 </Table>
               </CardContent>
             </Card>
-            {editingTest && (
-              <EditTestDialog
-                test={editingTest}
-                onClose={() => setEditingTest(null)}
-                onSave={async (payload) => {
-                  await adminUpdateTest(editingTest.id, payload);
-                  setTests((prev) => prev.map((t) => t.id === editingTest.id
-                    ? { ...t, title: payload.title ?? t.title, durationMinutes: payload.durationMinutes ?? t.durationMinutes, sectionsCount: payload.sections?.length ?? t.sectionsCount }
-                    : t
-                  ));
-                  toast.success("Test updated");
-                  setEditingTest(null);
-                }}
-              />
-            )}
             </>
           )}
 
@@ -516,6 +525,7 @@ export function Admin() {
               }}
             />
           )}
+
             </motion.div>
           </AnimatePresence>
         </motion.section>
@@ -645,7 +655,7 @@ function UserDetailsPage({
               { label: en.admin.sections.assignments, data: stats.homework },
             ]).map(({ label, data }) => (
               <div key={label} className="flex flex-col gap-3">
-                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">{label}</span>
+                <span className="text-[10px] text-muted-foreground font-medium uppercase">{label}</span>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   <StatChip label={en.admin.stats.testsDone} value={`${data.completed}/${data.total}`} />
                   <StatChip label={en.admin.stats.avgBand} value={data.avgBand ?? en.common.na} icon={<Trophy weight="bold" className="size-3 text-amber-400" />} />
@@ -654,7 +664,7 @@ function UserDetailsPage({
                 </div>
                 {data.recentAttempts.length > 0 ? (
                   <div className="flex flex-col gap-1">
-                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">{en.admin.stats.recent}</span>
+                    <span className="text-[10px] text-muted-foreground font-medium uppercase">{en.admin.stats.recent}</span>
                     <div className="flex flex-col gap-2">
                       {data.recentAttempts.map((a, i) => (
                         <div key={`${label}-${i}`} className="flex flex-col gap-1 rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-xs md:flex-row md:items-center md:justify-between">
@@ -1398,6 +1408,40 @@ function TestSelect({ tests, value, onChange }: { tests: TestSummary[]; value: s
   );
 }
 
+function CreateTestDialog({ onCreate }: {
+  onCreate: (payload: { title: string; durationMinutes: number }) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [duration, setDuration] = useState("120");
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" className="gap-1"><Plus weight="bold" className="size-3" /> New Test</Button>
+      </DialogTrigger>
+      <DialogContent className="border-neutral-800 bg-neutral-950">
+        <DialogHeader><DialogTitle className="text-sm">Create Test</DialogTitle></DialogHeader>
+        <FieldGroup>
+          <Field>
+            <FieldLabel>{en.admin.tests.dialog.titleLabel}</FieldLabel>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Academic Practice Test 1" />
+          </Field>
+          <Field>
+            <FieldLabel>{en.admin.tests.dialog.duration}</FieldLabel>
+            <Input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} min={1} />
+          </Field>
+        </FieldGroup>
+        <DialogFooter>
+          <Button disabled={!title.trim()} onClick={async () => {
+            await onCreate({ title: title.trim(), durationMinutes: Number(duration) || 120 });
+            setTitle(""); setDuration("120"); setOpen(false);
+          }}>Create</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function UploadTestButton({ onUpload }: {
   onUpload: (testData: TestDetail) => Promise<void>;
 }) {
@@ -1420,79 +1464,5 @@ function UploadTestButton({ onUpload }: {
         <Plus weight="bold" className="size-3" /> Upload JSON
       </Button>
     </>
-  );
-}
-
-function EditTestDialog({ test, onClose, onSave }: {
-  test: TestSummary;
-  onClose: () => void;
-  onSave: (payload: { title?: string; durationMinutes?: number; sections?: TestDetail['sections'] }) => Promise<void>;
-}) {
-  const [title, setTitle] = useState(test.title);
-  const [duration, setDuration] = useState(String(test.durationMinutes));
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [pendingSections, setPendingSections] = useState<TestDetail['sections'] | null>(null);
-
-  const handleDownload = async () => {
-    try {
-      const res = await adminGetTest(test.id);
-      const blob = new Blob([JSON.stringify(res.test, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = `${test.title.replace(/\s+/g, "-").toLowerCase()}.json`;
-      a.click(); URL.revokeObjectURL(url);
-    } catch { toast.error("Failed to download test."); }
-  };
-
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const text = await file.text();
-      const data = JSON.parse(text) as TestDetail;
-      if (!Array.isArray(data.sections)) { toast.error("Invalid test JSON."); return; }
-      setPendingSections(data.sections);
-      if (data.title) setTitle(data.title);
-      if (data.durationMinutes) setDuration(String(data.durationMinutes));
-      toast.success(`Loaded ${data.sections.length} sections from file`);
-    } catch { toast.error("Failed to parse JSON file."); }
-    e.target.value = "";
-  };
-
-  return (
-    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="border-neutral-800 bg-neutral-950 max-w-lg">
-        <DialogHeader><DialogTitle className="text-sm">{en.admin.tests.dialog.editTitle}</DialogTitle></DialogHeader>
-        <FieldGroup>
-          <Field>
-            <FieldLabel>{en.admin.tests.dialog.titleLabel}</FieldLabel>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
-          </Field>
-          <Field>
-            <FieldLabel>{en.admin.tests.dialog.duration}</FieldLabel>
-            <Input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} min={1} />
-          </Field>
-          <Field>
-            <FieldLabel>Sections</FieldLabel>
-            <div className="flex items-center gap-2">
-              <Button type="button" size="sm" variant="outline" className="h-7 text-xs border-neutral-700" onClick={handleDownload}>
-                Download JSON
-              </Button>
-              <input ref={inputRef} type="file" accept=".json" className="hidden" onChange={handleFile} />
-              <Button type="button" size="sm" variant="outline" className="h-7 text-xs border-neutral-700" onClick={() => inputRef.current?.click()}>
-                Upload JSON
-              </Button>
-              {pendingSections && <span className="text-xs text-emerald-400">{pendingSections.length} sections loaded</span>}
-            </div>
-          </Field>
-        </FieldGroup>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={async () => {
-            await onSave({ title: title.trim() || undefined, durationMinutes: Number(duration) || undefined, sections: pendingSections ?? undefined });
-          }}>{en.admin.tests.dialog.save}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
