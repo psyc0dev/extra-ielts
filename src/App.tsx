@@ -211,7 +211,7 @@ function AppShell({
 }
 
 function AppBody() {
-  const { user, loading, loginUser, logoutUser, refreshUser } = useAuth();
+  const { user, loading, loginUser, registerUser, logoutUser, refreshUser } = useAuth();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
 
@@ -253,6 +253,10 @@ function AppBody() {
                 onLogin={async (identifier, password) => {
                   await loginUser(identifier, password);
                   toast.success(en.login.successToast(identifier));
+                }}
+                onRegister={async (username, email, password) => {
+                  await registerUser(username, email, password);
+                  toast.success(en.login.signUpSuccessToast(username));
                 }}
                 loading={loading}
               />

@@ -46,6 +46,12 @@ export const LoginBodySchema = z.object({
   password: z.string().min(1),
 })
 
+export const RegisterBodySchema = z.object({
+  username: z.string().min(3).max(32).regex(/^[a-zA-Z0-9_]+$/, 'Username may only contain letters, numbers, and underscores'),
+  email: z.string().email().optional(),
+  password: z.string().min(6),
+})
+
 export const BootstrapBodySchema = z.object({
   username: z.string().min(1),
   email: z.string().email().optional(),

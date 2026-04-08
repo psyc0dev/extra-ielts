@@ -2,7 +2,7 @@ import type { Hono } from 'hono'
 import { deleteCookie, setCookie } from 'hono/cookie'
 import { rateLimiter } from 'hono-rate-limiter'
 import type { AppEnv } from '../lib/types'
-import { LoginBodySchema } from '../lib/schemas'
+import { LoginBodySchema, RegisterBodySchema } from '../lib/schemas'
 import { createPasswordHash, createToken, nowIso, zParse, requireAuth, toApiUser, verifyPassword, MemoryStore } from '../lib/store'
 
 const getSecret = (c: { env: { JWT_SECRET?: string } }) => {
@@ -23,6 +23,37 @@ const setAuthCookie = (c: Parameters<typeof setCookie>[0], token: string) =>
   setCookie(c, 'accessToken', token, { path: '/', secure: true, httpOnly: true, maxAge: 60 * 60 * 24 * 7, sameSite: 'Strict' })
 
 export const registerAuthRoutes = (api: Hono<AppEnv>) => {
+  api.post('/auth/register', authLimiter, async (c) => {
+    const { data, error } = await zParse(RegisterBodySchema, c)
+    if (error) return error
+
+    const username = data.username.trim()
+    const email = data.email?.trim().toLowerCase() ?? null
+
+    const existing = await c.env.DB.prepare(
+      'SELECT id FROM users WHERE LOWER(username) = ?'
+    ).bind(username.toLowerCase()).first()
+    if (existing) return c.json({ error: 'Username already taken.' }, 409)
+
+    if (email) {
+      const emailExists = await c.env.DB.prepare(
+        'SELECT id FROM users WHERE LOWER(email) = ?'
+      ).bind(email).first()
+      if (emailExists) return c.json({ error: 'Email already in use.' }, 409)
+    }
+
+    const id = crypto.randomUUID()
+    const passwordHash = await createPasswordHash(data.password)
+    await c.env.DB.prepare(
+      'INSERT INTO users (id, username, email, role, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(id, username, email, 'student', passwordHash, nowIso()).run()
+
+    const secret = getSecret(c)
+    const token = await createToken(id, secret)
+    setAuthCookie(c, token)
+    return c.json({ token, user: { id, username, email, role: 'student', avatarUrl: null } }, 201)
+  })
+
   api.post('/auth/login', authLimiter, async (c) => {
     const { data, error } = await zParse(LoginBodySchema, c)
     if (error) return error

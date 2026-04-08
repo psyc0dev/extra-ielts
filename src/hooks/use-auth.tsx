@@ -1,10 +1,11 @@
 ﻿import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { getMe, login, logout, setToken, setIsAdmin, type ApiUser } from "@/lib/api";
+import { getMe, login, logout, register, setToken, setIsAdmin, type ApiUser } from "@/lib/api";
 
 const AuthContext = createContext<{
   user: ApiUser | null;
   loading: boolean;
   loginUser: (identifier: string, password: string) => Promise<void>;
+  registerUser: (username: string, email: string | undefined, password: string) => Promise<void>;
   logoutUser: () => Promise<void>;
   refreshUser: () => Promise<void>;
 } | null>(null);
@@ -33,6 +34,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     init();
   }, [refreshUser]);
 
+  const registerUser = useCallback(async (username: string, email: string | undefined, password: string) => {
+    const res = await register({ username, email, password });
+    setToken(res.token);
+    setUser(res.user);
+    setIsAdmin(res.user.role === 'admin');
+  }, []);
+
   const loginUser = useCallback(async (identifier: string, password: string) => {
     const res = await login({ identifier, password });
     setToken(res.token);
@@ -51,8 +59,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, loginUser, logoutUser, refreshUser }),
-    [user, loading, loginUser, logoutUser, refreshUser]
+    () => ({ user, loading, loginUser, registerUser, logoutUser, refreshUser }),
+    [user, loading, loginUser, registerUser, logoutUser, refreshUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

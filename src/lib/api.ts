@@ -180,6 +180,13 @@ export async function login(payload: { identifier: string; password: string }) {
   });
 }
 
+export async function register(payload: { username: string; email?: string; password: string }) {
+  return apiFetch<{ token: string; user: ApiUser }>("/auth/register", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function logout() {
   return apiFetch<{ ok: boolean }>("/auth/logout", { method: "POST" });
 }
