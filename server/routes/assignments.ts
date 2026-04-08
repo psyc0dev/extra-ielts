@@ -1,6 +1,7 @@
 import type { Hono } from 'hono'
 import type { AppEnv } from '../lib/types'
-import { computeCorrectness, filterTestForAssignment, getAssignmentDurationMinutes, nowIso, parseJson, jsonParse, requireAuth, scoreAttempt } from '../lib/store'
+import { AnswerBodySchema, SubmitAttemptBodySchema } from '../lib/schemas'
+import { zParse, computeCorrectness, filterTestForAssignment, getAssignmentDurationMinutes, nowIso, jsonParse, requireAuth, scoreAttempt } from '../lib/store'
 import { getTestById } from '../lib/tests'
 
 type AttemptRow = { id: string; assignment_id: string; test_id: string; user_id: string; status: string; score_total: number | null; band: number | null; reading_band: number | null; listening_band: number | null; started_at: string; completed_at: string | null; responses_json: string }
@@ -98,11 +99,11 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
     if (attempt.user_id !== user.id && user.role !== 'admin') return c.json({ error: 'Forbidden' }, 403)
     if (attempt.status !== 'in-progress') return c.json({ error: 'Attempt already completed.' }, 400)
 
-    const body = await parseJson<{ questionId?: string; response?: unknown }>(c)
-    if (!body?.questionId) return c.json({ error: 'questionId is required.' }, 400)
+    const { data, error } = await zParse(AnswerBodySchema, c)
+    if (error) return error
 
     const responses = jsonParse<Record<string, unknown>>(attempt.responses_json, {})
-    responses[body.questionId] = body.response
+    responses[data.questionId] = data.response
     await c.env.DB.prepare('UPDATE attempts SET responses_json = ? WHERE id = ?')
       .bind(JSON.stringify(responses), attempt.id).run()
     return c.json({ ok: true }, 200)
@@ -115,8 +116,8 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
     if (!attempt) return c.json({ error: 'Attempt not found.' }, 404)
     if (attempt.user_id !== user.id && user.role !== 'admin') return c.json({ error: 'Forbidden' }, 403)
 
-    const body = await parseJson<{ status?: string }>(c)
-    if (body?.status !== 'completed') return c.json({ error: 'Only status "completed" is supported.' }, 400)
+    const { error } = await zParse(SubmitAttemptBodySchema, c)
+    if (error) return error
 
     if (attempt.status === 'completed') {
       return c.json({ attempt: { id: attempt.id, status: attempt.status, scoreTotal: attempt.score_total ?? 0, band: attempt.band } }, 200)

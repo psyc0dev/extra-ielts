@@ -2,7 +2,8 @@ import type { Hono } from 'hono'
 import { deleteCookie } from 'hono/cookie'
 import { rateLimiter } from 'hono-rate-limiter'
 import type { AppEnv } from '../lib/types'
-import { createPasswordHash, nowIso, parseJson, requireAuth, MemoryStore } from '../lib/store'
+import { PasswordResetRequestBodySchema, PasswordResetBodySchema, AvatarBodySchema } from '../lib/schemas'
+import { createPasswordHash, nowIso, zParse, requireAuth, MemoryStore } from '../lib/store'
 import axios from 'axios'
 
 const resetLimiter = rateLimiter({
@@ -31,11 +32,11 @@ async function sendOtpEmail(env: AppEnv['Bindings'], to: string, otp: string) {
 
 export const registerAccountRoutes = (api: Hono<AppEnv>) => {
   api.post('/account/password-reset-requests', resetLimiter, async (c) => {
-    const body = await parseJson<{ email?: string }>(c)
-    if (!body?.email) return c.json({ ok: true }, 202)
+    const { data, error } = await zParse(PasswordResetRequestBodySchema, c)
+    if (error) return c.json({ ok: true }, 202)
 
     const user = await c.env.DB.prepare('SELECT id, email FROM users WHERE LOWER(email) = ?')
-      .bind(body.email.toLowerCase()).first<{ id: string; email: string }>()
+      .bind(data.email.toLowerCase()).first<{ id: string; email: string }>()
     if (!user) return c.json({ ok: true }, 202)
 
     await c.env.DB.prepare('DELETE FROM otp_tokens WHERE expires_at < ?').bind(Date.now()).run()
@@ -57,33 +58,30 @@ export const registerAccountRoutes = (api: Hono<AppEnv>) => {
   })
 
   api.patch('/account/password', resetLimiter, async (c) => {
-    const body = await parseJson<{ otp?: string; password?: string }>(c)
-    if (!body?.otp || !body.password) return c.json({ error: 'otp and password are required.' }, 400)
+    const { data, error } = await zParse(PasswordResetBodySchema, c)
+    if (error) return error
 
     const ip = c.req.header('x-forwarded-for') ?? 'unknown'
     const entry = await c.env.DB.prepare('SELECT user_id, expires_at, ip FROM otp_tokens WHERE otp = ?')
-      .bind(body.otp).first<{ user_id: string; expires_at: number; ip: string }>()
+      .bind(data.otp).first<{ user_id: string; expires_at: number; ip: string }>()
     if (!entry || entry.expires_at < Date.now()) return c.json({ error: 'Invalid or expired code.' }, 400)
     if (entry.ip !== ip) return c.json({ error: 'Invalid or expired code.' }, 400)
 
-    const passwordHash = await createPasswordHash(body.password)
+    const passwordHash = await createPasswordHash(data.password)
     await c.env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(passwordHash, entry.user_id).run()
-    await c.env.DB.prepare('DELETE FROM otp_tokens WHERE otp = ?').bind(body.otp).run()
+    await c.env.DB.prepare('DELETE FROM otp_tokens WHERE otp = ?').bind(data.otp).run()
 
     return c.json({ ok: true }, 200)
   })
 
   api.put('/account/avatar', requireAuth, async (c) => {
-    const body = await parseJson<{ dataUrl?: string }>(c)
-    if (!body?.dataUrl) return c.json({ error: 'dataUrl is required.' }, 400)
-    if (!body.dataUrl.match(/^data:image\/(png|jpeg|webp);base64,/)) {
-      return c.json({ error: 'Invalid image format. Use PNG, JPEG, or WebP.' }, 400)
-    }
-    if (body.dataUrl.length > 700_000) return c.json({ error: 'Image too large. Max ~500KB.' }, 400)
+    const { data, error } = await zParse(AvatarBodySchema, c)
+    if (error) return error
+    if (data.dataUrl.length > 700_000) return c.json({ error: 'Image too large. Max ~500KB.' }, 400)
 
     const user = c.get('user')
-    await c.env.DB.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').bind(body.dataUrl, user.id).run()
-    return c.json({ avatarUrl: body.dataUrl }, 200)
+    await c.env.DB.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').bind(data.dataUrl, user.id).run()
+    return c.json({ avatarUrl: data.dataUrl }, 200)
   })
 
   api.delete('/account', requireAuth, async (c) => {

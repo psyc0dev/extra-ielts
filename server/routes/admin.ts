@@ -1,6 +1,7 @@
 import type { Hono } from 'hono'
 import type { AppEnv, Role } from '../lib/types'
-import { createPasswordHash, nowIso, parseJson, jsonParse, requireAdmin, requireAuth, toApiUser } from '../lib/store'
+import { CreateUserBodySchema, TestPublishedBodySchema, CreateAssignmentBodySchema, GroupAssignmentBodySchema, GroupNameBodySchema, GroupMemberBodySchema } from '../lib/schemas'
+import { createPasswordHash, nowIso, zParse, jsonParse, requireAdmin, requireAuth, toApiUser } from '../lib/store'
 import { getTestById, getTests } from '../lib/tests'
 
 type UserRow = { id: string; username: string; email: string | null; role: string; password_hash: string; avatar_url: string | null }
@@ -19,19 +20,18 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
   })
 
   api.post('/admin/users', requireAuth, requireAdmin, async (c) => {
-    const body = await parseJson<{ username?: string; email?: string; password?: string; role?: Role }>(c)
-    if (!body?.username || !body.password || !body.role) return c.json({ error: 'username, password, and role are required.' }, 400)
-    if (body.role !== 'admin' && body.role !== 'student') return c.json({ error: 'Invalid role.' }, 400)
+    const { data, error } = await zParse(CreateUserBodySchema, c)
+    if (error) return error
 
     const exists = await c.env.DB.prepare('SELECT 1 FROM users WHERE LOWER(username) = ? OR (email IS NOT NULL AND LOWER(email) = ?) LIMIT 1')
-      .bind(body.username.toLowerCase(), (body.email ?? '').toLowerCase()).first()
+      .bind(data.username.toLowerCase(), (data.email ?? '').toLowerCase()).first()
     if (exists) return c.json({ error: 'User already exists.' }, 400)
 
     const id = crypto.randomUUID()
-    const passwordHash = await createPasswordHash(body.password)
+    const passwordHash = await createPasswordHash(data.password)
     await c.env.DB.prepare('INSERT INTO users (id, username, email, role, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .bind(id, body.username, body.email ?? null, body.role, passwordHash, nowIso()).run()
-    return c.json({ user: { id, username: body.username, email: body.email ?? null, role: body.role, avatarUrl: null } }, 201)
+      .bind(id, data.username, data.email ?? null, data.role, passwordHash, nowIso()).run()
+    return c.json({ user: { id, username: data.username, email: data.email ?? null, role: data.role, avatarUrl: null } }, 201)
   })
 
   api.get('/admin/tests', requireAuth, requireAdmin, async (c) => {
@@ -46,12 +46,12 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
   })
 
   api.patch('/admin/tests/:testId', requireAuth, requireAdmin, async (c) => {
-    const body = await parseJson<{ published?: boolean }>(c)
-    if (typeof body?.published !== 'boolean') return c.json({ error: 'published flag is required.' }, 400)
+    const { data, error } = await zParse(TestPublishedBodySchema, c)
+    if (error) return error
     const testId = c.req.param('testId')
     if (!getTestById(testId)) return c.json({ error: 'Test not found.' }, 404)
     await c.env.DB.prepare('INSERT INTO tests (id, published) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET published = excluded.published')
-      .bind(testId, body.published ? 1 : 0).run()
+      .bind(testId, data.published ? 1 : 0).run()
     return c.json({ ok: true }, 200)
   })
 
@@ -82,18 +82,17 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
 
   api.post('/admin/assignments', requireAuth, requireAdmin, async (c) => {
     const user = c.get('user')
-    const body = await parseJson<{ type?: string; testId?: string; sectionKinds?: string[]; assignedTo?: string; dueAt?: string | null }>(c)
-    if (!body?.type || !body.testId || !body.assignedTo) return c.json({ error: 'type, testId, and assignedTo are required.' }, 400)
-    if (body.type !== 'task' && body.type !== 'homework') return c.json({ error: 'Invalid assignment type.' }, 400)
-    const test = getTestById(body.testId)
+    const { data, error } = await zParse(CreateAssignmentBodySchema, c)
+    if (error) return error
+    const test = getTestById(data.testId)
     if (!test) return c.json({ error: 'Test not found.' }, 404)
-    const assignedUser = await c.env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(body.assignedTo).first()
+    const assignedUser = await c.env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(data.assignedTo).first()
     if (!assignedUser) return c.json({ error: 'Assigned user not found.' }, 404)
 
-    const sectionKinds = body.sectionKinds?.length ? body.sectionKinds : Array.from(new Set(test.sections.map((s) => s.kind)))
+    const sectionKinds = data.sectionKinds?.length ? data.sectionKinds : Array.from(new Set(test.sections.map((s) => s.kind)))
     const id = crypto.randomUUID()
     await c.env.DB.prepare('INSERT INTO assignments (id, type, test_id, section_kinds_json, assigned_to, assigned_by, due_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .bind(id, body.type, body.testId, JSON.stringify(sectionKinds), body.assignedTo, user.id, body.dueAt ?? null, nowIso()).run()
+      .bind(id, data.type, data.testId, JSON.stringify(sectionKinds), data.assignedTo, user.id, data.dueAt ?? null, nowIso()).run()
     return c.json({ assignment: { id } }, 201)
   })
 
@@ -109,11 +108,11 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
   })
 
   api.post('/admin/groups', requireAuth, requireAdmin, async (c) => {
-    const body = await parseJson<{ name?: string }>(c)
-    if (!body?.name) return c.json({ error: 'Group name is required.' }, 400)
+    const { data, error } = await zParse(GroupNameBodySchema, c)
+    if (error) return error
     const id = crypto.randomUUID()
-    await c.env.DB.prepare('INSERT INTO groups (id, name, created_at) VALUES (?, ?, ?)').bind(id, body.name, nowIso()).run()
-    return c.json({ group: { id, name: body.name } }, 201)
+    await c.env.DB.prepare('INSERT INTO groups (id, name, created_at) VALUES (?, ?, ?)').bind(id, data.name, nowIso()).run()
+    return c.json({ group: { id, name: data.name } }, 201)
   })
 
   api.delete('/admin/groups/:groupId', requireAuth, requireAdmin, async (c) => {
@@ -128,11 +127,11 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     const groupId = c.req.param('groupId')
     const group = await c.env.DB.prepare('SELECT 1 FROM groups WHERE id = ?').bind(groupId).first()
     if (!group) return c.json({ error: 'Group not found.' }, 404)
-    const body = await parseJson<{ userId?: string }>(c)
-    if (!body?.userId) return c.json({ error: 'userId is required.' }, 400)
-    const user = await c.env.DB.prepare('SELECT 1 FROM users WHERE id = ?').bind(body.userId).first()
+    const { data, error } = await zParse(GroupMemberBodySchema, c)
+    if (error) return error
+    const user = await c.env.DB.prepare('SELECT 1 FROM users WHERE id = ?').bind(data.userId).first()
     if (!user) return c.json({ error: 'User not found.' }, 404)
-    await c.env.DB.prepare('INSERT OR IGNORE INTO group_members (group_id, user_id) VALUES (?, ?)').bind(groupId, body.userId).run()
+    await c.env.DB.prepare('INSERT OR IGNORE INTO group_members (group_id, user_id) VALUES (?, ?)').bind(groupId, data.userId).run()
     return c.json({ ok: true }, 201)
   })
 
@@ -147,19 +146,18 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     const groupId = c.req.param('groupId')
     const group = await c.env.DB.prepare('SELECT 1 FROM groups WHERE id = ?').bind(groupId).first()
     if (!group) return c.json({ error: 'Group not found.' }, 404)
-    const body = await parseJson<{ type?: string; testId?: string; sectionKinds?: string[]; dueAt?: string | null }>(c)
-    if (!body?.type || !body.testId) return c.json({ error: 'type and testId are required.' }, 400)
-    if (body.type !== 'task' && body.type !== 'homework') return c.json({ error: 'Invalid assignment type.' }, 400)
-    const test = getTestById(body.testId)
+    const { data, error } = await zParse(GroupAssignmentBodySchema, c)
+    if (error) return error
+    const test = getTestById(data.testId)
     if (!test) return c.json({ error: 'Test not found.' }, 404)
 
-    const sectionKinds = body.sectionKinds?.length ? body.sectionKinds : Array.from(new Set(test.sections.map((s) => s.kind)))
+    const sectionKinds = data.sectionKinds?.length ? data.sectionKinds : Array.from(new Set(test.sections.map((s) => s.kind)))
     const members = await c.env.DB.prepare('SELECT user_id FROM group_members WHERE group_id = ?').bind(groupId).all<{ user_id: string }>()
     let count = 0
     for (const { user_id } of members.results ?? []) {
       const id = crypto.randomUUID()
       await c.env.DB.prepare('INSERT INTO assignments (id, type, test_id, section_kinds_json, assigned_to, assigned_by, due_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-        .bind(id, body.type, body.testId, JSON.stringify(sectionKinds), user_id, user.id, body.dueAt ?? null, nowIso()).run()
+        .bind(id, data.type, data.testId, JSON.stringify(sectionKinds), user_id, user.id, data.dueAt ?? null, nowIso()).run()
       count++
     }
     return c.json({ count }, 201)

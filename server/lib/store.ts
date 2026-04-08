@@ -1,6 +1,7 @@
 import type { MiddlewareHandler } from 'hono'
 import { getCookie } from 'hono/cookie'
 import { sign, verify } from 'hono/jwt'
+import { z } from 'zod'
 import type { ApiUser, AppEnv, User } from './types'
 
 export class MemoryStore {
@@ -80,6 +81,23 @@ export const parseJson = async <T>(c: { req: { json: () => Promise<T> } }) => {
     return await c.req.json()
   } catch {
     return null
+  }
+}
+
+export const zParse = async <T extends z.ZodTypeAny>(
+  schema: T,
+  c: { req: { json: () => Promise<unknown> }; json: (data: unknown, status: number) => Response }
+): Promise<{ data: z.infer<T>; error: null } | { data: null; error: Response }> => {
+  try {
+    const body = await c.req.json()
+    const result = schema.safeParse(body)
+    if (!result.success) {
+      const message = result.error.issues.map((i) => i.message).join(', ')
+      return { data: null, error: c.json({ error: message }, 400) as unknown as Response }
+    }
+    return { data: result.data, error: null }
+  } catch {
+    return { data: null, error: c.json({ error: 'Invalid JSON body.' }, 400) as unknown as Response }
   }
 }
 

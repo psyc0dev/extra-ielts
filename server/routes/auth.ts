@@ -1,9 +1,9 @@
 import type { Hono } from 'hono'
 import { deleteCookie, setCookie } from 'hono/cookie'
 import { rateLimiter } from 'hono-rate-limiter'
-import { sign } from 'hono/jwt'
 import type { AppEnv } from '../lib/types'
-import { createPasswordHash, createToken, nowIso, parseJson, requireAuth, toApiUser, verifyPassword, MemoryStore } from '../lib/store'
+import { LoginBodySchema, BootstrapBodySchema } from '../lib/schemas'
+import { createPasswordHash, createToken, nowIso, zParse, requireAuth, toApiUser, verifyPassword, MemoryStore } from '../lib/store'
 
 const getSecret = (c: { env: { JWT_SECRET?: string } }) => {
   const s = c.env?.JWT_SECRET ?? process.env.JWT_SECRET
@@ -32,32 +32,32 @@ export const registerAuthRoutes = (api: Hono<AppEnv>) => {
     const row = await c.env.DB.prepare('SELECT COUNT(*) as count FROM users').first<{ count: number }>()
     if ((row?.count ?? 0) > 0) return c.json({ error: 'Bootstrap already completed.' }, 400)
 
-    const body = await parseJson<{ username?: string; email?: string; password?: string }>(c)
-    if (!body?.username || !body.password) return c.json({ error: 'Username and password are required.' }, 400)
+    const { data, error } = await zParse(BootstrapBodySchema, c)
+    if (error) return error
 
     const id = crypto.randomUUID()
-    const passwordHash = await createPasswordHash(body.password)
+    const passwordHash = await createPasswordHash(data.password)
     await c.env.DB.prepare(
       'INSERT INTO users (id, username, email, role, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind(id, body.username, body.email ?? null, 'admin', passwordHash, nowIso()).run()
+    ).bind(id, data.username, data.email ?? null, 'admin', passwordHash, nowIso()).run()
 
     const secret = getSecret(c)
     const token = await createToken(id, secret)
     setAuthCookie(c, token)
-    return c.json({ token, user: { id, username: body.username, email: body.email ?? null, role: 'admin', avatarUrl: null } }, 201)
+    return c.json({ token, user: { id, username: data.username, email: data.email ?? null, role: 'admin', avatarUrl: null } }, 201)
   })
 
   api.post('/auth/login', authLimiter, async (c) => {
-    const body = await parseJson<{ identifier?: string; password?: string }>(c)
-    if (!body?.identifier || !body.password) return c.json({ error: 'Identifier and password are required.' }, 400)
+    const { data, error } = await zParse(LoginBodySchema, c)
+    if (error) return error
 
-    const identifier = body.identifier.trim().toLowerCase()
+    const identifier = data.identifier.trim().toLowerCase()
     const row = await c.env.DB.prepare(
       'SELECT id, username, email, role, password_hash, avatar_url FROM users WHERE LOWER(username) = ? OR LOWER(email) = ?'
     ).bind(identifier, identifier).first<{ id: string; username: string; email: string | null; role: string; password_hash: string; avatar_url: string | null }>()
 
     if (!row) return c.json({ error: 'Invalid credentials.' }, 401)
-    const ok = await verifyPassword(body.password, row.password_hash)
+    const ok = await verifyPassword(data.password, row.password_hash)
     if (!ok) return c.json({ error: 'Invalid credentials.' }, 401)
 
     const secret = getSecret(c)

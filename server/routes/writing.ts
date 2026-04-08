@@ -1,6 +1,7 @@
 import type { Hono } from 'hono'
 import type { AppEnv } from '../lib/types'
-import { parseJson, requireAuth } from '../lib/store'
+import { WritingEvaluationBodySchema } from '../lib/schemas'
+import { zParse, requireAuth } from '../lib/store'
 import axios from 'axios'
 
 export const registerWritingRoutes = (api: Hono<AppEnv>) => {
@@ -20,9 +21,9 @@ export const registerWritingRoutes = (api: Hono<AppEnv>) => {
   api.post('/writing/evaluations', requireAuth, async (c) => {
     const url = c.env.EVALUATOR_URL
     if (!url) return c.json({ error: 'Evaluator service not configured.' }, 503)
-    const body = await parseJson<{ topic?: string; essay?: string }>(c)
-    if (!body?.topic?.trim() || !body?.essay?.trim()) return c.json({ error: 'topic and essay are required.' }, 400)
-    const { data, status } = await axios.post(`${url}/evaluate`, { topic: body.topic, essay: body.essay })
-    return c.json(data, status as 200)
+    const { data, error } = await zParse(WritingEvaluationBodySchema, c)
+    if (error) return error
+    const { data: result, status } = await axios.post(`${url}/evaluate`, { topic: data.topic, essay: data.essay })
+    return c.json(result, status as 200)
   })
 }

@@ -1,42 +1,5 @@
-export type Role = 'admin' | 'student'
-export type AssignmentType = 'task' | 'homework'
-export type SectionKind = 'listening' | 'reading'
-export type AttemptStatus = 'in-progress' | 'completed'
-export type QuestionType =
-  | 'mcq'
-  | 'short'
-  | 'true-false-notgiven'
-  | 'yes-no-notgiven'
-  | 'match-headings'
-  | 'matching'
-  | 'sentence-completion'
-  | 'note-completion'
-  | 'table-completion'
-  | 'diagram-labelling'
-  | 'form-completion'
-  | 'flowchart-completion'
-  | 'map-labelling'
-  | 'multiple-choice-multiple'
-  | 'summary-completion'
-  | 'matching-paragraph-information'
-  | 'matching-features'
-  | 'matching-sentence-endings'
-  | 'choose-title'
-
-export type ApiUser = {
-  id: string
-  username: string
-  email: string | null
-  role: Role
-  avatarUrl?: string | null
-}
-
-export type UserSettings = {
-  notifications: boolean
-  sound: boolean
-  timerWarning: boolean
-}
-
+export type { Role, AssignmentType, SectionKind, AttemptStatus, QuestionType, UserSettings, ApiUser } from './schemas'
+import type { Role, SectionKind, AttemptStatus, QuestionType, UserSettings, ApiUser } from './schemas'
 
 export type TestSummary = {
   id: string
@@ -85,7 +48,7 @@ export type TestDetail = {
 
 export type AssignmentSummary = {
   id: string
-  type: AssignmentType
+  type: string
   testId: string
   title: string
   durationMinutes: number
@@ -106,7 +69,7 @@ export type AssignmentSummary = {
 export type AssignmentAttemptDetail = {
   assignment: {
     id: string
-    type: AssignmentType
+    type: string
     testId: string
     title: string
     durationMinutes: number
@@ -128,7 +91,7 @@ export type AssignmentAttemptDetail = {
 
 export type AdminAssignment = {
   id: string
-  type: AssignmentType
+  type: string
   testId: string
   sectionKinds: SectionKind[]
   assignedTo: string
@@ -173,7 +136,7 @@ export type User = ApiUser & {
 
 export type Assignment = {
   id: string
-  type: AssignmentType
+  type: string
   testId: string
   sectionKinds: SectionKind[]
   assignedTo: string
@@ -212,14 +175,6 @@ export type Store = {
   settings: Record<string, UserSettings>
 }
 
-export type StoreSnapshot = {
-  users: User[]
-  assignments: Assignment[]
-  attempts: Attempt[]
-  groups: StoredGroup[]
-  settings: Record<string, UserSettings>
-}
-
 export type Bindings = {
   DB: D1Database
   CORS_ORIGIN?: string
@@ -240,6 +195,3 @@ export type AppEnv = {
   Bindings: Bindings
   Variables: AppVariables
 }
-
-
-
