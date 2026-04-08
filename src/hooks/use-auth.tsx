@@ -1,12 +1,10 @@
 ﻿import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { bootstrapAdmin, getBootstrapStatus, getMe, login, logout, setToken, setIsAdmin, type ApiUser } from "@/lib/api";
+import { getMe, login, logout, setToken, setIsAdmin, type ApiUser } from "@/lib/api";
 
 const AuthContext = createContext<{
   user: ApiUser | null;
   loading: boolean;
-  needsBootstrap: boolean;
   loginUser: (identifier: string, password: string) => Promise<void>;
-  bootstrap: (payload: { username: string; email?: string; password: string }) => Promise<void>;
   logoutUser: () => Promise<void>;
   refreshUser: () => Promise<void>;
 } | null>(null);
@@ -14,7 +12,6 @@ const AuthContext = createContext<{
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<ApiUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [needsBootstrap, setNeedsBootstrap] = useState(false);
 
   const refreshUser = useCallback(async () => {
     try {
@@ -30,13 +27,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const init = async () => {
-      try {
-        const status = await getBootstrapStatus();
-        setNeedsBootstrap(status.needsBootstrap);
-      } catch {
-        setNeedsBootstrap(false);
-      }
-
       await refreshUser();
       setLoading(false);
     };
@@ -50,14 +40,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsAdmin(res.user.role === 'admin');
   }, []);
 
-  const bootstrap = useCallback(async (payload: { username: string; email?: string; password: string }) => {
-    const res = await bootstrapAdmin(payload);
-    setToken(res.token);
-    setUser(res.user);
-    setIsAdmin(res.user.role === 'admin');
-    setNeedsBootstrap(false);
-  }, []);
-
   const logoutUser = useCallback(async () => {
     try {
       await logout();
@@ -69,8 +51,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, needsBootstrap, loginUser, bootstrap, logoutUser, refreshUser }),
-    [user, loading, needsBootstrap, loginUser, bootstrap, logoutUser, refreshUser]
+    () => ({ user, loading, loginUser, logoutUser, refreshUser }),
+    [user, loading, loginUser, logoutUser, refreshUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

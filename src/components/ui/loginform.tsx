@@ -3,7 +3,6 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import logo from "../../assets/extra-round.png"
 import en from "@/locales/en"
 import { LegalDialog } from "@/components/ui/legaldialog"
@@ -11,31 +10,21 @@ import { LegalDialog } from "@/components/ui/legaldialog"
 export function LoginForm({
   className,
   onLogin,
-  onBootstrap,
-  needsBootstrap,
   loading,
   ...props
 }: React.ComponentProps<"div"> & {
   onLogin: (identifier: string, password: string) => Promise<void>
-  onBootstrap: (payload: { username: string; email?: string; password: string }) => Promise<void>
-  needsBootstrap: boolean
   loading: boolean
 }) {
   const [identifier, setIdentifier] = useState("")
-  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const [mode, setMode] = useState(needsBootstrap ? "bootstrap" : "login")
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     try {
-      if (mode === "bootstrap") {
-        await onBootstrap({ username: identifier, email: email || undefined, password })
-      } else {
-        await onLogin(identifier, password)
-      }
+      await onLogin(identifier, password)
     } catch (err) {
       setError(err instanceof Error ? err.message : en.login.error)
     }
@@ -45,18 +34,9 @@ export function LoginForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <div className="flex flex-col items-center gap-2 text-center">
         <img src={logo} alt={en.login.logoAlt} className="w-10 h-10 rounded-xl mb-1" />
-        <h1 className="text-xl font-bold">{mode === "bootstrap" ? en.login.bootstrapTitle : en.login.title}</h1>
-        <p className="text-sm text-muted-foreground">
-          {mode === "bootstrap" ? en.login.bootstrapSubtitle : en.login.subtitle}
-        </p>
+        <h1 className="text-xl font-bold">{en.login.title}</h1>
+        <p className="text-sm text-muted-foreground">{en.login.subtitle}</p>
       </div>
-
-      <Tabs value={mode} onValueChange={setMode}>
-        <TabsList className="grid grid-cols-2">
-          <TabsTrigger value="login" disabled={needsBootstrap}>{en.login.signInTab}</TabsTrigger>
-          <TabsTrigger value="bootstrap">{en.login.bootstrapTab}</TabsTrigger>
-        </TabsList>
-      </Tabs>
 
       <form onSubmit={handleSubmit} autoComplete="off">
         <FieldGroup>
@@ -72,19 +52,6 @@ export function LoginForm({
               required
             />
           </Field>
-          {mode === "bootstrap" && (
-            <Field>
-              <FieldLabel htmlFor="email">{en.login.email}</FieldLabel>
-              <Input
-                id="email"
-                type="email"
-                placeholder={en.login.placeholders.adminEmail}
-                autoComplete="off"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-              />
-            </Field>
-          )}
           <Field>
             <FieldLabel htmlFor="password">{en.login.password}</FieldLabel>
             <Input
@@ -99,7 +66,7 @@ export function LoginForm({
           </Field>
           <Field>
             <Button type="submit" className="w-full" disabled={loading}>
-              {mode === "bootstrap" ? en.login.bootstrapAction : en.login.submit}
+              {en.login.submit}
             </Button>
           </Field>
           {error && (

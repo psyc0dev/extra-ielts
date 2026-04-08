@@ -211,7 +211,7 @@ function AppShell({
 }
 
 function AppBody() {
-  const { user, loading, loginUser, logoutUser, bootstrap, needsBootstrap, refreshUser } = useAuth();
+  const { user, loading, loginUser, logoutUser, refreshUser } = useAuth();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
 
@@ -254,11 +254,6 @@ function AppBody() {
                   await loginUser(identifier, password);
                   toast.success(en.login.successToast(identifier));
                 }}
-                onBootstrap={async (payload) => {
-                  await bootstrap(payload);
-                  toast.success(en.login.bootstrapSuccess);
-                }}
-                needsBootstrap={needsBootstrap}
                 loading={loading}
               />
             </div>

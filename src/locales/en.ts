@@ -282,22 +282,16 @@
   login: {
     title: "Welcome back",
     subtitle: "Sign in to your account",
-    bootstrapTitle: "Create admin account",
-    bootstrapSubtitle: "Set up the first admin for this workspace",
     signInTab: "Sign in",
-    bootstrapTab: "Create admin",
     username: "Username",
     email: "Email",
     password: "Password",
     submit: "Sign in",
-    bootstrapAction: "Create admin",
     error: "Invalid username or password.",
     successToast: (u: string) => `Welcome back, ${u}!`,
-    bootstrapSuccess: "Admin account created.",
     logoAlt: "logo",
     placeholders: {
       username: "username",
-      adminEmail: "admin@example.com",
       password: "••••••••",
     },
     terms: {

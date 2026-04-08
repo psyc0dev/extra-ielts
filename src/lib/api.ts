@@ -173,17 +173,6 @@ async function apiFetch<T>(path: string, options: RequestInit = {}) {
   }
 }
 
-export async function getBootstrapStatus() {
-  return apiFetch<{ needsBootstrap: boolean }>("/auth/bootstrap");
-}
-
-export async function bootstrapAdmin(payload: { username: string; email?: string; password: string }) {
-  return apiFetch<{ token: string; user: ApiUser }>("/auth/bootstrap", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
 export async function login(payload: { identifier: string; password: string }) {
   return apiFetch<{ token: string; user: ApiUser }>("/auth/login", {
     method: "POST",

@@ -2,7 +2,7 @@ import type { Hono } from 'hono'
 import { deleteCookie, setCookie } from 'hono/cookie'
 import { rateLimiter } from 'hono-rate-limiter'
 import type { AppEnv } from '../lib/types'
-import { LoginBodySchema, BootstrapBodySchema } from '../lib/schemas'
+import { LoginBodySchema } from '../lib/schemas'
 import { createPasswordHash, createToken, nowIso, zParse, requireAuth, toApiUser, verifyPassword, MemoryStore } from '../lib/store'
 
 const getSecret = (c: { env: { JWT_SECRET?: string } }) => {
@@ -23,30 +23,6 @@ const setAuthCookie = (c: Parameters<typeof setCookie>[0], token: string) =>
   setCookie(c, 'accessToken', token, { path: '/', secure: true, httpOnly: true, maxAge: 60 * 60 * 24 * 7, sameSite: 'Strict' })
 
 export const registerAuthRoutes = (api: Hono<AppEnv>) => {
-  api.get('/auth/bootstrap', async (c) => {
-    const row = await c.env.DB.prepare('SELECT COUNT(*) as count FROM users').first<{ count: number }>()
-    return c.json({ needsBootstrap: (row?.count ?? 0) === 0 })
-  })
-
-  api.post('/auth/bootstrap', authLimiter, async (c) => {
-    const row = await c.env.DB.prepare('SELECT COUNT(*) as count FROM users').first<{ count: number }>()
-    if ((row?.count ?? 0) > 0) return c.json({ error: 'Bootstrap already completed.' }, 400)
-
-    const { data, error } = await zParse(BootstrapBodySchema, c)
-    if (error) return error
-
-    const id = crypto.randomUUID()
-    const passwordHash = await createPasswordHash(data.password)
-    await c.env.DB.prepare(
-      'INSERT INTO users (id, username, email, role, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind(id, data.username, data.email ?? null, 'admin', passwordHash, nowIso()).run()
-
-    const secret = getSecret(c)
-    const token = await createToken(id, secret)
-    setAuthCookie(c, token)
-    return c.json({ token, user: { id, username: data.username, email: data.email ?? null, role: 'admin', avatarUrl: null } }, 201)
-  })
-
   api.post('/auth/login', authLimiter, async (c) => {
     const { data, error } = await zParse(LoginBodySchema, c)
     if (error) return error
