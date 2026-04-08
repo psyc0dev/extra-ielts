@@ -19,6 +19,7 @@ export const createApp = () => {
   const ALLOWED_ORIGINS = [
     'tauri://localhost',
     'https://tauri.localhost',
+    'http://localhost:1420',
   ]
 
   const getAllowed = (c: { env?: { CORS_ORIGIN?: string } }) =>

@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { AnimatePresence, motion } from "motion/react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -63,123 +64,136 @@ export function LoginForm({
         <p className="text-sm text-muted-foreground">{en.login.subtitle}</p>
       </div>
 
-      <div className="flex rounded-md border border-neutral-700 p-0.5 gap-0.5">
-        <button
-          type="button"
-          onClick={() => switchTab("login")}
-          className={cn(
-            "flex-1 rounded py-1 text-sm font-medium transition-colors",
-            tab === "login" ? "bg-neutral-700 text-white" : "text-muted-foreground hover:text-white"
-          )}
-        >
-          {en.login.signInTab}
-        </button>
-        <button
-          type="button"
-          onClick={() => switchTab("signup")}
-          className={cn(
-            "flex-1 rounded py-1 text-sm font-medium transition-colors",
-            tab === "signup" ? "bg-neutral-700 text-white" : "text-muted-foreground hover:text-white"
-          )}
-        >
-          {en.login.signUpTab}
-        </button>
-      </div>
+      <AnimatePresence mode="wait" initial={false}>
+        {tab === "login" ? (
+          <motion.form
+            key="login"
+            onSubmit={handleLogin}
+            autoComplete="off"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+          >
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="identifier">{en.login.username}</FieldLabel>
+                <Input
+                  id="identifier"
+                  type="text"
+                  placeholder={en.login.placeholders.username}
+                  autoComplete="off"
+                  value={identifier}
+                  onChange={e => setIdentifier(e.target.value)}
+                  required
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="password">{en.login.password}</FieldLabel>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder={en.login.placeholders.password}
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                />
+              </Field>
+              <Field>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {en.login.submit}
+                </Button>
+              </Field>
+              {error && <p className="text-xs text-destructive text-center -mt-2">{error}</p>}
+            </FieldGroup>
+          </motion.form>
+        ) : (
+          <motion.form
+            key="signup"
+            onSubmit={handleSignUp}
+            autoComplete="off"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+          >
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="su-username">{en.login.username}</FieldLabel>
+                <Input
+                  id="su-username"
+                  type="text"
+                  placeholder={en.login.placeholders.username}
+                  autoComplete="off"
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                  required
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="su-email">{en.login.emailOptional}</FieldLabel>
+                <Input
+                  id="su-email"
+                  type="email"
+                  placeholder={en.login.placeholders.email}
+                  autoComplete="off"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="su-password">{en.login.password}</FieldLabel>
+                <Input
+                  id="su-password"
+                  type="password"
+                  placeholder={en.login.placeholders.password}
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="su-confirm">{en.login.confirmPassword}</FieldLabel>
+                <Input
+                  id="su-confirm"
+                  type="password"
+                  placeholder={en.login.placeholders.password}
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  required
+                />
+              </Field>
+              <Field>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {en.login.submitSignUp}
+                </Button>
+              </Field>
+              {error && <p className="text-xs text-destructive text-center -mt-2">{error}</p>}
+            </FieldGroup>
+          </motion.form>
+        )}
+      </AnimatePresence>
 
-      {tab === "login" ? (
-        <form onSubmit={handleLogin} autoComplete="off">
-          <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor="identifier">{en.login.username}</FieldLabel>
-              <Input
-                id="identifier"
-                type="text"
-                placeholder={en.login.placeholders.username}
-                autoComplete="off"
-                value={identifier}
-                onChange={e => setIdentifier(e.target.value)}
-                required
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="password">{en.login.password}</FieldLabel>
-              <Input
-                id="password"
-                type="password"
-                placeholder={en.login.placeholders.password}
-                autoComplete="new-password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-              />
-            </Field>
-            <Field>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {en.login.submit}
-              </Button>
-            </Field>
-            {error && <p className="text-xs text-destructive text-center -mt-2">{error}</p>}
-          </FieldGroup>
-        </form>
-      ) : (
-        <form onSubmit={handleSignUp} autoComplete="off">
-          <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor="su-username">{en.login.username}</FieldLabel>
-              <Input
-                id="su-username"
-                type="text"
-                placeholder={en.login.placeholders.username}
-                autoComplete="off"
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-                required
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="su-email">{en.login.emailOptional}</FieldLabel>
-              <Input
-                id="su-email"
-                type="email"
-                placeholder={en.login.placeholders.email}
-                autoComplete="off"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="su-password">{en.login.password}</FieldLabel>
-              <Input
-                id="su-password"
-                type="password"
-                placeholder={en.login.placeholders.password}
-                autoComplete="new-password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="su-confirm">{en.login.confirmPassword}</FieldLabel>
-              <Input
-                id="su-confirm"
-                type="password"
-                placeholder={en.login.placeholders.password}
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                required
-              />
-            </Field>
-            <Field>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {en.login.submitSignUp}
-              </Button>
-            </Field>
-            {error && <p className="text-xs text-destructive text-center -mt-2">{error}</p>}
-          </FieldGroup>
-        </form>
-      )}
+      <p className="text-center text-sm text-muted-foreground">
+        {tab === "login" ? (
+          <>
+            Don't have an account?{" "}
+            <button type="button" onClick={() => switchTab("signup")} className="underline underline-offset-4 hover:text-primary">
+              Sign up
+            </button>
+          </>
+        ) : (
+          <>
+            Already have an account?{" "}
+            <button type="button" onClick={() => switchTab("login")} className="underline underline-offset-4 hover:text-primary">
+              Sign in
+            </button>
+          </>
+        )}
+      </p>
 
       <p className="text-center text-xs text-muted-foreground">
         {en.login.terms.prefix}{" "}
