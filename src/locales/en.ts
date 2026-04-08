@@ -616,6 +616,12 @@
         sections: "Sections",
         status: "Status",
         published: "Published",
+        actions: "Actions",
+      },
+      actions: {
+        downloadJson: "Download JSON",
+        delete: "Delete",
+        deleteConfirm: (title: string) => `Delete "${title}"? This cannot be undone.`,
       },
       search: "Search tests...",
       status: {
@@ -718,6 +724,12 @@
       userCreated: "User created",
       assignmentCreated: "Assignment created",
       assignedToCount: (n: number) => `Assigned to ${n} student${n !== 1 ? "s" : ""}`,
+      testUploaded: "Test uploaded",
+      testEmpty: "Test is empty.",
+      missingAuth: "Missing auth token.",
+      downloadFailed: "Failed to download test.",
+      testDeleted: "Test deleted.",
+      deleteFailed: "Failed to delete test.",
     },
   },
 } as const;

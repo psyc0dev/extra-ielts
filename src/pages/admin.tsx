@@ -31,6 +31,7 @@ import {
   adminAssignToGroup,
   adminGetStudentStats,
   adminUploadTest,
+  adminDeleteTest,
   getToken,
   type AdminAssignment,
   type ApiUser,
@@ -56,7 +57,6 @@ import {
   CaretDown
 } from "@phosphor-icons/react";
 import en from "@/locales/en";
-import { invoke } from "@tauri-apps/api/core";
 
 type AdminSection = "overview" | "users" | "tests" | "assignments" | "groups" | "user-details" | "group-details";
 
@@ -137,21 +137,32 @@ export function Admin() {
 
   const handleDownloadTest = useCallback(async (test: TestSummary) => {
     try {
-      const token = getToken();
-      if (!token) {
-        toast.error("Missing auth token.");
+      if (!test.sectionsCount) {
+        toast.error(en.admin.toasts.testEmpty);
         return;
       }
-      const base = import.meta.env.VITE_API_BASE_URL;
-      const url = `${base}/admin/tests/${test.id}/download?token=${encodeURIComponent(token)}`;
-      const isTauri = typeof window !== "undefined" && Boolean((window as typeof window & { __TAURI__?: unknown }).__TAURI__);
-      if (isTauri) {
-        await open(url);
-      } else {
-        window.open(url, "_blank", "noopener,noreferrer");
+      const token = getToken();
+      if (!token) {
+        toast.error(en.admin.toasts.missingAuth);
+        return;
       }
+      const base = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+      const url = `${base}/admin/tests/${test.id}/download?token=${encodeURIComponent(token)}`;
+      await open(url);
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to download test.");
+      toast.error(err instanceof Error ? err.message : en.admin.toasts.downloadFailed);
+    }
+  }, []);
+
+  const handleDeleteTest = useCallback(async (test: TestSummary) => {
+    const ok = window.confirm(en.admin.tests.actions.deleteConfirm(test.title));
+    if (!ok) return;
+    try {
+      await adminDeleteTest(test.id);
+      setTests((prev) => prev.filter((t) => t.id !== test.id));
+      toast.success(en.admin.toasts.testDeleted);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : en.admin.toasts.deleteFailed);
     }
   }, []);
 
@@ -220,7 +231,7 @@ export function Admin() {
                         { id: res.test.id, title: testData.title, durationMinutes: testData.durationMinutes, sectionsCount: testData.sections.length, questionsCount: testData.sections.reduce((n, s) => n + s.questions.length, 0), published: false },
                         ...prev,
                       ]);
-                      toast.success("Test uploaded");
+                      toast.success(en.admin.toasts.testUploaded);
                     }}
                   />
                 </div>
@@ -383,7 +394,7 @@ export function Admin() {
                       <TableHead>{en.admin.tests.table.sections}</TableHead>
                       <TableHead>{en.admin.tests.table.status}</TableHead>
                       <TableHead>{en.admin.tests.table.published}</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-right">{en.admin.tests.table.actions}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -415,9 +426,14 @@ export function Admin() {
                           />
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button size="sm" variant="outline" className="h-7 text-xs border-neutral-700" onClick={() => handleDownloadTest(test)}>
-                            Download JSON
-                          </Button>
+                          <div className="flex items-center justify-end gap-2">
+                            <Button size="sm" variant="outline" className="h-7 text-xs border-neutral-700" onClick={() => handleDownloadTest(test)}>
+                              {en.admin.tests.actions.downloadJson}
+                            </Button>
+                            <Button size="sm" variant="outline" className="h-7 text-xs border-red-700 text-red-400 hover:text-red-300" onClick={() => handleDeleteTest(test)}>
+                              {en.admin.tests.actions.delete}
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}

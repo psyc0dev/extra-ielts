@@ -315,6 +315,10 @@ export async function adminToggleTestPublished(testId: string, published: boolea
   });
 }
 
+export async function adminDeleteTest(testId: string) {
+  return apiFetch<{ ok: boolean }>(`/admin/tests/${testId}`, { method: "DELETE" });
+}
+
 export async function adminListGroups() {
   return apiFetch<{ groups: Group[] }>("/admin/groups");
 }

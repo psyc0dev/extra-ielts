@@ -56,6 +56,15 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     })
   })
 
+  api.delete('/admin/tests/:testId', requireAuth, requireAdmin, async (c) => {
+    const testId = c.req.param('testId')
+    if (!await getTestById(c.env.DB, testId)) return c.json({ error: 'Test not found.' }, 404)
+    await c.env.DB.prepare('DELETE FROM attempts WHERE test_id = ?').bind(testId).run()
+    await c.env.DB.prepare('DELETE FROM assignments WHERE test_id = ?').bind(testId).run()
+    await c.env.DB.prepare('DELETE FROM tests WHERE id = ?').bind(testId).run()
+    return c.json({ ok: true }, 200)
+  })
+
   api.post('/admin/tests', requireAuth, requireAdmin, async (c) => {
     const body = await c.req.json<{ title: string; durationMinutes: number; sections: unknown[] }>()
     if (!body.title?.trim()) return c.json({ error: 'Title is required.' }, 400)
