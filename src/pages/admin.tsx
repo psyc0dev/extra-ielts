@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Calendar } from "@/components/ui/calendar";
 import { open } from "@tauri-apps/plugin-shell";
@@ -74,6 +75,7 @@ export function Admin() {
   const [groupQuery, setGroupQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<ApiUser | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TestSummary | null>(null);
 
 
   const loadAll = useCallback(async () => {
@@ -154,17 +156,22 @@ export function Admin() {
     }
   }, []);
 
-  const handleDeleteTest = useCallback(async (test: TestSummary) => {
-    const ok = window.confirm(en.admin.tests.actions.deleteConfirm(test.title));
-    if (!ok) return;
+  const handleDeleteTest = useCallback((test: TestSummary) => {
+    setDeleteTarget(test);
+  }, []);
+
+  const confirmDeleteTest = useCallback(async () => {
+    if (!deleteTarget) return;
     try {
-      await adminDeleteTest(test.id);
-      setTests((prev) => prev.filter((t) => t.id !== test.id));
+      await adminDeleteTest(deleteTarget.id);
+      setTests((prev) => prev.filter((t) => t.id !== deleteTarget.id));
       toast.success(en.admin.toasts.testDeleted);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : en.admin.toasts.deleteFailed);
+    } finally {
+      setDeleteTarget(null);
     }
-  }, []);
+  }, [deleteTarget]);
 
   const navItems: { id: AdminSection; label: string; description: string; icon: ReactNode }[] = [
     { id: "overview", label: en.admin.sections.overview, description: en.admin.sections.overviewSub, icon: <Gauge weight="bold" className="size-4" /> },
@@ -389,12 +396,12 @@ export function Admin() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>{en.admin.tests.table.title}</TableHead>
-                      <TableHead>{en.admin.tests.table.duration}</TableHead>
-                      <TableHead>{en.admin.tests.table.sections}</TableHead>
-                      <TableHead>{en.admin.tests.table.status}</TableHead>
-                      <TableHead>{en.admin.tests.table.published}</TableHead>
-                      <TableHead className="text-right">{en.admin.tests.table.actions}</TableHead>
+                      <TableHead className="text-center">{en.admin.tests.table.title}</TableHead>
+                      <TableHead className="text-center">{en.admin.tests.table.duration}</TableHead>
+                      <TableHead className="text-center">{en.admin.tests.table.sections}</TableHead>
+                      <TableHead className="text-center">{en.admin.tests.table.status}</TableHead>
+                      <TableHead className="text-center">{en.admin.tests.table.published}</TableHead>
+                      <TableHead className="text-center">{en.admin.tests.table.actions}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -406,10 +413,10 @@ export function Admin() {
                       <TableRow><TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-8">{en.admin.tests.notFound}</TableCell></TableRow>
                     ) : visibleTests.map((test) => (
                       <TableRow key={test.id}>
-                        <TableCell className="font-medium">{test.title}</TableCell>
-                        <TableCell className="text-muted-foreground">{test.durationMinutes} {en.admin.tests.minutesSuffix}</TableCell>
-                        <TableCell className="text-muted-foreground">{test.sectionsCount}</TableCell>
-                        <TableCell>
+                        <TableCell className="font-medium text-center">{test.title}</TableCell>
+                        <TableCell className="text-muted-foreground text-center">{test.durationMinutes} {en.admin.tests.minutesSuffix}</TableCell>
+                        <TableCell className="text-muted-foreground text-center">{test.sectionsCount}</TableCell>
+                        <TableCell className="text-center">
                           <Badge
                             variant="outline"
                             className={test.published
@@ -419,14 +426,16 @@ export function Admin() {
                             {test.published ? en.admin.tests.status.published : en.admin.tests.status.draft}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          <Switch
-                            checked={test.published ?? false}
-                            onCheckedChange={(checked) => togglePublished(test.id, checked)}
-                          />
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center">
+                            <Switch
+                              checked={test.published ?? false}
+                              onCheckedChange={(checked) => togglePublished(test.id, checked)}
+                            />
+                          </div>
                         </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-2">
                             <Button size="sm" variant="outline" className="h-7 text-xs border-neutral-700" onClick={() => handleDownloadTest(test)}>
                               {en.admin.tests.actions.downloadJson}
                             </Button>
@@ -441,6 +450,22 @@ export function Admin() {
                 </Table>
               </CardContent>
             </Card>
+            <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+              <AlertDialogContent className="border-neutral-800 bg-neutral-950">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-sm">{en.admin.tests.actions.deleteConfirmTitle}</AlertDialogTitle>
+                  <AlertDialogDescription className="text-xs">
+                    {deleteTarget ? en.admin.tests.actions.deleteConfirmDesc(deleteTarget.title) : ""}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="text-xs">{en.admin.tests.actions.deleteCancel}</AlertDialogCancel>
+                  <AlertDialogAction className="text-xs" onClick={confirmDeleteTest}>
+                    {en.admin.tests.actions.deleteConfirm}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             </>
           )}
 

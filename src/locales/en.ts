@@ -621,7 +621,10 @@
       actions: {
         downloadJson: "Download JSON",
         delete: "Delete",
-        deleteConfirm: (title: string) => `Delete "${title}"? This cannot be undone.`,
+        deleteConfirmTitle: "Delete test?",
+        deleteConfirmDesc: (title: string) => `Delete "${title}"? This cannot be undone.`,
+        deleteCancel: "Cancel",
+        deleteConfirm: "Delete",
       },
       search: "Search tests...",
       status: {
