@@ -411,7 +411,9 @@ export async function evaluateWritingEssay(payload: { topic: string; essay: stri
     });
     return data;
   } catch (err) {
-    const message = axios.isAxiosError(err) ? (err.response?.data?.error ?? "Request failed") : "Request failed";
+    const message = axios.isAxiosError(err)
+      ? (err.response?.data?.error ?? err.response?.data?.message ?? err.message ?? "Request failed")
+      : "Request failed";
     throw new Error(message);
   }
 }

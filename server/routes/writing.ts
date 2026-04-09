@@ -23,7 +23,14 @@ export const registerWritingRoutes = (api: Hono<AppEnv>) => {
     if (!url) return c.json({ error: 'Evaluator service not configured.' }, 503)
     const { data, error } = await zParse(WritingEvaluationBodySchema, c)
     if (error) return error
-    const { data: result, status } = await axios.post(`${url}/evaluate`, { topic: data.topic, essay: data.essay })
-    return c.json(result, status as 200)
+    try {
+      const { data: result, status } = await axios.post(`${url}/evaluate`, { topic: data.topic, essay: data.essay })
+      return c.json(result, status as 200)
+    } catch (err) {
+      const message = axios.isAxiosError(err)
+        ? (err.response?.data?.error ?? err.message)
+        : 'Evaluation service error.'
+      return c.json({ error: message }, 502)
+    }
   })
 }

@@ -520,7 +520,7 @@
       title: "Topic",
       generateButton: "Generate Topic",
       generating: "Generating...",
-      placeholder: 'Click "Generate Topic" to get a writing prompt.',
+      placeholder: "Type your own topic or click \"Generate Topic\".",
     },
     essayCard: {
       title: "Your Essay",

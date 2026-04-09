@@ -2,7 +2,6 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import loadingLottie from "@/assets/loading.lottie";
-import { CopyButton } from "@/components/animate-ui/components/buttons/copy";
 import { generateWritingTopic, evaluateWritingEssay } from "@/lib/api";
 import { open } from "@tauri-apps/plugin-shell";
 import { Badge } from "@/components/ui/badge";
@@ -163,7 +162,6 @@ export function Writing() {
         <CardHeader className="px-4 pt-4 pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-semibold">{en.writing.topicCard.title}</CardTitle>
           <div className="flex items-center gap-1">
-            {topic && <CopyButton content={topic} variant="ghost" size="sm" />}
             <Button variant="outline" size="sm" onClick={generateTopic} disabled={generating} className="gap-1.5 text-xs h-7">
               <Sparkle weight="bold" className="size-3.5" /> {generating ? en.writing.topicCard.generating : en.writing.topicCard.generateButton}
             </Button>
@@ -175,10 +173,17 @@ export function Writing() {
               <Skeleton className="h-3.5 w-full" />
               <Skeleton className="h-3.5 w-5/6" />
             </div>
-          ) : topic ? (
-            <p className="text-sm leading-relaxed text-neutral-200">{topic}</p>
           ) : (
-            <p className="text-sm text-muted-foreground italic">{en.writing.topicCard.placeholder}</p>
+            <Textarea
+              placeholder={en.writing.topicCard.placeholder}
+              className="min-h-20 resize-none overflow-hidden bg-neutral-950 border-neutral-700 text-sm leading-relaxed"
+              value={topic}
+              onChange={(e) => {
+                setTopic(e.target.value);
+                e.target.style.height = "auto";
+                e.target.style.height = e.target.scrollHeight + "px";
+              }}
+            />
           )}
         </CardContent>
       </Card>

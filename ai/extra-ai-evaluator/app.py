@@ -21,7 +21,7 @@ model = outlines.from_transformers(_hf_model, tokenizer)
 
 class CriterionScore(BaseModel):
     score: float = Field(ge=1.0, le=9.0)
-    comment: str = Field(max_length=250)
+    comment: str = Field(max_length=600)
 
 class IELTSScore(BaseModel):
     task_response: CriterionScore
@@ -33,34 +33,43 @@ class EvaluateRequest(BaseModel):
     topic: str
     essay: str
 
-PROMPT_TEMPLATE = """You are a highly experienced IELTS Writing Examiner with 15+ years of experience in high-stakes assessment. Your goal is to provide a rigorous, objective, and accurate evaluation of a Task 2 essay based on the official IELTS Public Band Descriptors.
+PROMPT_TEMPLATE = """You are an expert IELTS Writing examiner with 15+ years of experience in high-stakes assessment. Evaluate the Task 2 essay below using the four official IELTS band descriptors.
 
-How to evaluate effictively:
-You should evaluate an essay four times, focusing on each criterion separately. This means reading the essay once for TR (Task Response), then again for CC (Coherence and Cohesion), and so on. 
-Each time you read, remember down what stands out. This layered approach helps you identify strenghts and weaknesses that you might miss if you read the essay just once.
+Read the essay four times — once per criterion — before scoring. This ensures each dimension is assessed independently and accurately.
 
-Evaluation Framework:
-1. Task Response: Complete response, Clear & comprehensive ideas, Relevant & specific examples, Appropriate word count.
-2. Coherence and Cohesion: Logical structure, Introduction & conclusion present, Supported main points, Accurate linking words, Variety in linking words.
-3. Lexical Resource: Assess the range and precision of vocabulary (Varied vocabulary), use of collocations, and the impact of errors on communication (Accurate spelling & word formation).
-4. Grammatical Range and Accuracy: Evaluate the variety of structures (Mix of complex & simple sentences), punctuation accuracy, and the frequency of error-free sentences (Clear and correct grammar).
+For each criterion, provide:
+1. A score from 1.0 to 9.0
+2. A full, detailed comment (4-6 sentences) that covers:
+   - What the candidate did well for this criterion
+   - The most significant weakness, with a specific example quoted or paraphrased from the essay
+   - How that weakness impacts the score
+   - A concrete, actionable suggestion for improvement
 
-Scoring Instructions:
-- Be Fair but Strict.
-- Each criterion MUST have a their own different score. Analyze each one independently.
-- Do NOT give the same or similar scores across all criteria.
-- For each dimension: 
-  - Provide a score (1.0 - 9.0).
-  - Provide comments: On the biggest weaknesses only.
+Criteria:
+
+1. Task Response (TR)
+Does the essay fully address all parts of the prompt? Is the position clear, consistent, and well-developed? Are ideas supported with relevant, specific examples? Is the word count appropriate (250+ words)?
+
+2. Coherence and Cohesion (CC)
+Are ideas logically organised with clear progression? Is there an effective introduction and conclusion? Are cohesive devices (linking words, pronouns, referencing) used accurately and with variety? Is paragraphing appropriate?
+
+3. Lexical Resource (LR)
+Is vocabulary varied and precise? Are collocations and topic-specific terms used correctly? Are there errors in spelling or word formation that affect communication?
+
+4. Grammatical Range and Accuracy (GRA)
+Is there a mix of simple, compound, and complex sentence structures? Are grammatical errors rare and non-impeding? Is punctuation accurate?
+
+Scoring Rules:
+- Be strict and accurate. Do NOT inflate scores.
+- Every criterion MUST receive a different score.
+- Never give all four criteria the same or nearly identical scores.
+- Base scores strictly on the essay content, not assumptions.
 
 Exam Topic:
 {topic}
 
 Candidate's Essay:
 {essay}
-
-Final Assessment Output:
-Return the scores and comments for the four dimensions, followed by an Overall Band Score (the average of the four, rounded to the nearest half-band).
 """
 
 def calibrate(s: float) -> float:
@@ -94,7 +103,7 @@ def evaluate(req: EvaluateRequest):
 
     prompt = PROMPT_TEMPLATE.format(topic=req.topic, essay=req.essay)
     try:
-        raw = model(prompt, IELTSScore, max_new_tokens=1200, temperature=0.2, do_sample=True, repetition_penalty=1.2)
+        raw = model(prompt, IELTSScore, max_new_tokens=1800, temperature=0.2, do_sample=True, repetition_penalty=1.2)
         result = IELTSScore.model_validate_json(raw) if isinstance(raw, str) else raw
     except Exception as e:
         return {"error": f"Scoring failed: {e}"}
