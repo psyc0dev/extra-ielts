@@ -1,23 +1,12 @@
-import warnings
-import torch
-import outlines
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, logging
+from groq import Groq
 import uvicorn
 
-logging.set_verbosity_error()
-warnings.filterwarnings("ignore")
-
-MODEL_ID = "psyc0dev/extraAI"
-tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
-tokenizer.pad_token_id = tokenizer.eos_token_id
-bnb_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16, llm_int8_enable_fp32_cpu_offload=True)
-_hf_model = AutoModelForCausalLM.from_pretrained(MODEL_ID, subfolder="bf16", quantization_config=bnb_config, device_map="auto")
-_hf_model.config.tie_word_embeddings = False
-_hf_model.lm_head.weight = _hf_model.model.embed_tokens.weight
-model = outlines.from_transformers(_hf_model, tokenizer)
+client = Groq(api_key=os.environ["GROQ_API_KEY"])
+MODEL = "llama-3.3-70b-versatile"
 
 class CriterionScore(BaseModel):
     score: float = Field(ge=1.0, le=9.0)
@@ -103,8 +92,13 @@ def evaluate(req: EvaluateRequest):
 
     prompt = PROMPT_TEMPLATE.format(topic=req.topic, essay=req.essay)
     try:
-        raw = model(prompt, IELTSScore, max_new_tokens=1800, temperature=0.2, do_sample=True, repetition_penalty=1.2)
-        result = IELTSScore.model_validate_json(raw) if isinstance(raw, str) else raw
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+        )
+        result = IELTSScore.model_validate_json(response.choices[0].message.content)
     except Exception as e:
         return {"error": f"Scoring failed: {e}"}
 
@@ -125,15 +119,12 @@ def evaluate(req: EvaluateRequest):
         "overall": overall,
         "overall_label": band_label(overall),
         "criteria": {
-            "task_response":                   {"score": tr,  "label": band_label(tr),  "comment": result.task_response.comment},
-            "coherence_and_cohesion":          {"score": cc,  "label": band_label(cc),  "comment": result.coherence_and_cohesion.comment},
-            "lexical_resource":                {"score": lr,  "label": band_label(lr),  "comment": result.lexical_resource.comment},
-            "grammatical_range_and_accuracy":  {"score": gra, "label": band_label(gra), "comment": result.grammatical_range_and_accuracy.comment},
+            "task_response":                  {"score": tr,  "label": band_label(tr),  "comment": result.task_response.comment},
+            "coherence_and_cohesion":         {"score": cc,  "label": band_label(cc),  "comment": result.coherence_and_cohesion.comment},
+            "lexical_resource":               {"score": lr,  "label": band_label(lr),  "comment": result.lexical_resource.comment},
+            "grammatical_range_and_accuracy": {"score": gra, "label": band_label(gra), "comment": result.grammatical_range_and_accuracy.comment},
         }
     }
 
 if __name__ == "__main__":
-    import asyncio
-    import nest_asyncio
-    nest_asyncio.apply()
-    asyncio.get_event_loop().run_until_complete(uvicorn.Server(uvicorn.Config(app, host="0.0.0.0", port=7860)).serve())
+    uvicorn.run(app, host="0.0.0.0", port=7860)
