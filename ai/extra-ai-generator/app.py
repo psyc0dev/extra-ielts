@@ -40,13 +40,15 @@ def generate():
         user_msg = (
             f"Generate a Task 2 {qtype} question topic.\n"
             f"The 'question' field MUST end exactly with: {closing}\n"
-            f"Do not repeat the example topic: {example}"
+            f"Do not repeat the example topic: {example}\n"
+            f"Respond with a JSON object only."
         )
     else:
         user_msg = (
             f"Generate a Task 2 Two-Part Question.\n"
             f"The 'question' field must contain two distinct questions.\n"
-            f"Do not repeat the example topic: {example}"
+            f"Do not repeat the example topic: {example}\n"
+            f"Respond with a JSON object only."
         )
 
     try:

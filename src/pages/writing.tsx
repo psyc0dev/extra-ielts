@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import loadingLottie from "@/assets/loading.lottie";
@@ -13,7 +13,7 @@ import { Sparkle, ArrowClockwise, PaperPlaneTilt } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import en from "@/locales/en";
 
-type CriterionScore = { score: number; label: string; comment: string };
+type CriterionScore = { score: number; label: string; comment: string; sub_scores: Record<string, number> };
 type EvalResult = {
   word_count: number;
   penalty: number;
@@ -22,8 +22,8 @@ type EvalResult = {
   criteria: {
     task_response: CriterionScore;
     coherence_and_cohesion: CriterionScore;
-    lexical_resource: CriterionScore;
     grammatical_range_and_accuracy: CriterionScore;
+    lexical_resource: CriterionScore;
   };
 };
 
@@ -86,6 +86,7 @@ export function Writing() {
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<EvalResult | null>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   const generateTopic = async () => {
     setGenerating(true);
@@ -113,6 +114,8 @@ export function Writing() {
       const data = await evaluateWritingEssay({ topic, essay });
       if (data.error) throw new Error(data.error);
       setResult(data);
+      toast.success("Evaluation finished.");
+      setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : en.writing.errors.evaluationFailed);
     } finally {
@@ -226,9 +229,10 @@ export function Writing() {
       </Card>
       </motion.div>
 
-      {result && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
-        <Card className="rounded-xl border-neutral-800 bg-neutral-900">
+      <div ref={resultsRef}>
+        {result && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
+          <Card className="rounded-xl border-neutral-800 bg-neutral-900">
           <CardHeader className="px-4 pt-4 pb-3 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-semibold">{en.writing.resultsCard.title}</CardTitle>
             <div className="flex items-center gap-2">
@@ -243,20 +247,27 @@ export function Writing() {
           </CardHeader>
           <CardContent className="px-4 pb-4 flex flex-col gap-2">
             {(Object.entries(result.criteria) as [string, CriterionScore][]).map(([key, val]) => (
-              <div key={key} className="rounded-lg border border-neutral-800 bg-neutral-950 p-3 flex flex-col gap-1">
+              <div key={key} className="rounded-lg border border-neutral-800 bg-neutral-950 p-3 flex flex-col gap-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold capitalize text-neutral-300">
-                    {key.replace(/_/g, " ")}
-                  </span>
+                  <span className="text-xs font-semibold capitalize text-neutral-300">{key.replace(/_/g, " ")}</span>
                   <span className="text-xs text-violet-300">{val.score} · {val.label}</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {Object.entries(val.sub_scores).map(([sk, sv]) => (
+                    <span key={sk} className="flex items-center gap-1 text-[10px] bg-neutral-900 border border-neutral-700 rounded px-1.5 py-0.5">
+                      <span className="text-neutral-400 capitalize">{sk.replace(/_/g, " ")}</span>
+                      <span className="text-violet-400 font-semibold">{sv}</span>
+                    </span>
+                  ))}
                 </div>
                 <p className="text-xs text-neutral-400 leading-relaxed">{val.comment}</p>
               </div>
             ))}
           </CardContent>
-        </Card>
-        </motion.div>
-      )}
+          </Card>
+          </motion.div>
+        )}
+      </div>
     </div>
   );
 }

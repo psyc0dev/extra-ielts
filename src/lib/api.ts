@@ -395,10 +395,10 @@ export async function evaluateWritingEssay(payload: { topic: string; essay: stri
       overall_label: string
       error?: string
       criteria: {
-        task_response: { score: number; label: string; comment: string }
-        coherence_and_cohesion: { score: number; label: string; comment: string }
-        lexical_resource: { score: number; label: string; comment: string }
-        grammatical_range_and_accuracy: { score: number; label: string; comment: string }
+        task_response: { score: number; label: string; comment: string; sub_scores: { relevance_to_prompt: number; clarity_of_position: number; depth_of_ideas: number; appropriateness_of_format: number; relevant_and_specific_examples: number } }
+        coherence_and_cohesion: { score: number; label: string; comment: string; sub_scores: { logical_organization: number; effective_introduction_and_conclusion: number; supported_main_points: number; cohesive_devices_usage: number; paragraphing: number } }
+        grammatical_range_and_accuracy: { score: number; label: string; comment: string; sub_scores: { sentence_structure_variety: number; grammar_accuracy: number; punctuation_usage: number } }
+        lexical_resource: { score: number; label: string; comment: string; sub_scores: { vocabulary_range: number; lexical_accuracy: number; spelling_and_word_formation: number } }
       }
     }>(`${API_BASE}/writing/evaluations`, {
       method: 'POST',

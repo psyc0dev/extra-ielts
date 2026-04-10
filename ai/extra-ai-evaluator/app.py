@@ -1,4 +1,5 @@
 import os
+import json
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -8,58 +9,92 @@ import uvicorn
 client = Groq(api_key=os.environ["GROQ_API_KEY"])
 MODEL = "llama-3.3-70b-versatile"
 
-class CriterionScore(BaseModel):
-    score: float = Field(ge=1.0, le=9.0)
-    comment: str = Field(max_length=600)
+class TRScore(BaseModel):
+    relevance_to_prompt: float = Field(ge=1.0, le=9.0)
+    clarity_of_position: float = Field(ge=1.0, le=9.0)
+    depth_of_ideas: float = Field(ge=1.0, le=9.0)
+    appropriateness_of_format: float = Field(ge=1.0, le=9.0)
+    relevant_and_specific_examples: float = Field(ge=1.0, le=9.0)
+    comment: str
+
+class CCScore(BaseModel):
+    logical_organization: float = Field(ge=1.0, le=9.0)
+    effective_introduction_and_conclusion: float = Field(ge=1.0, le=9.0)
+    supported_main_points: float = Field(ge=1.0, le=9.0)
+    cohesive_devices_usage: float = Field(ge=1.0, le=9.0)
+    paragraphing: float = Field(ge=1.0, le=9.0)
+    comment: str
+
+class GRAScore(BaseModel):
+    sentence_structure_variety: float = Field(ge=1.0, le=9.0)
+    grammar_accuracy: float = Field(ge=1.0, le=9.0)
+    punctuation_usage: float = Field(ge=1.0, le=9.0)
+    comment: str
+
+class LRScore(BaseModel):
+    vocabulary_range: float = Field(ge=1.0, le=9.0)
+    lexical_accuracy: float = Field(ge=1.0, le=9.0)
+    spelling_and_word_formation: float = Field(ge=1.0, le=9.0)
+    comment: str
 
 class IELTSScore(BaseModel):
-    task_response: CriterionScore
-    coherence_and_cohesion: CriterionScore
-    lexical_resource: CriterionScore
-    grammatical_range_and_accuracy: CriterionScore
+    task_response: TRScore
+    coherence_and_cohesion: CCScore
+    grammatical_range_and_accuracy: GRAScore
+    lexical_resource: LRScore
 
 class EvaluateRequest(BaseModel):
     topic: str
     essay: str
 
-PROMPT_TEMPLATE = """You are an expert IELTS Writing examiner with 15+ years of experience in high-stakes assessment. Evaluate the Task 2 essay below using the four official IELTS band descriptors.
+PROMPT_TEMPLATE = """Task: ielts-writing-task-2.
+The task prompt:
+"{topic}"
 
-Read the essay four times — once per criterion — before scoring. This ensures each dimension is assessed independently and accurately.
+The candidate's essay:
+"{essay}"
 
-For each criterion, provide:
-1. A score from 1.0 to 9.0
-2. A full, detailed comment (4-6 sentences) that covers:
-   - What the candidate did well for this criterion
-   - The most significant weakness, with a specific example quoted or paraphrased from the essay
-   - How that weakness impacts the score
-   - A concrete, actionable suggestion for improvement
+You are an expert IELTS Writing Task 2 examiner with 15+ years of experience. Evaluate the essay above using the four official IELTS band descriptors. Score each sub-criterion independently on a scale of 1.0 to 9.0, then provide a detailed examiner comment per criterion.
 
-Criteria:
+Scoring rules:
+- Be strict and realistic. Do NOT inflate scores. A strong but imperfect essay is typically 6.5–7.5.
+- Sub-scores within a criterion may differ from each other.
+- Base all scores strictly on the essay content — no assumptions.
 
-1. Task Response (TR)
-Does the essay fully address all parts of the prompt? Is the position clear, consistent, and well-developed? Are ideas supported with relevant, specific examples? Is the word count appropriate (250+ words)?
+Criteria and sub-scores to evaluate:
 
-2. Coherence and Cohesion (CC)
-Are ideas logically organised with clear progression? Is there an effective introduction and conclusion? Are cohesive devices (linking words, pronouns, referencing) used accurately and with variety? Is paragraphing appropriate?
+1. task_response
+   - relevance_to_prompt: Does the essay fully address all parts of the prompt?
+   - clarity_of_position: Is the candidate's position clear and consistent throughout?
+   - depth_of_ideas: Are ideas well-developed with sufficient explanation?
+   - appropriateness_of_format: Is the essay format appropriate for Task 2 (intro, body, conclusion)?
+   - relevant_and_specific_examples: Are examples relevant, specific, and well-integrated?
+   - comment: 3–5 sentence examiner comment covering strengths, the most significant weakness with a specific quote or paraphrase from the essay, and a concrete improvement suggestion.
 
-3. Lexical Resource (LR)
-Is vocabulary varied and precise? Are collocations and topic-specific terms used correctly? Are there errors in spelling or word formation that affect communication?
+2. coherence_and_cohesion
+   - logical_organization: Are ideas logically sequenced with clear progression?
+   - effective_introduction_and_conclusion: Are the introduction and conclusion effective and complete?
+   - supported_main_points: Is each main point supported with explanation or evidence?
+   - cohesive_devices_usage: Are linking words and referencing used accurately and with variety?
+   - paragraphing: Is paragraphing logical and consistent?
+   - comment: 3–5 sentence examiner comment (same format as above).
 
-4. Grammatical Range and Accuracy (GRA)
-Is there a mix of simple, compound, and complex sentence structures? Are grammatical errors rare and non-impeding? Is punctuation accurate?
+3. grammatical_range_and_accuracy
+   - sentence_structure_variety: Is there a mix of simple, compound, and complex structures?
+   - grammar_accuracy: Are grammatical errors rare and non-impeding?
+   - punctuation_usage: Is punctuation accurate throughout?
+   - comment: 3–5 sentence examiner comment (same format as above).
 
-Scoring Rules:
-- Be strict and accurate. Do NOT inflate scores.
-- Every criterion MUST receive a different score.
-- Never give all four criteria the same or nearly identical scores.
-- Base scores strictly on the essay content, not assumptions.
+4. lexical_resource
+   - vocabulary_range: Is vocabulary varied and topic-appropriate?
+   - lexical_accuracy: Are words and collocations used correctly?
+   - spelling_and_word_formation: Are spelling and word formation accurate?
+   - comment: 3–5 sentence examiner comment (same format as above).
 
-Exam Topic:
-{topic}
+Respond with a JSON object only."""
 
-Candidate's Essay:
-{essay}
-"""
+def avg(*scores: float) -> float:
+    return sum(scores) / len(scores)
 
 def calibrate(s: float) -> float:
     return round(s * 2) / 2
@@ -102,11 +137,16 @@ def evaluate(req: EvaluateRequest):
     except Exception as e:
         return {"error": f"Scoring failed: {e}"}
 
-    tr  = calibrate(result.task_response.score)
-    cc  = calibrate(result.coherence_and_cohesion.score)
-    lr  = calibrate(result.lexical_resource.score)
-    gra = calibrate(result.grammatical_range_and_accuracy.score)
-    overall = round((tr + cc + lr + gra) / 4 * 2) / 2
+    tr  = result.task_response
+    cc  = result.coherence_and_cohesion
+    gra = result.grammatical_range_and_accuracy
+    lr  = result.lexical_resource
+
+    tr_score  = calibrate(avg(tr.relevance_to_prompt, tr.clarity_of_position, tr.depth_of_ideas, tr.appropriateness_of_format, tr.relevant_and_specific_examples))
+    cc_score  = calibrate(avg(cc.logical_organization, cc.effective_introduction_and_conclusion, cc.supported_main_points, cc.cohesive_devices_usage, cc.paragraphing))
+    gra_score = calibrate(avg(gra.sentence_structure_variety, gra.grammar_accuracy, gra.punctuation_usage))
+    lr_score  = calibrate(avg(lr.vocabulary_range, lr.lexical_accuracy, lr.spelling_and_word_formation))
+    overall   = round((tr_score + cc_score + gra_score + lr_score) / 4 * 2) / 2
 
     penalty = 0.0
     if word_count < 250:
@@ -119,10 +159,42 @@ def evaluate(req: EvaluateRequest):
         "overall": overall,
         "overall_label": band_label(overall),
         "criteria": {
-            "task_response":                  {"score": tr,  "label": band_label(tr),  "comment": result.task_response.comment},
-            "coherence_and_cohesion":         {"score": cc,  "label": band_label(cc),  "comment": result.coherence_and_cohesion.comment},
-            "lexical_resource":               {"score": lr,  "label": band_label(lr),  "comment": result.lexical_resource.comment},
-            "grammatical_range_and_accuracy": {"score": gra, "label": band_label(gra), "comment": result.grammatical_range_and_accuracy.comment},
+            "task_response": {
+                "score": tr_score, "label": band_label(tr_score), "comment": tr.comment,
+                "sub_scores": {
+                    "relevance_to_prompt": tr.relevance_to_prompt,
+                    "clarity_of_position": tr.clarity_of_position,
+                    "depth_of_ideas": tr.depth_of_ideas,
+                    "appropriateness_of_format": tr.appropriateness_of_format,
+                    "relevant_and_specific_examples": tr.relevant_and_specific_examples,
+                }
+            },
+            "coherence_and_cohesion": {
+                "score": cc_score, "label": band_label(cc_score), "comment": cc.comment,
+                "sub_scores": {
+                    "logical_organization": cc.logical_organization,
+                    "effective_introduction_and_conclusion": cc.effective_introduction_and_conclusion,
+                    "supported_main_points": cc.supported_main_points,
+                    "cohesive_devices_usage": cc.cohesive_devices_usage,
+                    "paragraphing": cc.paragraphing,
+                }
+            },
+            "grammatical_range_and_accuracy": {
+                "score": gra_score, "label": band_label(gra_score), "comment": gra.comment,
+                "sub_scores": {
+                    "sentence_structure_variety": gra.sentence_structure_variety,
+                    "grammar_accuracy": gra.grammar_accuracy,
+                    "punctuation_usage": gra.punctuation_usage,
+                }
+            },
+            "lexical_resource": {
+                "score": lr_score, "label": band_label(lr_score), "comment": lr.comment,
+                "sub_scores": {
+                    "vocabulary_range": lr.vocabulary_range,
+                    "lexical_accuracy": lr.lexical_accuracy,
+                    "spelling_and_word_formation": lr.spelling_and_word_formation,
+                }
+            },
         }
     }
 
