@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import WindowControls from "./components/WindowControls";
 import { NavProvider, useNav } from "./hooks/use-nav";
-import { Dashboard, Tests, Homework, Settings, Admin, Writing } from "./pages/index";
+import { Dashboard, Tests, Homework, Settings, Admin, Writing, Vocabulary } from "./pages/index";
 import NotFound from "./pages/not-found";
 import { LoginForm } from "@/components/ui/loginform";
 import { Toaster } from "@/components/ui/sonner";
@@ -64,6 +64,7 @@ function PageContent({
     Homework: en.nav.homework,
     Settings: en.nav.settings,
     Admin: en.nav.admin,
+    Vocabulary: en.nav.vocabulary,
     Writing: en.nav.writing,
   };
 
@@ -72,6 +73,7 @@ function PageContent({
     Tests: <Tests onStartTest={onStartTest} onStopTest={onStopTest} timerActive={timerActive} />,
     Homework: <Homework onStartTest={onStartTest} onStopTest={onStopTest} timerActive={timerActive} />,
     Writing: <Writing />,
+    Vocabulary: <Vocabulary />,
     Settings: (
       <Settings
         onSignOut={onSignOut}

@@ -1,4 +1,4 @@
-﻿import { House, BookOpen, Notebook, Gear, ShieldCheck, PencilLine } from "@phosphor-icons/react";
+﻿import { House, BookOpen, Notebook, Gear, ShieldCheck, PencilLine, TextAa } from "@phosphor-icons/react";
 import {
   Sidebar,
   SidebarContent,
@@ -26,6 +26,7 @@ export default function Navbar() {
     { id: "Tests", title: en.nav.tests, icon: BookOpen },
     { id: "Homework", title: en.nav.homework, icon: Notebook },
     { id: "Writing", title: en.nav.writing, icon: PencilLine },
+    { id: "Vocabulary", title: en.nav.vocabulary, icon: TextAa },
   ] as const;
 
   const adminItems = user?.role === "admin"

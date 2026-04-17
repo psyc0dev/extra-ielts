@@ -13,6 +13,7 @@
     settings: "Settings",
     brand: "extra",
     logoAlt: "logo",
+    vocabulary: "Vocabulary",
   },
 
   app: {
