@@ -1,5 +1,5 @@
 import { serveStatic } from 'hono/bun'
-import { join, resolve, normalize } from 'node:path'
+import { join, resolve, normalize, sep } from 'node:path'
 import { Database } from 'bun:sqlite'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createApp } from './app'
@@ -44,17 +44,17 @@ const makeD1 = (db: Database): D1Database => ({
 } as unknown as D1Database)
 
 const app = createApp()
-const staticRoot = join(import.meta.dir, '..', 'dist')
+const staticRoot = resolve(join(import.meta.dir, '..', 'dist'))
+const staticRootPrefix = staticRoot + sep
 const staticMiddleware = serveStatic({ root: staticRoot })
 
 app.use('*', async (c, next) => {
   if (c.req.path.startsWith('/api/') || c.req.path === '/api') return next()
   if (c.req.method !== 'GET' && c.req.method !== 'HEAD') return next()
-  const safePath = normalize(c.req.path).replace(/^(\.\.[/\\])+/, '')
-  // amazonq-ignore-next-line
-  const resolvedPath = resolve(staticRoot, safePath.replace(/^\//, ''))
-  if (!resolvedPath.startsWith(staticRoot)) return c.text('Forbidden', 403)
+  const resolvedPath = resolve(staticRoot, normalize(c.req.path).replace(/^\//, ''))
+  if (resolvedPath !== staticRoot && !resolvedPath.startsWith(staticRootPrefix)) return c.text('Forbidden', 403)
   return staticMiddleware(c, async () => {
+    // amazonq-ignore-next-line
     const indexFile = Bun.file(join(staticRoot, 'index.html'))
     c.res = (await indexFile.exists()) ? c.html(await indexFile.text()) : c.text('Not Found', 404)
   })
