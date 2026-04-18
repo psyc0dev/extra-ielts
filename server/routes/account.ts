@@ -26,7 +26,7 @@ async function sendOtpEmail(env: AppEnv['Bindings'], to: string, otp: string) {
       subject: 'Your extra IELTS password reset code',
       html: `<p>Your password reset code is:</p><h2 style="letter-spacing:8px;font-size:32px">${otp}</h2><p>This code expires in 15 minutes. If you did not request this, ignore this email.</p>`,
     },
-    { headers: { Authorization: `Bearer ${apiKey}` } }
+    { headers: { Authorization: `Bearer ${apiKey}` }, timeout: 10_000 }
   )
 }
 
@@ -42,7 +42,7 @@ export const registerAccountRoutes = (api: Hono<AppEnv>) => {
     await c.env.DB.prepare('DELETE FROM otp_tokens WHERE expires_at < ?').bind(Date.now()).run()
 
     const ip = c.req.header('x-forwarded-for') ?? 'unknown'
-    const otp = String(Math.floor(100000 + Math.random() * 900000))
+    const otp = String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000))
     const expiresAt = Date.now() + 15 * 60 * 1000
     await c.env.DB.prepare('INSERT OR REPLACE INTO otp_tokens (otp, user_id, expires_at, ip) VALUES (?, ?, ?, ?)')
       .bind(otp, user.id, expiresAt, ip).run()

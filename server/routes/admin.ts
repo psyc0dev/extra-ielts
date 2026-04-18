@@ -52,7 +52,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     const filename = (safeTitle ? safeTitle : test.id) + '.json'
     return c.body(JSON.stringify(test, null, 2), 200, {
       'Content-Type': 'application/json',
-      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Disposition': `attachment; filename="${filename.replace(/"/g, '')}"`,
     })
   })
 
@@ -68,8 +68,10 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
   api.post('/admin/tests', requireAuth, requireAdmin, async (c) => {
     const body = await c.req.json<{ title: string; durationMinutes: number; sections: unknown[] }>()
     if (!body.title?.trim()) return c.json({ error: 'Title is required.' }, 400)
+    if (typeof body.durationMinutes !== 'number' || body.durationMinutes < 1 || body.durationMinutes > 600) return c.json({ error: 'Invalid duration.' }, 400)
+    if (!Array.isArray(body.sections)) return c.json({ error: 'Sections must be an array.' }, 400)
     const id = crypto.randomUUID()
-    const testData = { id, title: body.title, durationMinutes: body.durationMinutes ?? 120, sections: body.sections ?? [] }
+    const testData = { id, title: String(body.title).trim().slice(0, 200), durationMinutes: body.durationMinutes, sections: body.sections }
     await c.env.DB.prepare('INSERT INTO tests (id, published, data_json) VALUES (?, 0, ?)')
       .bind(id, JSON.stringify(testData)).run()
     return c.json({ test: { id } }, 201)

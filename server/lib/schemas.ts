@@ -61,7 +61,7 @@ export const BootstrapBodySchema = z.object({
 export const CreateUserBodySchema = z.object({
   username: z.string().min(1),
   email: z.string().email().optional(),
-  password: z.string().min(1),
+  password: z.string().min(6),
   role: RoleSchema,
 })
 
@@ -89,8 +89,8 @@ export const GroupMemberBodySchema = z.object({
 })
 
 export const AnswerBodySchema = z.object({
-  questionId: z.string().min(1),
-  response: z.unknown().optional(),
+  questionId: z.string().min(1).max(100),
+  response: z.union([z.string().max(500), z.array(z.string().max(200)).max(20), z.null()]).optional(),
 })
 
 export const SubmitAttemptBodySchema = z.object({

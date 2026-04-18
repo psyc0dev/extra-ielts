@@ -50,6 +50,9 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
       .bind(assignmentId, user.id).first<AssignmentRow>()
     if (!assignment) return c.json({ error: 'Assignment not found.' }, 404)
 
+    if (assignment.due_at && Date.now() > new Date(assignment.due_at).getTime())
+      return c.json({ error: 'This assignment is past its due date.' }, 403)
+
     const existing = await c.env.DB.prepare(
       "SELECT id, status FROM attempts WHERE assignment_id = ? AND user_id = ? AND status = 'in-progress' LIMIT 1"
     ).bind(assignmentId, user.id).first<{ id: string; status: string }>()
@@ -100,6 +103,25 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
     if (attempt.user_id !== user.id && user.role !== 'admin') return c.json({ error: 'Forbidden' }, 403)
     if (attempt.status !== 'in-progress') return c.json({ error: 'Attempt already completed.' }, 400)
 
+    const assignment = await c.env.DB.prepare('SELECT * FROM assignments WHERE id = ?')
+      .bind(attempt.assignment_id).first<AssignmentRow>()
+    if (assignment) {
+      const test = await getTestById(c.env.DB, attempt.test_id)
+      if (test) {
+        const sectionKinds = jsonParse<Array<'listening' | 'reading'>>(assignment.section_kinds_json, [])
+        const durationMs = getAssignmentDurationMinutes(test, sectionKinds) * 60_000
+        const elapsed = Date.now() - new Date(attempt.started_at).getTime()
+        if (elapsed > durationMs + 30_000) {
+          const responses = jsonParse<Record<string, unknown>>(attempt.responses_json, {})
+          const scored = scoreAttempt(responses, test)
+          await c.env.DB.prepare(
+            'UPDATE attempts SET status = ?, score_total = ?, band = ?, reading_band = ?, listening_band = ?, completed_at = ? WHERE id = ?'
+          ).bind('completed', scored.scoreTotal, scored.band, scored.readingBand, scored.listeningBand, nowIso(), attempt.id).run()
+          return c.json({ error: 'Time expired. Attempt auto-submitted.' }, 403)
+        }
+      }
+    }
+
     const { data, error } = await zParse(AnswerBodySchema, c)
     if (error) return error
 
@@ -127,6 +149,16 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
     const test = await getTestById(c.env.DB, attempt.test_id)
     if (!test) return c.json({ error: 'Test not found.' }, 404)
 
+    const assignment = await c.env.DB.prepare('SELECT * FROM assignments WHERE id = ?')
+      .bind(attempt.assignment_id).first<AssignmentRow>()
+    if (assignment) {
+      const sectionKinds = jsonParse<Array<'listening' | 'reading'>>(assignment.section_kinds_json, [])
+      const durationMs = getAssignmentDurationMinutes(test, sectionKinds) * 60_000
+      const elapsed = Date.now() - new Date(attempt.started_at).getTime()
+      if (elapsed > durationMs + 30_000)
+        return c.json({ error: 'Submission rejected: time limit exceeded.' }, 403)
+    }
+
     const responses = jsonParse<Record<string, unknown>>(attempt.responses_json, {})
     const scored = scoreAttempt(responses, test)
     await c.env.DB.prepare(
@@ -140,6 +172,7 @@ export const registerAssignmentRoutes = (api: Hono<AppEnv>) => {
     const user = c.get('user')
     const test = await getTestById(c.env.DB, c.req.param('testId'))
     if (!test) return c.json({ error: 'Test not found.' }, 404)
+    if (!test.published && user.role !== 'admin') return c.json({ error: 'Test not found.' }, 404)
 
     const existing = await c.env.DB.prepare(
       "SELECT id, status, assignment_id FROM attempts WHERE user_id = ? AND test_id = ? AND status = 'in-progress' LIMIT 1"
