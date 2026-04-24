@@ -57,6 +57,58 @@ function buildOptions(correct: IeltsWord, pool: IeltsWord[]): string[] {
   return shuffle([correct.meaning, ...distractors]);
 }
 
+function extractSynonyms(html: string, originalWord: string): string[] {
+  const synonyms: string[] = [];
+  
+  // Create a simple regex-based HTML parser since we're in a server environment
+  // Look for the synonyms list section
+  const synonymsListMatch = html.match(/<div[^>]*class="thes-list-content[^"]*synonyms_list[^"]*"[^>]*>(.*?)<\/div>/s);
+  if (!synonymsListMatch) {
+    return synonyms;
+  }
+  
+  const synonymsListHtml = synonymsListMatch[1];
+  
+  // Extract words from list items with class "thes-word-list-item"
+  const listItemRegex = /<li[^>]*class="thes-word-list-item[^"]*"[^>]*>(.*?)<\/li>/gs;
+  let match;
+  
+  while ((match = listItemRegex.exec(synonymsListHtml)) !== null) {
+    const itemHtml = match[1];
+    
+    // Extract the word text, removing HTML tags
+    const wordMatch = itemHtml.match(/<a[^>]*>(.*?)<\/a>/);
+    if (wordMatch) {
+      let word = wordMatch[1]
+        .replace(/<[^>]*>/g, '') // Remove any remaining HTML tags
+        .trim()
+        .toLowerCase();
+      
+      // Clean up common HTML entities and extra spaces
+      word = word.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+      
+      if (word && word.length > 2) {
+        synonyms.push(word);
+      }
+    }
+  }
+  
+  // Also try to find synonyms in the meta description as a fallback
+  const metaDescriptionMatch = html.match(/<meta[^>]*name="description"[^>]*content="[^"]*Synonyms for[^:]*:([^"]*)"/i);
+  if (metaDescriptionMatch && synonyms.length === 0) {
+    const descriptionSynonyms = metaDescriptionMatch[1]
+      .split(',')[0] // Take only the first part before semicolon
+      .split(';')[0] // Take only the first part before semicolon
+      .split(',')
+      .map(s => s.trim().toLowerCase())
+      .filter(s => s.length > 2 && s !== originalWord); // Fixed: use originalWord instead of undefined 'word'
+    
+    synonyms.push(...descriptionSynonyms.slice(0, 8)); // Limit to 8 from description
+  }
+  
+  return synonyms.slice(0, 12); // Limit total to 12 words
+}
+
 // Get a new vocabulary test
 router.get('/test', async (c) => {
   try {
@@ -123,26 +175,27 @@ router.get('/similar/:word', async (c) => {
     // Try multiple APIs for similar words
     const similarWords: string[] = [];
     
-    // API 1: WordsAPI (if available)
+    // API 1: Merriam-Webster Thesaurus (primary source)
     try {
-      const wordsApiResponse = await fetch(`https://api.datamuse.com/words?rel_syn=${encodeURIComponent(word)}&max=5`);
-      if (wordsApiResponse.ok) {
-        const wordsData = await wordsApiResponse.json() as Array<{ word: string }>;
-        similarWords.push(...wordsData.map((item) => item.word));
+      const mwResponse = await fetch(`https://www.merriam-webster.com/thesaurus/${encodeURIComponent(word)}`);
+      if (mwResponse.ok) {
+        const html = await mwResponse.text();
+        const mwWords = extractSynonyms(html, word);
+        similarWords.push(...mwWords);
       }
     } catch (error) {
-      console.log('WordsAPI failed:', error);
+      console.log('Merriam-Webster API failed:', error);
     }
     
-    // API 2: Datamuse for related words
+    // API 2: Fallback to Datamuse synonyms (WordNet synsets)
     try {
-      const datamuseResponse = await fetch(`https://api.datamuse.com/words?ml=${encodeURIComponent(word)}&max=5`);
-      if (datamuseResponse.ok) {
-        const datamuseData = await datamuseResponse.json() as Array<{ word: string }>;
-        similarWords.push(...datamuseData.map((item) => item.word));
+      const synonymResponse = await fetch(`https://api.datamuse.com/words?rel_syn=${encodeURIComponent(word)}&max=4`);
+      if (synonymResponse.ok) {
+        const synonymData = await synonymResponse.json() as Array<{ word: string; score: number }>;
+        similarWords.push(...synonymData.map((item) => item.word));
       }
     } catch (error) {
-      console.log('Datamuse API failed:', error);
+      console.log('Datamuse synonym API failed:', error);
     }
     
     // API 3: Free Dictionary API for synonyms
