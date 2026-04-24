@@ -20,10 +20,6 @@ async function fetchIeltsWords(): Promise<IeltsWord[]> {
   try {
     const response = await fetch(IELTS_4000_URL);
     if (!response.ok) {
-      if (response.status === 401) {
-        console.error('Unauthorized access to IELTS words. Using fallback words.');
-        return getFallbackWords();
-      }
       throw new Error(`Failed to fetch IELTS words: ${response.status}`);
     }
     
@@ -46,33 +42,8 @@ async function fetchIeltsWords(): Promise<IeltsWord[]> {
     return words;
   } catch (error) {
     console.error('Error fetching IELTS words:', error);
-    return getFallbackWords();
+    throw error;
   }
-}
-
-function getFallbackWords(): IeltsWord[] {
-  return [
-    { word: "achieve", meaning: "to successfully reach a goal" },
-    { word: "adapt", meaning: "to change to fit a new situation" },
-    { word: "adequate", meaning: "enough or satisfactory for a purpose" },
-    { word: "allocate", meaning: "to distribute resources for a purpose" },
-    { word: "analyze", meaning: "to examine something in detail" },
-    { word: "approach", meaning: "to deal with a situation or problem" },
-    { word: "assess", meaning: "to evaluate or estimate the nature of something" },
-    { word: "benefit", meaning: "an advantage or profit gained from something" },
-    { word: "concept", meaning: "an abstract idea or general notion" },
-    { word: "contribute", meaning: "to help cause or bring about something" },
-    { word: "create", meaning: "to bring something into existence" },
-    { word: "define", meaning: "to state or describe the exact nature of something" },
-    { word: "develop", meaning: "to grow or cause to grow and become more mature" },
-    { word: "effect", meaning: "a change which is a result or consequence of an action" },
-    { word: "establish", meaning: "to set up on a firm or permanent basis" },
-    { word: "factor", meaning: "a circumstance or fact that contributes to a result" },
-    { word: "function", meaning: "the natural purpose of something or someone" },
-    { word: "identify", meaning: "to establish or indicate who or what someone or something is" },
-    { word: "implement", meaning: "to put a decision or plan into effect" },
-    { word: "indicate", meaning: "to point out or show something" }
-  ];
 }
 
 function pickDistractors(correct: IeltsWord, pool: IeltsWord[], count: number): string[] {
@@ -145,7 +116,7 @@ router.get('/dictionary/:word', async (c) => {
 });
 
 export function registerVocabularyRoutes(app: any) {
-  app.route('/api/vocabulary', router);
+  app.route('/vocabulary', router);
 }
 
 export default router;

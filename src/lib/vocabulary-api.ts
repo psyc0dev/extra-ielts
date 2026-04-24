@@ -43,9 +43,11 @@ export interface DictionaryResponse {
   data: DictionaryEntry | null;
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 export async function getVocabularyTest(): Promise<VocabularyTestResponse> {
   try {
-    const response = await fetch('/api/vocabulary/test');
+    const response = await fetch(`${API_BASE_URL}/vocabulary/test`);
     if (!response.ok) {
       throw new Error(`Failed to fetch vocabulary test: ${response.status}`);
     }
@@ -58,7 +60,7 @@ export async function getVocabularyTest(): Promise<VocabularyTestResponse> {
 
 export async function getDictionaryEntry(word: string): Promise<DictionaryResponse> {
   try {
-    const response = await fetch(`/api/vocabulary/dictionary/${encodeURIComponent(word)}`);
+    const response = await fetch(`${API_BASE_URL}/vocabulary/dictionary/${encodeURIComponent(word)}`);
     if (!response.ok) {
       throw new Error(`Failed to fetch dictionary entry: ${response.status}`);
     }
