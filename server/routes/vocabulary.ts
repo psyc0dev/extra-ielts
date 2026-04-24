@@ -60,53 +60,79 @@ function buildOptions(correct: IeltsWord, pool: IeltsWord[]): string[] {
 function extractSynonyms(html: string, originalWord: string): string[] {
   const synonyms: string[] = [];
   
-  // Create a simple regex-based HTML parser since we're in a server environment
-  // Look for the synonyms list section
+  // Try multiple approaches to find synonyms
+  
+  // Approach 1: Look for the main synonyms list section
   const synonymsListMatch = html.match(/<div[^>]*class="thes-list-content[^"]*synonyms_list[^"]*"[^>]*>(.*?)<\/div>/s);
-  if (!synonymsListMatch) {
-    return synonyms;
-  }
-  
-  const synonymsListHtml = synonymsListMatch[1];
-  
-  // Extract words from list items with class "thes-word-list-item"
-  const listItemRegex = /<li[^>]*class="thes-word-list-item[^"]*"[^>]*>(.*?)<\/li>/gs;
-  let match;
-  
-  while ((match = listItemRegex.exec(synonymsListHtml)) !== null) {
-    const itemHtml = match[1];
+  if (synonymsListMatch) {
+    const synonymsListHtml = synonymsListMatch[1];
     
-    // Extract the word text, removing HTML tags
-    const wordMatch = itemHtml.match(/<a[^>]*>(.*?)<\/a>/);
-    if (wordMatch) {
-      let word = wordMatch[1]
-        .replace(/<[^>]*>/g, '') // Remove any remaining HTML tags
-        .trim()
-        .toLowerCase();
+    // Extract words from list items with class "thes-word-list-item"
+    const listItemRegex = /<li[^>]*class="thes-word-list-item[^"]*"[^>]*>(.*?)<\/li>/gs;
+    let match;
+    
+    while ((match = listItemRegex.exec(synonymsListHtml)) !== null) {
+      const itemHtml = match[1];
       
-      // Clean up common HTML entities and extra spaces
-      word = word.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-      
-      if (word && word.length > 2) {
-        synonyms.push(word);
+      // Extract the word text, removing HTML tags
+      const wordMatch = itemHtml.match(/<a[^>]*>(.*?)<\/a>/);
+      if (wordMatch) {
+        let word = wordMatch[1]
+          .replace(/<[^>]*>/g, '') // Remove any remaining HTML tags
+          .trim()
+          .toLowerCase();
+        
+        // Clean up common HTML entities and extra spaces
+        word = word.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+        
+        if (word && word.length > 2 && word !== originalWord.toLowerCase()) {
+          synonyms.push(word);
+        }
       }
     }
   }
   
-  // Also try to find synonyms in the meta description as a fallback
-  const metaDescriptionMatch = html.match(/<meta[^>]*name="description"[^>]*content="[^"]*Synonyms for[^:]*:([^"]*)"/i);
-  if (metaDescriptionMatch && synonyms.length === 0) {
-    const descriptionSynonyms = metaDescriptionMatch[1]
-      .split(',')[0] // Take only the first part before semicolon
-      .split(';')[0] // Take only the first part before semicolon
-      .split(',')
-      .map(s => s.trim().toLowerCase())
-      .filter(s => s.length > 2 && s !== originalWord); // Fixed: use originalWord instead of undefined 'word'
+  // Approach 2: Look for any list items that might contain synonyms
+  if (synonyms.length < 4) {
+    const allListItemsRegex = /<li[^>]*class="[^"]*word[^"]*"[^>]*>(.*?)<\/li>/gs;
+    let match;
     
-    synonyms.push(...descriptionSynonyms.slice(0, 8)); // Limit to 8 from description
+    while ((match = allListItemsRegex.exec(html)) !== null && synonyms.length < 4) {
+      const itemHtml = match[1];
+      
+      // Extract the word text
+      const wordMatch = itemHtml.match(/<a[^>]*>(.*?)<\/a>/);
+      if (wordMatch) {
+        let word = wordMatch[1]
+          .replace(/<[^>]*>/g, '')
+          .trim()
+          .toLowerCase();
+        
+        word = word.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+        
+        if (word && word.length > 2 && word !== originalWord.toLowerCase() && !synonyms.includes(word)) {
+          synonyms.push(word);
+        }
+      }
+    }
   }
   
-  return synonyms.slice(0, 12); // Limit total to 12 words
+  // Approach 3: Try meta description as last resort
+  if (synonyms.length === 0) {
+    const metaDescriptionMatch = html.match(/<meta[^>]*name="description"[^>]*content="[^"]*Synonyms for[^:]*:([^"]*)"/i);
+    if (metaDescriptionMatch) {
+      const descriptionSynonyms = metaDescriptionMatch[1]
+        .split(',')[0] // Take only the first part before semicolon
+        .split(';')[0] // Take only the first part before semicolon
+        .split(',')
+        .map(s => s.trim().toLowerCase())
+        .filter(s => s.length > 2 && s !== originalWord.toLowerCase());
+      
+      synonyms.push(...descriptionSynonyms.slice(0, 4));
+    }
+  }
+  
+  return synonyms.slice(0, 4); // Limit to 4 words from Merriam-Webster
 }
 
 // Get a new vocabulary test
@@ -172,57 +198,58 @@ router.get('/similar/:word', async (c) => {
   try {
     const { word } = c.req.param();
     
-    // Try multiple APIs for similar words
-    const similarWords: string[] = [];
+    // Try Merriam-Webster first
+    let similarWords: string[] = [];
     
-    // API 1: Merriam-Webster Thesaurus (primary source)
     try {
       const mwResponse = await fetch(`https://www.merriam-webster.com/thesaurus/${encodeURIComponent(word)}`);
       if (mwResponse.ok) {
         const html = await mwResponse.text();
-        const mwWords = extractSynonyms(html, word);
-        similarWords.push(...mwWords);
+        similarWords = extractSynonyms(html, word);
       }
     } catch (error) {
       console.log('Merriam-Webster API failed:', error);
     }
     
-    // API 2: Fallback to Datamuse synonyms (WordNet synsets)
-    try {
-      const synonymResponse = await fetch(`https://api.datamuse.com/words?rel_syn=${encodeURIComponent(word)}&max=4`);
-      if (synonymResponse.ok) {
-        const synonymData = await synonymResponse.json() as Array<{ word: string; score: number }>;
-        similarWords.push(...synonymData.map((item) => item.word));
-      }
-    } catch (error) {
-      console.log('Datamuse synonym API failed:', error);
-    }
-    
-    // API 3: Free Dictionary API for synonyms
-    try {
-      const freeDictResponse = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
-      if (freeDictResponse.ok) {
-        const freeDictData = await freeDictResponse.json() as Array<{
-          meanings: Array<{
-            synonyms: string[];
+    // If no synonyms found from Merriam-Webster, try Free Dictionary as fallback
+    if (similarWords.length === 0) {
+      try {
+        const freeDictResponse = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+        if (freeDictResponse.ok) {
+          const freeDictData = await freeDictResponse.json() as Array<{
+            meanings: Array<{
+              synonyms: string[];
+            }>;
           }>;
-        }>;
-        if (Array.isArray(freeDictData) && freeDictData.length > 0) {
-          const meanings = freeDictData[0]?.meanings || [];
-          meanings.forEach((meaning) => {
-            const synonyms = meaning.synonyms || [];
-            similarWords.push(...synonyms.slice(0, 3)); // Limit to avoid too many results
-          });
+          if (Array.isArray(freeDictData) && freeDictData.length > 0) {
+            const meanings = freeDictData[0]?.meanings || [];
+            const allSynonyms: string[] = [];
+            meanings.forEach((meaning) => {
+              const synonyms = meaning.synonyms || [];
+              allSynonyms.push(...synonyms);
+            });
+            similarWords = allSynonyms.slice(0, 4); // Limit to 4 words from Free Dictionary
+          }
         }
+      } catch (error) {
+        console.log('Free Dictionary API failed:', error);
       }
-    } catch (error) {
-      console.log('Free Dictionary API failed:', error);
     }
     
-    // Remove duplicates and the original word
+    // If still no synonyms found, return empty array
+    if (similarWords.length === 0) {
+      return c.json({
+        success: true,
+        data: {
+          word,
+          similarWords: []
+        }
+      });
+    }
+    
+    // Remove duplicates and limit results
     const uniqueWords = [...new Set(similarWords)]
       .filter(w => w.toLowerCase() !== word.toLowerCase())
-      .filter(w => w.length > 2) // Filter out very short words
       .slice(0, 8); // Limit to 8 similar words
     
     return c.json({
