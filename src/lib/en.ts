@@ -20,6 +20,10 @@ export const en = {
     
     // Toast messages
     pronunciationError: 'Could not play pronunciation.',
+    loading: 'Loading vocabulary words...',
+    testCompleted: 'Test completed! Starting new test...',
+    failedToLoad: 'Failed to load vocabulary test',
+    failedToReset: 'Failed to reset vocabulary test',
   },
   
   // General UI

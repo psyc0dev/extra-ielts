@@ -15,15 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { speakText } from "@/lib/tts";
 import { toast } from "sonner";
-import { getVocabularyTest, getDictionaryEntry, type VocabularyWord, type DictionaryEntry } from "@/lib/vocabulary-api";
+import { getVocabularyTest, getDictionaryEntry, type VocabularyWord, type DictionaryEntry, type DictDefinition } from "@/lib/vocabulary-api";
 import { en } from "@/lib/en";
-
-interface DictDefinition {
-  text: string;
-  pos: string;
-  source: string;
-  example?: { text: string }[];
-}
 
 
 
@@ -78,11 +71,11 @@ export function Vocabulary() {
         if (response.success) {
           setWords(response.data.words);
         } else {
-          toast.error('Failed to load vocabulary test');
+          toast.error(en.vocabulary.failedToLoad);
         }
       } catch (error) {
         console.error('Failed to load vocabulary test:', error);
-        toast.error('Failed to load vocabulary test');
+        toast.error(en.vocabulary.failedToLoad);
       } finally {
         setLoading(false);
       }
@@ -124,20 +117,6 @@ export function Vocabulary() {
     [answered, current?.meaning, current?.word, getDictionaryEntry],
   );
 
-  const handleContinue = useCallback(() => {
-    if (index < words.length - 1) {
-      setIndex((i) => i + 1);
-    } else {
-      // Test completed - show completion message
-      toast.success('Test completed! Starting new test...');
-      handleReset();
-      return;
-    }
-    setSelected(null);
-    setAnswered(false);
-    setDictEntry(null);
-  }, [index, words, handleReset]);
-
   const handleReset = useCallback(async () => {
     try {
       setLoading(true);
@@ -151,15 +130,29 @@ export function Vocabulary() {
         setIncorrect(0);
         setDictEntry(null);
       } else {
-        toast.error('Failed to reset vocabulary test');
+        toast.error(en.vocabulary.failedToReset);
       }
     } catch (error) {
       console.error('Failed to reset vocabulary test:', error);
-      toast.error('Failed to reset vocabulary test');
+      toast.error(en.vocabulary.failedToReset);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const handleContinue = useCallback(() => {
+    if (index < words.length - 1) {
+      setIndex((i) => i + 1);
+    } else {
+      // Test completed - show completion message
+      toast.success(en.vocabulary.testCompleted);
+      handleReset();
+      return;
+    }
+    setSelected(null);
+    setAnswered(false);
+    setDictEntry(null);
+  }, [index, words, handleReset]);
 
   const optionStyle = (option: string) => {
     if (!answered) {
@@ -236,7 +229,7 @@ export function Vocabulary() {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-12 gap-4">
           <CircleNotch weight="bold" className="size-8 text-indigo-400 animate-spin" />
-          <p className="text-muted-foreground">Loading vocabulary words...</p>
+          <p className="text-muted-foreground">{en.vocabulary.loading}</p>
         </div>
       ) : current && (
         <AnimatePresence mode="wait">

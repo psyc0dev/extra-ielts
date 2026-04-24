@@ -13,14 +13,6 @@ export interface VocabularyTestResponse {
   };
 }
 
-export interface DictionaryEntry {
-  word: string;
-  pos: string[];
-  verbs?: DictVerb[];
-  pronunciation: DictPronunciation[];
-  definition: DictDefinition[];
-}
-
 interface DictVerb {
   text: string;
   tense: string;
@@ -31,11 +23,19 @@ interface DictPronunciation {
   audio?: string;
 }
 
-interface DictDefinition {
+export interface DictDefinition {
   text: string;
   pos: string;
   source: string;
   example?: { text: string }[];
+}
+
+export interface DictionaryEntry {
+  word: string;
+  pos: string[];
+  verbs?: DictVerb[];
+  pronunciation: DictPronunciation[];
+  definition: DictDefinition[];
 }
 
 export interface DictionaryResponse {
