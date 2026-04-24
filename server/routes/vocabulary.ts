@@ -8,42 +8,28 @@ interface IeltsWord {
   meaning: string;
 }
 
-const IELTS_4000_URL = 'https://raw.githubusercontent.com/psyc0dev/ielts_words/refs/heads/main/IELTS-4000.txt';
+const WORDS_URL = 'https://raw.githubusercontent.com/psyc0dev/ielts_words/refs/heads/main/IELTS-4000.txt';
 
 let cachedWords: IeltsWord[] | null = null;
 
-async function fetchIeltsWords(): Promise<IeltsWord[]> {
-  if (cachedWords) {
-    return cachedWords;
-  }
+async function fetchWords(): Promise<IeltsWord[]> {
+  if (cachedWords) return cachedWords;
 
-  try {
-    const response = await fetch(IELTS_4000_URL);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch IELTS words: ${response.status}`);
-    }
-    
-    const text = await response.text();
-    const lines = text.split('\n').filter(line => line.trim());
-    
-    const words: IeltsWord[] = lines.map(line => {
-      const colonIndex = line.indexOf(':');
-      if (colonIndex === -1) {
-        return null;
-      }
-      
-      const word = line.substring(0, colonIndex).trim();
-      const meaning = line.substring(colonIndex + 1).trim();
-      
-      return { word, meaning };
-    }).filter((item): item is IeltsWord => item !== null);
-    
-    cachedWords = words;
-    return words;
-  } catch (error) {
-    console.error('Error fetching IELTS words:', error);
-    throw error;
-  }
+  const response = await fetch(WORDS_URL);
+  if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
+
+  const text = await response.text();
+  const words = text.split('\n')
+    .filter(line => line.trim())
+    .map(line => {
+      const i = line.indexOf(':');
+      if (i === -1) return null;
+      return { word: line.slice(0, i).trim(), meaning: line.slice(i + 1).trim() };
+    })
+    .filter((w): w is IeltsWord => !!w?.word && !!w.meaning);
+
+  cachedWords = words;
+  return words;
 }
 
 function pickDistractors(correct: IeltsWord, pool: IeltsWord[], count: number): string[] {
@@ -57,111 +43,30 @@ function buildOptions(correct: IeltsWord, pool: IeltsWord[]): string[] {
   return shuffle([correct.meaning, ...distractors]);
 }
 
-function extractSynonyms(html: string, originalWord: string): string[] {
+function extractSynonyms(html: string, word: string): string[] {
   const synonyms: string[] = [];
-  
-  // Approach 1: Look for the main synonyms list section
-  const synonymsListMatch = html.match(/<div[^>]*class="thes-list-content[^"]*synonyms_list[^"]*"[^>]*>(.*?)<\/div>/s);
-  if (synonymsListMatch) {
-    const synonymsListHtml = synonymsListMatch[1];
-    
-    // Extract words from list items with class "thes-word-list-item"
-    const listItemRegex = /<li[^>]*class="thes-word-list-item[^"]*"[^>]*>(.*?)<\/li>/gs;
-    let match;
-    
-    while ((match = listItemRegex.exec(synonymsListHtml)) !== null) {
-      const itemHtml = match[1];
-      
-      // Extract the word text, removing HTML tags
-      const wordMatch = itemHtml.match(/<a[^>]*>(.*?)<\/a>/);
-      if (wordMatch) {
-        let word = wordMatch[1]
-          .replace(/<[^>]*>/g, '') // Remove any remaining HTML tags
-          .trim()
-          .toLowerCase();
-        
-        // Clean up common HTML entities and extra spaces
-        word = word.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-        
-        if (word && word.length > 2 && word !== originalWord.toLowerCase()) {
-          synonyms.push(word);
-        }
-      }
+  const match = html.match(/class="thes-list-content[^"]*synonyms_list[^"]*"[^>]*>([^<]{0,5000})/);
+  if (!match) return synonyms;
+
+  let idx = match[1].indexOf('<a');
+  while (idx !== -1 && synonyms.length < 8) {
+    const end = match[1].indexOf('</a>', idx);
+    if (end === -1) break;
+    const content = match[1].slice(idx, end);
+    const gt = content.indexOf('>');
+    if (gt !== -1) {
+      const w = content.slice(gt + 1).replace(/&nbsp;/g, ' ').trim().toLowerCase();
+      if (w.length > 2 && w !== word.toLowerCase() && !synonyms.includes(w)) synonyms.push(w);
     }
+    idx = match[1].indexOf('<a', end);
   }
-  
-  // Approach 2: Look for ANY list items in the synonyms section that contain links
-  if (synonyms.length < 4) {
-    const synonymsSectionMatch = html.match(/<div[^>]*class="thes-list-content[^"]*synonyms_list[^"]*"[^>]*>(.*?)<\/div>/s);
-    if (synonymsSectionMatch) {
-      const sectionHtml = synonymsSectionMatch[1];
-      
-      // Find all list items with links in the synonyms section
-      const allListItemsRegex = /<li[^>]*>(.*?)<\/li>/gs;
-      let match;
-      
-      while ((match = allListItemsRegex.exec(sectionHtml)) !== null && synonyms.length < 4) {
-        const itemHtml = match[1];
-        
-        // Extract the word text from any link
-        const wordMatch = itemHtml.match(/<a[^>]*>(.*?)<\/a>/);
-        if (wordMatch) {
-          let word = wordMatch[1]
-            .replace(/<[^>]*>/g, '')
-            .trim()
-            .toLowerCase();
-          
-          word = word.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-          
-          if (word && word.length > 2 && word !== originalWord.toLowerCase() && !synonyms.includes(word)) {
-            synonyms.push(word);
-          }
-        }
-      }
-    }
-  }
-  
-  // Approach 3: Look for any links in the entire page that might be synonyms
-  if (synonyms.length < 4) {
-    const linkRegex = /<a[^>]*href="\/thesaurus\/[^"]*"[^>]*>(.*?)<\/a>/gs;
-    let match;
-    
-    while ((match = linkRegex.exec(html)) !== null && synonyms.length < 4) {
-      let word = match[1]
-        .replace(/<[^>]*>/g, '')
-        .trim()
-        .toLowerCase();
-      
-      word = word.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-      
-      if (word && word.length > 2 && word !== originalWord.toLowerCase() && !synonyms.includes(word)) {
-        synonyms.push(word);
-      }
-    }
-  }
-  
-  // Approach 4: Try meta description as last resort
-  if (synonyms.length === 0) {
-    const metaDescriptionMatch = html.match(/<meta[^>]*name="description"[^>]*content="[^"]*Synonyms for[^:]*:([^"]*)"/i);
-    if (metaDescriptionMatch) {
-      const descriptionSynonyms = metaDescriptionMatch[1]
-        .split(',')[0] // Take only the first part before semicolon
-        .split(';')[0] // Take only the first part before semicolon
-        .split(',')
-        .map(s => s.trim().toLowerCase())
-        .filter(s => s.length > 2 && s !== originalWord.toLowerCase());
-      
-      synonyms.push(...descriptionSynonyms.slice(0, 4));
-    }
-  }
-  
-  return synonyms.slice(0, 4); // Limit to 4 words from Merriam-Webster
+  return synonyms;
 }
 
 // Get a new vocabulary test
 router.get('/test', async (c) => {
   try {
-    const words = await fetchIeltsWords();
+    const words = await fetchWords();
     const shuffled = shuffle(words);
     const testWords = shuffled.slice(0, 20);
     
@@ -189,106 +94,45 @@ router.get('/test', async (c) => {
 
 // Get dictionary entry for a word
 router.get('/dictionary/:word', async (c) => {
+  const word = c.req.param('word');
   try {
-    const { word } = c.req.param();
-    const response = await fetch(
-      `https://dictionary-api.eliaschen.dev/api/dictionary/en/${encodeURIComponent(word)}`
-    );
-    
-    if (!response.ok) {
-      return c.json({
-        success: true,
-        data: null
-      });
-    }
-    
-    const data = await response.json();
-    return c.json({
-      success: true,
-      data
-    });
-  } catch (error) {
-    console.error('Error fetching dictionary entry:', error);
-    return c.json({
-      success: true,
-      data: null
-    });
+    const res = await fetch(`https://dictionary-api.eliaschen.dev/api/dictionary/en/${encodeURIComponent(word)}`);
+    const data = await res.json().catch(() => null);
+    return c.json({ success: res.ok, data });
+  } catch {
+    return c.json({ success: false, error: 'Service error' }, 500);
   }
 });
 
 // Get similar words for a word
 router.get('/similar/:word', async (c) => {
+  const word = c.req.param('word');
+  const synonyms: string[] = [];
+
+  // Try Merriam-Webster
   try {
-    const { word } = c.req.param();
-    
-    // Try Merriam-Webster first
-    let similarWords: string[] = [];
-    
+    const res = await fetch(`https://www.merriam-webster.com/thesaurus/${encodeURIComponent(word)}`);
+    if (res.ok) synonyms.push(...extractSynonyms(await res.text(), word));
+  } catch {}
+
+  // Fallback to Free Dictionary
+  if (synonyms.length === 0) {
     try {
-      const mwResponse = await fetch(`https://www.merriam-webster.com/thesaurus/${encodeURIComponent(word)}`);
-      if (mwResponse.ok) {
-        const html = await mwResponse.text();
-        similarWords = extractSynonyms(html, word);
-      }
-    } catch (error) {
-      console.log('Merriam-Webster API failed:', error);
-    }
-    
-    // If no synonyms found from Merriam-Webster, try Free Dictionary as fallback
-    if (similarWords.length === 0) {
-      try {
-        const freeDictResponse = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
-        if (freeDictResponse.ok) {
-          const freeDictData = await freeDictResponse.json() as Array<{
-            meanings: Array<{
-              synonyms: string[];
-            }>;
-          }>;
-          if (Array.isArray(freeDictData) && freeDictData.length > 0) {
-            const meanings = freeDictData[0]?.meanings || [];
-            const allSynonyms: string[] = [];
-            meanings.forEach((meaning) => {
-              const synonyms = meaning.synonyms || [];
-              allSynonyms.push(...synonyms);
-            });
-            similarWords = allSynonyms.slice(0, 4); // Limit to 4 words from Free Dictionary
-          }
+      const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+      if (res.ok) {
+        const data = await res.json() as Array<{ meanings?: Array<{ synonyms?: string[] }> }>;
+        if (data?.[0]?.meanings) {
+          synonyms.push(...data[0].meanings.flatMap(m => m.synonyms || []).slice(0, 4));
         }
-      } catch (error) {
-        console.log('Free Dictionary API failed:', error);
       }
-    }
-    
-    // If still no synonyms found, return empty array
-    if (similarWords.length === 0) {
-      return c.json({
-        success: true,
-        data: {
-          word,
-          similarWords: []
-        }
-      });
-    }
-    
-    // Remove duplicates and limit results
-    const uniqueWords = [...new Set(similarWords)]
-      .filter(w => w.toLowerCase() !== word.toLowerCase())
-      .slice(0, 8); // Limit to 8 similar words
-    
-    return c.json({
-      success: true,
-      data: {
-        word,
-        similarWords: uniqueWords
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching similar words:', error);
-    return c.json({
-      success: false,
-      error: 'Failed to fetch similar words'
-    }, 500);
+    } catch {}
   }
+
+  const unique = [...new Set(synonyms)]
+    .filter(w => w.toLowerCase() !== word.toLowerCase())
+    .slice(0, 8);
+
+  return c.json({ success: true, data: { word, similarWords: unique } });
 });
 
 export function registerVocabularyRoutes(app: any) {
