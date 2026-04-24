@@ -10,6 +10,7 @@ import { registerSettingsRoutes } from './routes/settings'
 import { registerTestRoutes } from './routes/tests'
 import { registerWritingRoutes } from './routes/writing'
 import { registerAccountRoutes } from './routes/account'
+import { registerVocabularyRoutes } from './routes/vocabulary'
 import { MemoryStore } from './lib/store'
 
 export const createApp = () => {
@@ -51,6 +52,7 @@ export const createApp = () => {
   registerAssignmentRoutes(api)
   registerWritingRoutes(api)
   registerAccountRoutes(api)
+  registerVocabularyRoutes(api)
   registerAdminRoutes(api)
 
   api.notFound((c) => c.json({ error: 'API route not found.' }, 404))

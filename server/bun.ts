@@ -54,7 +54,6 @@ app.use('*', async (c, next) => {
   const resolvedPath = resolve(staticRoot, normalize(c.req.path).replace(/^\//, ''))
   if (resolvedPath !== staticRoot && !resolvedPath.startsWith(staticRootPrefix)) return c.text('Forbidden', 403)
   return staticMiddleware(c, async () => {
-    // amazonq-ignore-next-line
     const indexFile = Bun.file(join(staticRoot, 'index.html'))
     c.res = (await indexFile.exists()) ? c.html(await indexFile.text()) : c.text('Not Found', 404)
   })
