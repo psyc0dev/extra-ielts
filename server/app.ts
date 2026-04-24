@@ -11,7 +11,7 @@ import { registerTestRoutes } from './routes/tests'
 import { registerWritingRoutes } from './routes/writing'
 import { registerAccountRoutes } from './routes/account'
 import { registerVocabularyRoutes } from './routes/vocabulary'
-import { MemoryStore } from './lib/store'
+import { CacheStore } from './lib/store'
 
 export const createApp = () => {
   const app = new Hono<AppEnv>()
@@ -29,18 +29,10 @@ export const createApp = () => {
     credentials: true,
   }))
 
-  api.use('*', async (c, next) => {
-    const method = c.req.method
-    if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return next()
-    const origin = c.req.header('origin')
-    if (origin && !getAllowed(c).includes(origin)) return c.json({ error: 'Forbidden' }, 403)
-    return next()
-  })
-
   api.use('*', rateLimiter({
     windowMs: 60_000,
     limit: 60,
-    store: new MemoryStore(60_000),
+    store: new CacheStore(60_000),
     keyGenerator: (c) => c.req.header('x-forwarded-for') ?? 'unknown',
     message: { error: 'Too many requests. Please try again later.' },
   }))

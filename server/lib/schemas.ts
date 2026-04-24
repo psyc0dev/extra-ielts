@@ -106,8 +106,16 @@ export const PasswordResetBodySchema = z.object({
   password: z.string().min(6),
 })
 
+const MAX_AVATAR_SIZE_MB = 1;
+const MAX_BASE64_LENGTH = Math.ceil(MAX_AVATAR_SIZE_MB * 1024 * 1024 * 4 / 3) + 100; // ~1.33MB + header overhead
+
 export const AvatarBodySchema = z.object({
-  dataUrl: z.string().regex(/^data:image\/(png|jpeg|webp);base64,/),
+  dataUrl: z.string()
+    .regex(/^data:image\/(png|jpeg|webp);base64,/, 'Invalid image format. Only PNG, JPEG, and WebP are allowed.')
+    .refine(
+      (s) => s.length <= MAX_BASE64_LENGTH,
+      `Image too large. Maximum size is ${MAX_AVATAR_SIZE_MB}MB.`
+    ),
 })
 
 export const WritingEvaluationBodySchema = z.object({

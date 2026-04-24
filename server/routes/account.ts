@@ -3,13 +3,13 @@ import { deleteCookie } from 'hono/cookie'
 import { rateLimiter } from 'hono-rate-limiter'
 import type { AppEnv } from '../lib/types'
 import { PasswordResetRequestBodySchema, PasswordResetBodySchema, AvatarBodySchema } from '../lib/schemas'
-import { createPasswordHash, nowIso, zParse, requireAuth, MemoryStore } from '../lib/store'
+import { createPasswordHash, nowIso, zParse, requireAuth, CacheStore } from '../lib/store'
 import axios from 'axios'
 
 const resetLimiter = rateLimiter({
   windowMs: 15 * 60_000,
   limit: 5,
-  store: new MemoryStore(15 * 60_000),
+  store: new CacheStore(15 * 60_000),
   keyGenerator: (c) => c.req.header('x-forwarded-for') ?? 'unknown',
   message: { error: 'Too many attempts. Please try again later.' },
 })

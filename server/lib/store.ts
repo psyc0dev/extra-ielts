@@ -4,22 +4,86 @@ import { sign, verify } from 'hono/jwt'
 import { z } from 'zod'
 import type { ApiUser, AppEnv, User } from './types'
 
-export class MemoryStore {
-  private hits = new Map<string, { count: number; resetAt: number }>()
-  constructor(private windowMs: number) {}
-  init(_options: { windowMs: number }) {}
-  async increment(key: string) {
-    const now = Date.now()
-    const entry = this.hits.get(key)
-    if (!entry || now >= entry.resetAt) {
-      this.hits.set(key, { count: 1, resetAt: now + this.windowMs })
-      return { totalHits: 1, resetTime: new Date(now + this.windowMs) }
-    }
-    entry.count++
-    return { totalHits: entry.count, resetTime: new Date(entry.resetAt) }
+/**
+ * Distributed rate limit store using Cloudflare Cache API.
+ * Works across multiple Worker instances (unlike in-memory Map).
+ */
+export class CacheStore {
+  private windowMs: number
+  constructor(windowMs: number) {
+    this.windowMs = windowMs
   }
-  async decrement(key: string) { const e = this.hits.get(key); if (e && e.count > 0) e.count-- }
-  async resetKey(key: string) { this.hits.delete(key) }
+
+  private getCacheKey(key: string): string {
+    return `https://rate-limit.internal/${key}`
+  }
+
+  async increment(key: string) {
+    const cacheKey = this.getCacheKey(key)
+    const cache = (caches as unknown as { default: Cache }).default
+    const now = Date.now()
+    const resetAt = now + this.windowMs
+
+    const cached = await cache.match(cacheKey)
+    if (!cached) {
+      const data = { count: 1, resetAt }
+      const response = new Response(JSON.stringify(data), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': `max-age=${Math.ceil(this.windowMs / 1000)}`,
+        },
+      })
+      await cache.put(cacheKey, response)
+      return { totalHits: 1, resetTime: new Date(resetAt) }
+    }
+
+    const data = await cached.json<{ count: number; resetAt: number }>()
+    if (now >= data.resetAt) {
+      const newData = { count: 1, resetAt }
+      const response = new Response(JSON.stringify(newData), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': `max-age=${Math.ceil(this.windowMs / 1000)}`,
+        },
+      })
+      await cache.put(cacheKey, response)
+      return { totalHits: 1, resetTime: new Date(resetAt) }
+    }
+
+    data.count++
+    const response = new Response(JSON.stringify(data), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': `max-age=${Math.ceil((data.resetAt - now) / 1000)}`,
+      },
+    })
+    await cache.put(cacheKey, response)
+    return { totalHits: data.count, resetTime: new Date(data.resetAt) }
+  }
+
+  async decrement(key: string) {
+    const cacheKey = this.getCacheKey(key)
+    const cache = (caches as unknown as { default: Cache }).default
+    const cached = await cache.match(cacheKey)
+    if (!cached) return
+    const data = await cached.json<{ count: number; resetAt: number }>()
+    if (data.count > 0) {
+      data.count--
+      const response = new Response(JSON.stringify(data), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': `max-age=${Math.ceil((data.resetAt - Date.now()) / 1000)}`,
+        },
+      })
+      await cache.put(cacheKey, response)
+    }
+  }
+
+  async resetKey(key: string) {
+    const cacheKey = this.getCacheKey(key)
+    const cache = (caches as unknown as { default: Cache }).default
+    await cache.delete(cacheKey)
+  }
 }
 
 export const nowIso = () => new Date().toISOString()
@@ -32,8 +96,8 @@ export const toApiUser = (user: User): ApiUser => ({
   avatarUrl: user.avatarUrl ?? null,
 })
 
-const getJwtSecret = (c: { env: { JWT_SECRET?: string } }) => {
-  const secret = c.env?.JWT_SECRET ?? process.env.JWT_SECRET
+const getJwtSecret = (c: { env: { JWT_SECRET: string } }) => {
+  const secret = c.env.JWT_SECRET
   if (!secret) throw new Error('JWT_SECRET is required')
   return secret
 }

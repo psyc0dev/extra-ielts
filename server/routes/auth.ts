@@ -3,10 +3,10 @@ import { deleteCookie, setCookie } from 'hono/cookie'
 import { rateLimiter } from 'hono-rate-limiter'
 import type { AppEnv } from '../lib/types'
 import { LoginBodySchema, RegisterBodySchema } from '../lib/schemas'
-import { createPasswordHash, createToken, nowIso, zParse, requireAuth, toApiUser, verifyPassword, MemoryStore } from '../lib/store'
+import { createPasswordHash, createToken, nowIso, zParse, requireAuth, toApiUser, verifyPassword, CacheStore } from '../lib/store'
 
-const getSecret = (c: { env: { JWT_SECRET?: string } }) => {
-  const s = c.env?.JWT_SECRET ?? process.env.JWT_SECRET
+const getSecret = (c: { env: { JWT_SECRET: string } }) => {
+  const s = c.env.JWT_SECRET
   if (!s) throw new Error('JWT_SECRET is required')
   return s
 }
@@ -14,7 +14,7 @@ const getSecret = (c: { env: { JWT_SECRET?: string } }) => {
 const authLimiter = rateLimiter({
   windowMs: 15 * 60_000,
   limit: 10,
-  store: new MemoryStore(15 * 60_000),
+  store: new CacheStore(15 * 60_000),
   keyGenerator: (c) => c.req.header('x-forwarded-for') ?? 'unknown',
   message: { error: 'Too many attempts. Please try again later.' },
 })
