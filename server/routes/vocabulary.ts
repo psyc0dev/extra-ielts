@@ -60,8 +60,6 @@ function buildOptions(correct: IeltsWord, pool: IeltsWord[]): string[] {
 function extractSynonyms(html: string, originalWord: string): string[] {
   const synonyms: string[] = [];
   
-  // Try multiple approaches to find synonyms
-  
   // Approach 1: Look for the main synonyms list section
   const synonymsListMatch = html.match(/<div[^>]*class="thes-list-content[^"]*synonyms_list[^"]*"[^>]*>(.*?)<\/div>/s);
   if (synonymsListMatch) {
@@ -92,32 +90,57 @@ function extractSynonyms(html: string, originalWord: string): string[] {
     }
   }
   
-  // Approach 2: Look for any list items that might contain synonyms
+  // Approach 2: Look for ANY list items in the synonyms section that contain links
   if (synonyms.length < 4) {
-    const allListItemsRegex = /<li[^>]*class="[^"]*word[^"]*"[^>]*>(.*?)<\/li>/gs;
-    let match;
-    
-    while ((match = allListItemsRegex.exec(html)) !== null && synonyms.length < 4) {
-      const itemHtml = match[1];
+    const synonymsSectionMatch = html.match(/<div[^>]*class="thes-list-content[^"]*synonyms_list[^"]*"[^>]*>(.*?)<\/div>/s);
+    if (synonymsSectionMatch) {
+      const sectionHtml = synonymsSectionMatch[1];
       
-      // Extract the word text
-      const wordMatch = itemHtml.match(/<a[^>]*>(.*?)<\/a>/);
-      if (wordMatch) {
-        let word = wordMatch[1]
-          .replace(/<[^>]*>/g, '')
-          .trim()
-          .toLowerCase();
+      // Find all list items with links in the synonyms section
+      const allListItemsRegex = /<li[^>]*>(.*?)<\/li>/gs;
+      let match;
+      
+      while ((match = allListItemsRegex.exec(sectionHtml)) !== null && synonyms.length < 4) {
+        const itemHtml = match[1];
         
-        word = word.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-        
-        if (word && word.length > 2 && word !== originalWord.toLowerCase() && !synonyms.includes(word)) {
-          synonyms.push(word);
+        // Extract the word text from any link
+        const wordMatch = itemHtml.match(/<a[^>]*>(.*?)<\/a>/);
+        if (wordMatch) {
+          let word = wordMatch[1]
+            .replace(/<[^>]*>/g, '')
+            .trim()
+            .toLowerCase();
+          
+          word = word.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+          
+          if (word && word.length > 2 && word !== originalWord.toLowerCase() && !synonyms.includes(word)) {
+            synonyms.push(word);
+          }
         }
       }
     }
   }
   
-  // Approach 3: Try meta description as last resort
+  // Approach 3: Look for any links in the entire page that might be synonyms
+  if (synonyms.length < 4) {
+    const linkRegex = /<a[^>]*href="\/thesaurus\/[^"]*"[^>]*>(.*?)<\/a>/gs;
+    let match;
+    
+    while ((match = linkRegex.exec(html)) !== null && synonyms.length < 4) {
+      let word = match[1]
+        .replace(/<[^>]*>/g, '')
+        .trim()
+        .toLowerCase();
+      
+      word = word.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+      
+      if (word && word.length > 2 && word !== originalWord.toLowerCase() && !synonyms.includes(word)) {
+        synonyms.push(word);
+      }
+    }
+  }
+  
+  // Approach 4: Try meta description as last resort
   if (synonyms.length === 0) {
     const metaDescriptionMatch = html.match(/<meta[^>]*name="description"[^>]*content="[^"]*Synonyms for[^:]*:([^"]*)"/i);
     if (metaDescriptionMatch) {
