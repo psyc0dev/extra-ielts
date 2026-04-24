@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trophy, BookOpen, Notebook, Fire, ClockCountdown, ArrowRight } from "@phosphor-icons/react";
-import { listAssignments, type AssignmentSummary } from "@/lib/api";
+import { Trophy, BookOpen, Notebook, Fire, ClockCountdown, ArrowRight, Users, Check as CheckIcon, X } from "@phosphor-icons/react";
+import { listAssignments, listMyInvitations, respondToInvitation, type AssignmentSummary, type StudentInvitation } from "@/lib/api";
 import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import { useNav } from "@/hooks/use-nav";
 import en from "@/locales/en";
@@ -14,13 +14,14 @@ import en from "@/locales/en";
 export function Dashboard() {
   const [tasks, setTasks] = useState<AssignmentSummary[]>([]);
   const [homework, setHomework] = useState<AssignmentSummary[]>([]);
+  const [invitations, setInvitations] = useState<StudentInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const sk = useDelayedLoading(loading);
   const { setPage } = useNav();
 
   useEffect(() => {
-    Promise.all([listAssignments("task"), listAssignments("homework")])
-      .then(([t, h]) => { setTasks(t.assignments); setHomework(h.assignments); })
+    Promise.all([listAssignments("task"), listAssignments("homework"), listMyInvitations()])
+      .then(([t, h, inv]) => { setTasks(t.assignments); setHomework(h.assignments); setInvitations(inv.invitations); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -238,7 +239,43 @@ export function Dashboard() {
         </Card>
       </motion.div>
 
-      <motion.div {...fade(3)}>
+      {invitations.filter((inv) => inv.status === "pending").length > 0 && (
+        <motion.div {...fade(3)}>
+          <Card className="rounded-xl border-neutral-800 bg-neutral-900">
+            <CardHeader className="px-4 pt-4 pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Users weight="bold" className="size-4" /> {en.dashboard.invitations.title}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 flex flex-col gap-3">
+              {invitations.filter((inv) => inv.status === "pending").map((inv) => (
+                <div key={inv.id} className="flex items-center justify-between gap-3 rounded-lg border border-neutral-800 px-3 py-3 text-xs">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-medium text-sm">{inv.groupName}</span>
+                    <span className="text-xs text-muted-foreground">{en.dashboard.invitations.invitedBy(inv.invitedByName)}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button size="sm" className="h-7 text-xs gap-1" onClick={async () => {
+                      await respondToInvitation(inv.id, "accept");
+                      setInvitations((prev) => prev.map((i) => i.id === inv.id ? { ...i, status: "accepted" as const } : i));
+                    }}>
+                      <CheckIcon weight="bold" className="size-3" /> {en.dashboard.invitations.accept}
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-7 text-xs border-red-700 text-red-400 hover:text-red-300" onClick={async () => {
+                      await respondToInvitation(inv.id, "decline");
+                      setInvitations((prev) => prev.map((i) => i.id === inv.id ? { ...i, status: "declined" as const } : i));
+                    }}>
+                      <X weight="bold" className="size-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      <motion.div {...fade(4)}>
       <Card className="rounded-xl border-neutral-800 bg-neutral-900">
         <CardHeader className="px-4 pt-4 pb-3">
           <CardTitle className="text-sm font-semibold flex items-center justify-between">

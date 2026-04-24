@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { BookOpen, ClockCountdown, Trophy, ArrowRight, Play, Headphones } from "@phosphor-icons/react";
+import { BookOpen, ClockCountdown, Trophy, ArrowRight, Play, Headphones, MagnifyingGlass } from "@phosphor-icons/react";
 import { listTests, startTest, getAttempt, type AssignmentAttemptDetail, type TestSummary } from "@/lib/api";
 import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import { TestRunner } from "@/components/TestRunner";
@@ -174,6 +174,7 @@ export function Tests({ onStartTest, onStopTest, timerActive }: {
   onStartTest: (name: string, seconds: number) => void; onStopTest: () => void; timerActive: boolean;
 }) {
   const [filter, setFilter] = useState<"all" | Status>("all");
+  const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<TestSummary | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -185,6 +186,15 @@ export function Tests({ onStartTest, onStopTest, timerActive }: {
   const sectionFinishRef = useRef(false);
   const registerSubmit = useCallback((submit: () => void) => { submitRef.current = submit; }, []);
 
+  const refresh = useCallback(async () => {
+    const res = await listTests();
+    setTests(res.tests.filter((t) => t.published !== false));
+  }, []);
+
+  useEffect(() => {
+    refresh().catch((err) => toast.error(err.message)).finally(() => setLoading(false));
+  }, [refresh]);
+
   useEffect(() => {
     if (wasTimerActive.current && !timerActive && activeAttempt && activeAttempt.attempt.status === "in-progress") {
       if (!sectionFinishRef.current) submitRef.current?.();
@@ -193,17 +203,16 @@ export function Tests({ onStartTest, onStopTest, timerActive }: {
     wasTimerActive.current = timerActive;
   }, [timerActive, activeAttempt]);
 
-  const refresh = async () => {
-    const res = await listTests();
-    setTests(res.tests.filter((t) => t.published !== false));
-  };
-
-  useEffect(() => {
-    refresh().catch((err) => toast.error(err.message)).finally(() => setLoading(false));
-  }, []);
-
   const open = (test: TestSummary) => { setSelected(test); setDialogOpen(true); };
-  const filtered = filter === "all" ? tests : tests.filter((t) => getStatus(t) === filter);
+  const filtered = useMemo(() => {
+    let result = tests;
+    if (filter !== "all") result = result.filter((t) => getStatus(t) === filter);
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      result = result.filter((t) => t.title.toLowerCase().includes(q));
+    }
+    return result;
+  }, [tests, filter, search]);
   const completed = tests.filter((t) => t.attempt?.status === "completed").length;
   const bands = tests.map((t) => t.attempt?.band).filter((b): b is number => b != null);
   const avgBand = bands.length ? +(bands.reduce((a, b) => a + b, 0) / bands.length).toFixed(2) : null;
@@ -257,9 +266,19 @@ export function Tests({ onStartTest, onStopTest, timerActive }: {
               </div>
             </motion.div>
 
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.06, ease: 'easeOut' as const }} className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <BookOpen weight="bold" className="size-4 text-muted-foreground" />
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.06, ease: 'easeOut' as const }} className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className="relative flex-1 max-w-xs">
+                  <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder={en.tests.search.placeholder}
+                    className="h-8 w-full rounded-md border border-neutral-800 bg-neutral-900 pl-8 pr-3 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+                  />
+                </div>
+                <BookOpen weight="bold" className="size-4 text-muted-foreground shrink-0" />
                 <span className="text-sm font-semibold">{en.tests.title}</span>
               </div>
               <Select value={filter} onValueChange={(v) => setFilter(v as "all" | Status)}>

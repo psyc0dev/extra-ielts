@@ -1,5 +1,5 @@
 ﻿import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { getMe, login, logout, register, setToken, setIsAdmin, type ApiUser } from "@/lib/api";
+import { getMe, login, logout, register, setToken, setIsAdmin, setIsTeacher, type ApiUser } from "@/lib/api";
 
 const AuthContext = createContext<{
   user: ApiUser | null;
@@ -19,10 +19,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await getMe();
       setUser(res.user);
       setIsAdmin(res.user.role === 'admin');
+      setIsTeacher(res.user.role === 'teacher');
     } catch {
       setUser(null);
       setToken(null);
       setIsAdmin(false);
+      setIsTeacher(false);
     }
   }, []);
 
@@ -39,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(res.token);
     setUser(res.user);
     setIsAdmin(res.user.role === 'admin');
+    setIsTeacher(res.user.role === 'teacher');
   }, []);
 
   const loginUser = useCallback(async (identifier: string, password: string) => {
@@ -46,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(res.token);
     setUser(res.user);
     setIsAdmin(res.user.role === 'admin');
+    setIsTeacher(res.user.role === 'teacher');
   }, []);
 
   const logoutUser = useCallback(async () => {
@@ -55,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(null);
       setUser(null);
       setIsAdmin(false);
+      setIsTeacher(false);
     }
   }, []);
 

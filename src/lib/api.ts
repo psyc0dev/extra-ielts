@@ -2,7 +2,7 @@
   id: string;
   username: string;
   email: string | null;
-  role: "admin" | "student";
+  role: "admin" | "teacher" | "student";
   avatarUrl?: string | null;
 };
 export type UserSettings = {
@@ -119,6 +119,34 @@ export type Group = {
   members: { id: string; username: string; email: string | null }[];
 };
 
+export type Invitation = {
+  id: string;
+  groupId: string;
+  userId: string;
+  username: string;
+  email: string | null;
+  invitedBy: string;
+  invitedByName: string;
+  status: "pending" | "accepted" | "declined";
+  createdAt: string;
+};
+
+export type StudentInvitation = {
+  id: string;
+  groupId: string;
+  groupName: string;
+  invitedByName: string;
+  status: "pending" | "accepted" | "declined";
+  createdAt: string;
+};
+
+export type MyGroup = {
+  id: string;
+  name: string;
+  createdAt: string;
+  memberCount: number;
+};
+
 export type StudentStatsBucket = {
   completed: number;
   total: number;
@@ -152,8 +180,11 @@ export function setToken(token: string | null) {
 }
 
 let _isAdmin = false;
+let _isTeacher = false;
 export function setIsAdmin(v: boolean) { _isAdmin = v; }
 export function getIsAdmin() { return _isAdmin; }
+export function setIsTeacher(v: boolean) { _isTeacher = v; }
+export function getIsTeacher() { return _isTeacher; }
 
 async function apiFetch<T>(path: string, options: RequestInit = {}) {
   const token = getToken();
@@ -262,7 +293,11 @@ export async function adminListUsers() {
   return apiFetch<{ users: ApiUser[] }>("/admin/users");
 }
 
-export async function adminCreateUser(payload: { username: string; email?: string; password: string; role: "admin" | "student" }) {
+export async function adminListStudents() {
+  return apiFetch<{ users: ApiUser[] }>("/admin/students");
+}
+
+export async function adminCreateUser(payload: { username: string; email?: string; password: string; role: "admin" | "teacher" | "student" }) {
   return apiFetch<{ user: ApiUser }>("/admin/users", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -354,6 +389,32 @@ export async function adminAssignToGroup(groupId: string, payload: { type: "task
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function adminListInvitations(groupId: string) {
+  return apiFetch<{ invitations: Invitation[] }>(`/admin/groups/${groupId}/invitations`);
+}
+
+export async function adminInviteStudent(groupId: string, userId: string) {
+  return apiFetch<{ invitation: { id: string; groupId: string; userId: string; status: string } }>(`/admin/groups/${groupId}/invitations`, {
+    method: "POST",
+    body: JSON.stringify({ groupId, userId }),
+  });
+}
+
+export async function listMyInvitations() {
+  return apiFetch<{ invitations: StudentInvitation[] }>('/invitations');
+}
+
+export async function respondToInvitation(invitationId: string, action: "accept" | "decline") {
+  return apiFetch<{ ok: boolean; status: string }>(`/invitations/${invitationId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action }),
+  });
+}
+
+export async function listMyGroups() {
+  return apiFetch<{ groups: MyGroup[] }>('/groups');
 }
 
 export async function requestPasswordReset(email: string) {

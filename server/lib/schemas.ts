@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const RoleSchema = z.enum(['admin', 'student'])
+export const RoleSchema = z.enum(['admin', 'teacher', 'student'])
 export const AssignmentTypeSchema = z.enum(['task', 'homework'])
 export const SectionKindSchema = z.enum(['listening', 'reading'])
 export const AttemptStatusSchema = z.enum(['in-progress', 'completed'])
@@ -86,6 +86,15 @@ export const GroupNameBodySchema = z.object({
 
 export const GroupMemberBodySchema = z.object({
   userId: z.string().min(1),
+})
+
+export const GroupInviteSchema = z.object({
+  groupId: z.string().min(1),
+  userId: z.string().min(1),
+})
+
+export const InvitationActionSchema = z.object({
+  action: z.enum(['accept', 'decline']),
 })
 
 export const AnswerBodySchema = z.object({

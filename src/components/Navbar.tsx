@@ -29,7 +29,7 @@ export default function Navbar() {
     { id: "Vocabulary", title: en.nav.vocabulary, icon: TextAa },
   ] as const;
 
-  const adminItems = user?.role === "admin"
+  const adminItems = (user?.role === "admin" || user?.role === "teacher")
     ? [{ id: "Admin", title: en.nav.admin, icon: ShieldCheck } as const]
     : [];
 

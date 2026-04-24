@@ -45,6 +45,7 @@ function PageContent({
   onFullscreen,
   timerActive,
   isAdmin,
+  isTeacher,
 }: {
   onSignOut: () => void;
   user: ApiUser;
@@ -56,6 +57,7 @@ function PageContent({
   onFullscreen: (v: boolean) => void;
   timerActive: boolean;
   isAdmin: boolean;
+  isTeacher: boolean;
 }) {
   const { page } = useNav();
   const pageLabels: Record<string, string> = {
@@ -83,7 +85,7 @@ function PageContent({
         onSettingsChange={onSettingsChange}
       />
     ),
-    Admin: isAdmin ? <Admin /> : <Dashboard />,
+    Admin: (isAdmin || isTeacher) ? <Admin /> : <Dashboard />,
   };
 
   return (
@@ -128,6 +130,7 @@ function AppShell({
   isFullscreen,
   setIsFullscreen,
   isAdmin,
+  isTeacher,
 }: {
   onSignOut: () => void;
   user: ApiUser;
@@ -135,6 +138,7 @@ function AppShell({
   isFullscreen: boolean;
   setIsFullscreen: (v: boolean) => void;
   isAdmin: boolean;
+  isTeacher: boolean;
 }) {
   const { timerActive, setTimerActive } = useNav();
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
@@ -194,6 +198,7 @@ function AppShell({
                 onFullscreen={setIsFullscreen}
                 timerActive={timerActive}
                 isAdmin={isAdmin}
+                isTeacher={isTeacher}
               />
             </SidebarInset>
           </div>
@@ -283,6 +288,7 @@ function AppBody() {
                 isFullscreen={isFullscreen}
                 setIsFullscreen={setIsFullscreen}
                 isAdmin={user.role === "admin"}
+                isTeacher={user.role === "teacher"}
               />
             </TooltipProvider>
           </NavProvider>

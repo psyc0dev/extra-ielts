@@ -1,7 +1,7 @@
 import type { Hono } from 'hono'
 import type { AppEnv, Role } from '../lib/types'
-import { CreateUserBodySchema, TestPublishedBodySchema, CreateAssignmentBodySchema, GroupAssignmentBodySchema, GroupNameBodySchema, GroupMemberBodySchema } from '../lib/schemas'
-import { createPasswordHash, nowIso, zParse, jsonParse, requireAdmin, requireAuth, toApiUser } from '../lib/store'
+import { CreateUserBodySchema, TestPublishedBodySchema, CreateAssignmentBodySchema, GroupAssignmentBodySchema, GroupNameBodySchema, GroupMemberBodySchema, GroupInviteSchema, InvitationActionSchema } from '../lib/schemas'
+import { createPasswordHash, nowIso, zParse, jsonParse, requireAdmin, requireTeacherOrAdmin, requireAuth, toApiUser } from '../lib/store'
 import { getTestById, getDbTests } from '../lib/tests'
 
 type UserRow = { id: string; username: string; email: string | null; role: string; password_hash: string; avatar_url: string | null }
@@ -12,6 +12,11 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
   api.get('/admin/users', requireAuth, requireAdmin, async (c) => {
     const rows = await c.env.DB.prepare('SELECT id, username, email, role, password_hash, avatar_url FROM users ORDER BY created_at').all<UserRow>()
     return c.json({ users: (rows.results ?? []).map((r) => toApiUser({ id: r.id, username: r.username, email: r.email, role: r.role as Role, passwordHash: r.password_hash, avatarUrl: r.avatar_url })) })
+  })
+
+  api.get('/admin/students', requireAuth, requireTeacherOrAdmin, async (c) => {
+    const rows = await c.env.DB.prepare("SELECT id, username, email, role, avatar_url FROM users WHERE role = 'student' ORDER BY username").all<{ id: string; username: string; email: string | null; role: string; avatar_url: string | null }>()
+    return c.json({ users: (rows.results ?? []).map((r) => ({ id: r.id, username: r.username, email: r.email, role: r.role as Role, avatarUrl: r.avatar_url ?? null })) })
   })
 
   api.post('/admin/users', requireAuth, requireAdmin, async (c) => {
@@ -29,7 +34,8 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     return c.json({ user: { id, username: data.username, email: data.email ?? null, role: data.role, avatarUrl: null } }, 201)
   })
 
-  api.get('/admin/tests', requireAuth, requireAdmin, async (c) => {
+  // Tests — teachers can manage tests (except delete)
+  api.get('/admin/tests', requireAuth, requireTeacherOrAdmin, async (c) => {
     const tests = await getDbTests(c.env.DB)
     return c.json({ tests: tests.map((t) => ({
       id: t.id, title: t.title, durationMinutes: t.durationMinutes, published: t.published ?? false,
@@ -39,13 +45,13 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     })) })
   })
 
-  api.get('/admin/tests/:testId', requireAuth, requireAdmin, async (c) => {
+  api.get('/admin/tests/:testId', requireAuth, requireTeacherOrAdmin, async (c) => {
     const test = await getTestById(c.env.DB, c.req.param('testId'))
     if (!test) return c.json({ error: 'Test not found.' }, 404)
     return c.json({ test })
   })
 
-  api.get('/admin/tests/:testId/download', requireAuth, requireAdmin, async (c) => {
+  api.get('/admin/tests/:testId/download', requireAuth, requireTeacherOrAdmin, async (c) => {
     const test = await getTestById(c.env.DB, c.req.param('testId'))
     if (!test) return c.json({ error: 'Test not found.' }, 404)
     const safeTitle = (test.title ?? test.id).replace(/[^a-z0-9]+/gi, '-').toLowerCase()
@@ -56,6 +62,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     })
   })
 
+  // Delete test — admin only
   api.delete('/admin/tests/:testId', requireAuth, requireAdmin, async (c) => {
     const testId = c.req.param('testId')
     if (!await getTestById(c.env.DB, testId)) return c.json({ error: 'Test not found.' }, 404)
@@ -65,7 +72,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     return c.json({ ok: true }, 200)
   })
 
-  api.post('/admin/tests', requireAuth, requireAdmin, async (c) => {
+  api.post('/admin/tests', requireAuth, requireTeacherOrAdmin, async (c) => {
     const body = await c.req.json<{ title: string; durationMinutes: number; sections: unknown[] }>()
     if (!body.title?.trim()) return c.json({ error: 'Title is required.' }, 400)
     if (typeof body.durationMinutes !== 'number' || body.durationMinutes < 1 || body.durationMinutes > 600) return c.json({ error: 'Invalid duration.' }, 400)
@@ -77,7 +84,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     return c.json({ test: { id } }, 201)
   })
 
-  api.put('/admin/tests/:testId', requireAuth, requireAdmin, async (c) => {
+  api.put('/admin/tests/:testId', requireAuth, requireTeacherOrAdmin, async (c) => {
     const testId = c.req.param('testId')
     const existing = await getTestById(c.env.DB, testId)
     if (!existing) return c.json({ error: 'Test not found.' }, 404)
@@ -94,7 +101,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     return c.json({ ok: true }, 200)
   })
 
-  api.patch('/admin/tests/:testId', requireAuth, requireAdmin, async (c) => {
+  api.patch('/admin/tests/:testId', requireAuth, requireTeacherOrAdmin, async (c) => {
     const { data, error } = await zParse(TestPublishedBodySchema, c)
     if (error) return error
     const testId = c.req.param('testId')
@@ -104,7 +111,8 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     return c.json({ ok: true }, 200)
   })
 
-  api.get('/admin/assignments', requireAuth, requireAdmin, async (c) => {
+  // Assignments — teachers can manage assignments
+  api.get('/admin/assignments', requireAuth, requireTeacherOrAdmin, async (c) => {
     const type = c.req.query('type') as 'task' | 'homework' | undefined
     if (type && type !== 'task' && type !== 'homework') return c.json({ error: 'Invalid assignment type.' }, 400)
     const rows = type
@@ -129,7 +137,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     })
   })
 
-  api.post('/admin/assignments', requireAuth, requireAdmin, async (c) => {
+  api.post('/admin/assignments', requireAuth, requireTeacherOrAdmin, async (c) => {
     const user = c.get('user')
     const { data, error } = await zParse(CreateAssignmentBodySchema, c)
     if (error) return error
@@ -145,7 +153,8 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     return c.json({ assignment: { id } }, 201)
   })
 
-  api.get('/admin/groups', requireAuth, requireAdmin, async (c) => {
+  // Groups — teachers can manage
+  api.get('/admin/groups', requireAuth, requireTeacherOrAdmin, async (c) => {
     const groups = await c.env.DB.prepare('SELECT id, name, created_at FROM groups ORDER BY created_at').all<{ id: string; name: string; created_at: string }>()
     const result = await Promise.all((groups.results ?? []).map(async (g) => {
       const members = await c.env.DB.prepare(
@@ -156,7 +165,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     return c.json({ groups: result })
   })
 
-  api.post('/admin/groups', requireAuth, requireAdmin, async (c) => {
+  api.post('/admin/groups', requireAuth, requireTeacherOrAdmin, async (c) => {
     const { data, error } = await zParse(GroupNameBodySchema, c)
     if (error) return error
     const id = crypto.randomUUID()
@@ -164,6 +173,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     return c.json({ group: { id, name: data.name } }, 201)
   })
 
+  // Delete group — admin only
   api.delete('/admin/groups/:groupId', requireAuth, requireAdmin, async (c) => {
     const groupId = c.req.param('groupId')
     const exists = await c.env.DB.prepare('SELECT 1 FROM groups WHERE id = ?').bind(groupId).first()
@@ -172,6 +182,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     return c.json({ ok: true }, 200)
   })
 
+  // Direct member add — admin only (teachers must use join request flow)
   api.post('/admin/groups/:groupId/members', requireAuth, requireAdmin, async (c) => {
     const groupId = c.req.param('groupId')
     const group = await c.env.DB.prepare('SELECT 1 FROM groups WHERE id = ?').bind(groupId).first()
@@ -184,13 +195,13 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     return c.json({ ok: true }, 201)
   })
 
-  api.delete('/admin/groups/:groupId/members/:userId', requireAuth, requireAdmin, async (c) => {
+  api.delete('/admin/groups/:groupId/members/:userId', requireAuth, requireTeacherOrAdmin, async (c) => {
     await c.env.DB.prepare('DELETE FROM group_members WHERE group_id = ? AND user_id = ?')
       .bind(c.req.param('groupId'), c.req.param('userId')).run()
     return c.json({ ok: true }, 200)
   })
 
-  api.post('/admin/groups/:groupId/assignments', requireAuth, requireAdmin, async (c) => {
+  api.post('/admin/groups/:groupId/assignments', requireAuth, requireTeacherOrAdmin, async (c) => {
     const user = c.get('user')
     const groupId = c.req.param('groupId')
     const group = await c.env.DB.prepare('SELECT 1 FROM groups WHERE id = ?').bind(groupId).first()
@@ -212,7 +223,8 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     return c.json({ count }, 201)
   })
 
-  api.get('/admin/users/:userId/stats', requireAuth, requireAdmin, async (c) => {
+  // Student stats — teachers can view
+  api.get('/admin/users/:userId/stats', requireAuth, requireTeacherOrAdmin, async (c) => {
     const userId = c.req.param('userId')
     const assignments = await c.env.DB.prepare('SELECT id, type FROM assignments WHERE assigned_to = ?').bind(userId).all<{ id: string; type: string }>()
     const assignmentMap = new Map((assignments.results ?? []).map((a) => [a.id, a.type]))
@@ -239,5 +251,121 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
         homework: summarize(byType('homework'), (assignments.results ?? []).filter((a) => a.type === 'homework').length),
       }
     })
+  })
+
+  // Invitations — teachers/admins invite students, students accept/decline
+  type InvitationRow = { id: string; group_id: string; user_id: string; invited_by: string; status: string; created_at: string }
+
+  api.post('/admin/groups/:groupId/invitations', requireAuth, requireTeacherOrAdmin, async (c) => {
+    const inviter = c.get('user')
+    const groupId = c.req.param('groupId')
+    const group = await c.env.DB.prepare('SELECT 1 FROM groups WHERE id = ?').bind(groupId).first()
+    if (!group) return c.json({ error: 'Group not found.' }, 404)
+
+    const { data, error } = await zParse(GroupInviteSchema, c)
+    if (error) return error
+
+    const targetUser = await c.env.DB.prepare('SELECT id, role FROM users WHERE id = ?').bind(data.userId).first<{ id: string; role: string }>()
+    if (!targetUser) return c.json({ error: 'User not found.' }, 404)
+
+    const alreadyMember = await c.env.DB.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?').bind(groupId, data.userId).first()
+    if (alreadyMember) return c.json({ error: 'User is already a member of this group.' }, 400)
+
+    const existing = await c.env.DB.prepare("SELECT status FROM group_invitations WHERE group_id = ? AND user_id = ? AND status = 'pending'").bind(groupId, data.userId).first<{ status: string }>()
+    if (existing) return c.json({ error: 'Invitation already pending for this user.' }, 400)
+
+    const id = crypto.randomUUID()
+    await c.env.DB.prepare('INSERT INTO group_invitations (id, group_id, user_id, invited_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(id, groupId, data.userId, inviter.id, 'pending', nowIso()).run()
+    return c.json({ invitation: { id, groupId, userId: data.userId, status: 'pending' } }, 201)
+  })
+
+  api.get('/admin/groups/:groupId/invitations', requireAuth, requireTeacherOrAdmin, async (c) => {
+    const groupId = c.req.param('groupId')
+    const group = await c.env.DB.prepare('SELECT 1 FROM groups WHERE id = ?').bind(groupId).first()
+    if (!group) return c.json({ error: 'Group not found.' }, 404)
+
+    const rows = await c.env.DB.prepare("SELECT * FROM group_invitations WHERE group_id = ? ORDER BY created_at DESC").bind(groupId).all<InvitationRow>()
+    const userIds = [...new Set((rows.results ?? []).flatMap((r) => [r.user_id, r.invited_by]))]
+    const userMap = new Map<string, { username: string; email: string | null }>()
+    await Promise.all(userIds.map(async (uid) => {
+      const u = await c.env.DB.prepare('SELECT id, username, email FROM users WHERE id = ?').bind(uid).first<{ id: string; username: string; email: string | null }>()
+      if (u) userMap.set(u.id, { username: u.username, email: u.email })
+    }))
+
+    return c.json({
+      invitations: (rows.results ?? []).map((r) => ({
+        id: r.id, groupId: r.group_id, userId: r.user_id,
+        username: userMap.get(r.user_id)?.username ?? 'Unknown',
+        email: userMap.get(r.user_id)?.email ?? null,
+        invitedBy: r.invited_by,
+        invitedByName: userMap.get(r.invited_by)?.username ?? 'Unknown',
+        status: r.status, createdAt: r.created_at,
+      }))
+    })
+  })
+
+  // Student-facing: list own invitations
+  api.get('/invitations', requireAuth, async (c) => {
+    const user = c.get('user')
+    const rows = await c.env.DB.prepare("SELECT * FROM group_invitations WHERE user_id = ? ORDER BY created_at DESC").bind(user.id).all<InvitationRow>()
+    const groupIds = [...new Set((rows.results ?? []).map((r) => r.group_id))]
+    const groupMap = new Map<string, string>()
+    await Promise.all(groupIds.map(async (gid) => {
+      const g = await c.env.DB.prepare('SELECT id, name FROM groups WHERE id = ?').bind(gid).first<{ id: string; name: string }>()
+      if (g) groupMap.set(g.id, g.name)
+    }))
+
+    const inviterIds = [...new Set((rows.results ?? []).map((r) => r.invited_by))]
+    const inviterMap = new Map<string, string>()
+    await Promise.all(inviterIds.map(async (uid) => {
+      const u = await c.env.DB.prepare('SELECT id, username FROM users WHERE id = ?').bind(uid).first<{ id: string; username: string }>()
+      if (u) inviterMap.set(u.id, u.username)
+    }))
+
+    return c.json({
+      invitations: (rows.results ?? []).map((r) => ({
+        id: r.id, groupId: r.group_id, groupName: groupMap.get(r.group_id) ?? 'Unknown',
+        invitedByName: inviterMap.get(r.invited_by) ?? 'Unknown',
+        status: r.status, createdAt: r.created_at,
+      }))
+    })
+  })
+
+  // Student-facing: accept or decline invitation
+  api.patch('/invitations/:invitationId', requireAuth, async (c) => {
+    const user = c.get('user')
+    const invitationId = c.req.param('invitationId')
+    const { data, error } = await zParse(InvitationActionSchema, c)
+    if (error) return error
+
+    const inv = await c.env.DB.prepare('SELECT * FROM group_invitations WHERE id = ? AND user_id = ?').bind(invitationId, user.id).first<InvitationRow>()
+    if (!inv) return c.json({ error: 'Invitation not found.' }, 404)
+    if (inv.status !== 'pending') return c.json({ error: 'Invitation already processed.' }, 400)
+
+    const newStatus = data.action === 'accept' ? 'accepted' : 'declined'
+    await c.env.DB.prepare('UPDATE group_invitations SET status = ? WHERE id = ?').bind(newStatus, invitationId).run()
+
+    if (data.action === 'accept') {
+      await c.env.DB.prepare('INSERT OR IGNORE INTO group_members (group_id, user_id) VALUES (?, ?)').bind(inv.group_id, user.id).run()
+    }
+
+    return c.json({ ok: true, status: newStatus })
+  })
+
+  // Student-facing: list groups the user is a member of
+  api.get('/groups', requireAuth, async (c) => {
+    const user = c.get('user')
+    const memberOf = await c.env.DB.prepare('SELECT group_id FROM group_members WHERE user_id = ?').bind(user.id).all<{ group_id: string }>()
+    const groupIds = (memberOf.results ?? []).map((r) => r.group_id)
+    if (groupIds.length === 0) return c.json({ groups: [] })
+
+    const groups = await Promise.all(groupIds.map(async (gid) => {
+      const g = await c.env.DB.prepare('SELECT id, name, created_at FROM groups WHERE id = ?').bind(gid).first<{ id: string; name: string; created_at: string }>()
+      if (!g) return null
+      const count = await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM group_members WHERE group_id = ?').bind(gid).first<{ cnt: number }>()
+      return { id: g.id, name: g.name, createdAt: g.created_at, memberCount: count?.cnt ?? 0 }
+    }))
+    return c.json({ groups: groups.filter(Boolean) })
   })
 }

@@ -184,7 +184,7 @@ export const dbGetUser = async (db: D1Database, userId: string): Promise<User | 
     id: row.id,
     username: row.username,
     email: row.email ?? null,
-    role: row.role as 'admin' | 'student',
+    role: row.role as 'admin' | 'teacher' | 'student',
     passwordHash: row.password_hash,
     avatarUrl: row.avatar_url ?? null,
   }
@@ -216,6 +216,12 @@ export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
 export const requireAdmin: MiddlewareHandler<AppEnv> = async (c, next) => {
   const user = c.get('user')
   if (user.role !== 'admin') return c.json({ error: 'Forbidden' }, 403)
+  await next()
+}
+
+export const requireTeacherOrAdmin: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const user = c.get('user')
+  if (user.role !== 'admin' && user.role !== 'teacher') return c.json({ error: 'Forbidden' }, 403)
   await next()
 }
 

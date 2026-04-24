@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { motion, AnimatePresence } from "motion/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -23,6 +24,7 @@ import {
   adminListAssignments,
   adminListTests,
   adminListUsers,
+  adminListStudents,
   adminToggleTestPublished,
   adminListGroups,
   adminCreateGroup,
@@ -33,6 +35,8 @@ import {
   adminGetStudentStats,
   adminUploadTest,
   adminDeleteTest,
+  adminListInvitations,
+  adminInviteStudent,
   getToken,
   type AdminAssignment,
   type ApiUser,
@@ -40,6 +44,7 @@ import {
   type TestDetail,
   type Group,
   type StudentStats,
+  type Invitation,
 } from "@/lib/api";
 import {
   toast
@@ -57,11 +62,16 @@ import {
   UsersThree,
   CaretDown
 } from "@phosphor-icons/react";
+import { TestBuilderDialog } from "@/components/test-builder";
+import { useAuth } from "@/hooks/use-auth";
 import en from "@/locales/en";
 
 type AdminSection = "overview" | "users" | "tests" | "assignments" | "groups" | "user-details" | "group-details";
 
 export function Admin() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const isTeacher = user?.role === "teacher";
   const [users, setUsers] = useState<ApiUser[]>([]);
   const [tests, setTests] = useState<TestSummary[]>([]);
   const [homeworkAssignments, setHomeworkAssignments] = useState<AdminAssignment[]>([]);
@@ -79,18 +89,31 @@ export function Admin() {
 
 
   const loadAll = useCallback(async () => {
-    const [usersRes, testsRes, homeworkRes, groupsRes] = await Promise.all([
-      adminListUsers(),
-      adminListTests(),
-      adminListAssignments("homework"),
-      adminListGroups(),
-    ]);
-    setUsers(usersRes.users);
-    setTests(testsRes.tests);
-    setHomeworkAssignments(homeworkRes.assignments);
-    setGroups(groupsRes.groups);
+    if (isAdmin) {
+      const [usersRes, testsRes, homeworkRes, groupsRes] = await Promise.all([
+        adminListUsers(),
+        adminListTests(),
+        adminListAssignments("homework"),
+        adminListGroups(),
+      ]);
+      setUsers(usersRes.users);
+      setTests(testsRes.tests);
+      setHomeworkAssignments(homeworkRes.assignments);
+      setGroups(groupsRes.groups);
+    } else {
+      const [testsRes, homeworkRes, groupsRes, studentsRes] = await Promise.all([
+        adminListTests(),
+        adminListAssignments("homework"),
+        adminListGroups(),
+        adminListStudents(),
+      ]);
+      setTests(testsRes.tests);
+      setHomeworkAssignments(homeworkRes.assignments);
+      setGroups(groupsRes.groups);
+      setUsers(studentsRes.users);
+    }
     setLoading(false);
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     loadAll().catch((err) => toast.error(err.message));
@@ -175,7 +198,7 @@ export function Admin() {
 
   const navItems: { id: AdminSection; label: string; description: string; icon: ReactNode }[] = [
     { id: "overview", label: en.admin.sections.overview, description: en.admin.sections.overviewSub, icon: <Gauge weight="bold" className="size-4" /> },
-    { id: "users", label: en.admin.sections.users, description: en.admin.sections.usersSub, icon: <UsersThree weight="bold" className="size-4" /> },
+    ...(isAdmin ? [{ id: "users" as AdminSection, label: en.admin.sections.users, description: en.admin.sections.usersSub, icon: <UsersThree weight="bold" className="size-4" /> }] : []),
     { id: "tests", label: en.admin.sections.tests, description: en.admin.sections.testsSub, icon: <BookOpenIcon weight="bold" className="size-4" /> },
     { id: "assignments", label: en.admin.sections.assignments, description: en.admin.sections.assignmentsSub, icon: <ClipboardText weight="bold" className="size-4" /> },
     { id: "groups", label: en.admin.sections.groups, description: en.admin.sections.groupsSub, icon: <Users weight="bold" className="size-4" /> },
@@ -231,6 +254,11 @@ export function Admin() {
             <div className="flex flex-wrap items-center gap-2">
               {section === "tests" && (
                 <div className="flex items-center gap-2">
+                  <TestBuilderDialog
+                    onCreated={(test) => {
+                      setTests((prev) => [test, ...prev]);
+                    }}
+                  />
                   <UploadTestButton
                     onUpload={async (testData) => {
                       const res = await adminUploadTest(testData);
@@ -439,9 +467,11 @@ export function Admin() {
                             <Button size="sm" variant="outline" className="h-7 text-xs border-neutral-700" onClick={() => handleDownloadTest(test)}>
                               {en.admin.tests.actions.downloadJson}
                             </Button>
-                            <Button size="sm" variant="outline" className="h-7 text-xs border-red-700 text-red-400 hover:text-red-300" onClick={() => handleDeleteTest(test)}>
-                              {en.admin.tests.actions.delete}
-                            </Button>
+                            {isAdmin && (
+                              <Button size="sm" variant="outline" className="h-7 text-xs border-red-700 text-red-400 hover:text-red-300" onClick={() => handleDeleteTest(test)}>
+                                {en.admin.tests.actions.delete}
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -527,6 +557,7 @@ export function Admin() {
                   groups={visibleGroups}
                   users={users}
                   tests={tests}
+                  isAdmin={isAdmin}
                   onViewGroup={(group) => {
                     setSelectedGroup(group);
                     setSection("group-details");
@@ -564,6 +595,8 @@ export function Admin() {
                 setSelectedUser(user);
                 setSection("user-details");
               }}
+              onMemberRemoved={(groupId, userId) => setGroups((prev) => prev.map((g) => g.id === groupId ? { ...g, members: g.members.filter((m) => m.id !== userId) } : g))}
+              allUsers={users}
             />
           )}
 
@@ -739,13 +772,19 @@ function GroupDetailsPage({
   group,
   onBack,
   onViewUser,
+  onMemberRemoved,
+  allUsers,
 }: {
   group: Group;
   onBack: () => void;
   onViewUser: (userId: string) => void;
+  onMemberRemoved: (groupId: string, userId: string) => void;
+  allUsers: ApiUser[];
 }) {
   const [statsByUser, setStatsByUser] = useState<Record<string, StudentStats | null>>({});
   const [loading, setLoading] = useState(false);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -770,6 +809,27 @@ function GroupDetailsPage({
     return () => { mounted = false; };
   }, [group]);
 
+  useEffect(() => {
+    let mounted = true;
+    adminListInvitations(group.id)
+      .then((res) => { if (mounted) setInvitations(res.invitations); })
+      .catch(() => {})
+    return () => { mounted = false; };
+  }, [group.id]);
+
+  const pendingInvitations = invitations.filter((r) => r.status === "pending");
+
+  const memberIds = new Set(group.members.map((m) => m.id));
+  const pendingUserIds = new Set(pendingInvitations.map((inv) => inv.userId));
+  const eligibleStudents = allUsers.filter((u) => u.role === "student" && !memberIds.has(u.id) && !pendingUserIds.has(u.id));
+
+  const handleInvite = async (userId: string) => {
+    await adminInviteStudent(group.id, userId);
+    setInviteOpen(false);
+    const res = await adminListInvitations(group.id);
+    setInvitations(res.invitations);
+  };
+
   return (
     <Card className="border-neutral-800 bg-neutral-900">
       <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -777,9 +837,33 @@ function GroupDetailsPage({
           <CardTitle className="text-xs font-semibold">{en.admin.groupDetails.title}</CardTitle>
           <div className="text-xs text-muted-foreground mt-1">{en.admin.groupDetails.membersCount(group.name, group.members.length)}</div>
         </div>
-        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onBack}>
-          {en.admin.groupDetails.backButton}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Popover open={inviteOpen} onOpenChange={setInviteOpen}>
+            <PopoverTrigger asChild>
+              <Button size="sm" className="h-7 text-xs gap-1" disabled={eligibleStudents.length === 0}>
+                <Plus weight="bold" className="size-3" /> {en.admin.groupDetails.inviteStudent}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-0 border-neutral-800 bg-neutral-950" align="end">
+              <Command>
+                <CommandInput placeholder={en.admin.groupDetails.inviteStudent} />
+                <CommandList>
+                  <CommandEmpty>{en.admin.groups.noResults}</CommandEmpty>
+                  <CommandGroup>
+                    {eligibleStudents.map((u) => (
+                      <CommandItem key={u.id} value={u.username} onSelect={() => handleInvite(u.id)}>
+                        {u.username}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onBack}>
+            {en.admin.groupDetails.backButton}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {group.members.length === 0 ? (
@@ -811,14 +895,51 @@ function GroupDetailsPage({
                   <TableCell>{loading ? <Skeleton className="h-3 w-10" /> : assignmentsDone}</TableCell>
                   <TableCell>{loading ? <Skeleton className="h-3 w-8" /> : assignmentsAvg}</TableCell>
                   <TableCell className="text-right">
-                    <Button size="sm" variant="outline" className="h-7 text-xs border-neutral-700" onClick={() => onViewUser(member.id)}>
-                      {en.admin.users.viewStats}
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button size="sm" variant="outline" className="h-7 text-xs border-neutral-700" onClick={() => onViewUser(member.id)}>
+                        {en.admin.users.viewStats}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs text-red-400 hover:text-red-300" onClick={async () => {
+                        await adminRemoveGroupMember(group.id, member.id);
+                        onMemberRemoved(group.id, member.id);
+                      }}>
+                        <Trash weight="bold" className="size-3" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               )})}
             </TableBody>
           </Table>
+        )}
+
+        {pendingInvitations.length > 0 && (
+          <>
+            <Separator className="my-4 bg-neutral-800" />
+            <div className="text-xs font-semibold mb-2">{en.admin.groupDetails.pendingInvitations} ({pendingInvitations.length})</div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{en.admin.groupDetails.tableHeaders.student}</TableHead>
+                  <TableHead>{en.admin.groupDetails.invitedBy}</TableHead>
+                  <TableHead>{en.admin.groupDetails.joinRequestDate}</TableHead>
+                  <TableHead>{en.admin.groupDetails.invitationStatus}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pendingInvitations.map((inv) => (
+                  <TableRow key={inv.id}>
+                    <TableCell className="font-medium">{inv.username}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs">{inv.invitedByName}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs">{new Date(inv.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-[10px] border-yellow-700 text-yellow-400">{en.admin.groupDetails.statusPending}</Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </>
         )}
       </CardContent>
     </Card>
@@ -900,12 +1021,12 @@ function AssignmentPanel({
   );
 }
 
-function CreateUserDialog({ onCreate }: { onCreate: (payload: { username: string; email?: string; password: string; role: "admin" | "student" }) => Promise<void> }) {
+function CreateUserDialog({ onCreate }: { onCreate: (payload: { username: string; email?: string; password: string; role: "admin" | "teacher" | "student" }) => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"admin" | "student">("student");
+  const [role, setRole] = useState<"admin" | "teacher" | "student">("student");
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -933,12 +1054,13 @@ function CreateUserDialog({ onCreate }: { onCreate: (payload: { username: string
           </Field>
           <Field>
             <FieldLabel>{en.admin.users.dialog.role}</FieldLabel>
-            <Select value={role} onValueChange={(value) => setRole(value as "admin" | "student")}>
+            <Select value={role} onValueChange={(value) => setRole(value as "admin" | "teacher" | "student")}>
               <SelectTrigger>
                 <SelectValue placeholder={en.admin.users.dialog.role} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="student">{en.admin.users.dialog.roleStudent}</SelectItem>
+                <SelectItem value="teacher">{en.admin.users.dialog.roleTeacher}</SelectItem>
                 <SelectItem value="admin">{en.admin.users.dialog.roleAdmin}</SelectItem>
               </SelectContent>
             </Select>
@@ -1153,6 +1275,7 @@ function GroupsPanel({
   groups,
   users,
   tests,
+  isAdmin,
   onViewGroup,
   onGroupCreated,
   onGroupDeleted,
@@ -1162,6 +1285,7 @@ function GroupsPanel({
   groups: Group[];
   users: ApiUser[];
   tests: TestSummary[];
+  isAdmin: boolean;
   onViewGroup: (group: Group) => void;
   onGroupCreated: (g: Group) => void;
   onGroupDeleted: (id: string) => void;
@@ -1194,6 +1318,7 @@ function GroupsPanel({
             group={group}
             users={users}
             tests={tests}
+            isAdmin={isAdmin}
             onView={() => onViewGroup(group)}
             onDelete={async () => {
               await adminDeleteGroup(group.id);
@@ -1220,6 +1345,7 @@ function GroupCard({
   group,
   users,
   tests,
+  isAdmin,
   onView,
   onDelete,
   onAddMember,
@@ -1228,6 +1354,7 @@ function GroupCard({
   group: Group;
   users: ApiUser[];
   tests: TestSummary[];
+  isAdmin: boolean;
   onView: () => void;
   onDelete: () => Promise<void>;
   onAddMember: (userId: string) => Promise<void>;
@@ -1250,14 +1377,16 @@ function GroupCard({
           <Button size="sm" variant="outline" className="h-7 text-xs border-neutral-700" onClick={onView}>
             {en.admin.groupDetails.viewDetails}
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 px-2 text-red-400 hover:text-red-300 hover:bg-red-950/30"
-            onClick={onDelete}
-          >
-            <Trash weight="bold" className="size-3" />
-          </Button>
+          {isAdmin && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-red-400 hover:text-red-300 hover:bg-red-950/30"
+              onClick={onDelete}
+            >
+              <Trash weight="bold" className="size-3" />
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
@@ -1273,7 +1402,7 @@ function GroupCard({
             ))}
           </div>
         )}
-        {nonMembers.length > 0 && (
+        {isAdmin && nonMembers.length > 0 && (
           <AddMemberSelect nonMembers={nonMembers} onAdd={onAddMember} />
         )}
       </CardContent>

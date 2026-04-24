@@ -161,7 +161,6 @@ export function Vocabulary() {
     if (index < words.length - 1) {
       setIndex((i) => i + 1);
     } else {
-      // Test completed - show completion message
       toast.success(en.vocabulary.testCompleted);
       handleReset();
       return;
