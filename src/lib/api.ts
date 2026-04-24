@@ -398,7 +398,7 @@ export async function adminListInvitations(groupId: string) {
 export async function adminInviteStudent(groupId: string, userId: string) {
   return apiFetch<{ invitation: { id: string; groupId: string; userId: string; status: string } }>(`/admin/groups/${groupId}/invitations`, {
     method: "POST",
-    body: JSON.stringify({ groupId, userId }),
+    body: JSON.stringify({ userId }),
   });
 }
 

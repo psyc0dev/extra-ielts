@@ -1,9 +1,11 @@
 ﻿import { useState, useEffect, useRef, useContext } from "react";
-import { getCurrentWindow, type Window } from "@tauri-apps/api/window";
+import { type Window } from "@tauri-apps/api/window";
 import { NavContext } from "@/hooks/use-nav";
 import { forceSubmitAttempt } from "@/lib/api";
 import { Minus, Square, Minimize2, X } from "lucide-react";
 import en from "@/locales/en";
+
+const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 export default function WindowControls({ onFullscreen }: { onFullscreen?: (v: boolean) => void }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -18,11 +20,14 @@ export default function WindowControls({ onFullscreen }: { onFullscreen?: (v: bo
   }, [activeAttemptId]);
 
   useEffect(() => {
+    if (!isTauri) return;
+
     let appWindow: Window | null = null;
     let unlistenResize: (() => void) | null = null;
     let unlistenClose: (() => void) | null = null;
 
     const init = async () => {
+      const { getCurrentWindow } = await import("@tauri-apps/api/window");
       appWindow = getCurrentWindow();
       windowRef.current = appWindow;
 
