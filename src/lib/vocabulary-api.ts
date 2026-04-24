@@ -43,6 +43,15 @@ export interface DictionaryResponse {
   data: DictionaryEntry | null;
 }
 
+export interface SimilarWordsResponse {
+  success: boolean;
+  data?: {
+    word: string;
+    similarWords: string[];
+  };
+  error?: string;
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export async function getVocabularyTest(): Promise<VocabularyTestResponse> {
@@ -67,6 +76,19 @@ export async function getDictionaryEntry(word: string): Promise<DictionaryRespon
     return await response.json();
   } catch (error) {
     console.error('Error fetching dictionary entry:', error);
+    throw error;
+  }
+}
+
+export async function getSimilarWords(word: string): Promise<SimilarWordsResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/vocabulary/similar/${encodeURIComponent(word)}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch similar words: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching similar words:', error);
     throw error;
   }
 }

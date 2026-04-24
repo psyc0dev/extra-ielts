@@ -115,6 +115,79 @@ router.get('/dictionary/:word', async (c) => {
   }
 });
 
+// Get similar words for a word
+router.get('/similar/:word', async (c) => {
+  try {
+    const { word } = c.req.param();
+    
+    // Try multiple APIs for similar words
+    const similarWords: string[] = [];
+    
+    // API 1: WordsAPI (if available)
+    try {
+      const wordsApiResponse = await fetch(`https://api.datamuse.com/words?rel_syn=${encodeURIComponent(word)}&max=5`);
+      if (wordsApiResponse.ok) {
+        const wordsData = await wordsApiResponse.json() as Array<{ word: string }>;
+        similarWords.push(...wordsData.map((item) => item.word));
+      }
+    } catch (error) {
+      console.log('WordsAPI failed:', error);
+    }
+    
+    // API 2: Datamuse for related words
+    try {
+      const datamuseResponse = await fetch(`https://api.datamuse.com/words?ml=${encodeURIComponent(word)}&max=5`);
+      if (datamuseResponse.ok) {
+        const datamuseData = await datamuseResponse.json() as Array<{ word: string }>;
+        similarWords.push(...datamuseData.map((item) => item.word));
+      }
+    } catch (error) {
+      console.log('Datamuse API failed:', error);
+    }
+    
+    // API 3: Free Dictionary API for synonyms
+    try {
+      const freeDictResponse = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+      if (freeDictResponse.ok) {
+        const freeDictData = await freeDictResponse.json() as Array<{
+          meanings: Array<{
+            synonyms: string[];
+          }>;
+        }>;
+        if (Array.isArray(freeDictData) && freeDictData.length > 0) {
+          const meanings = freeDictData[0]?.meanings || [];
+          meanings.forEach((meaning) => {
+            const synonyms = meaning.synonyms || [];
+            similarWords.push(...synonyms.slice(0, 3)); // Limit to avoid too many results
+          });
+        }
+      }
+    } catch (error) {
+      console.log('Free Dictionary API failed:', error);
+    }
+    
+    // Remove duplicates and the original word
+    const uniqueWords = [...new Set(similarWords)]
+      .filter(w => w.toLowerCase() !== word.toLowerCase())
+      .filter(w => w.length > 2) // Filter out very short words
+      .slice(0, 8); // Limit to 8 similar words
+    
+    return c.json({
+      success: true,
+      data: {
+        word,
+        similarWords: uniqueWords
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching similar words:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to fetch similar words'
+    }, 500);
+  }
+});
+
 export function registerVocabularyRoutes(app: any) {
   app.route('/vocabulary', router);
 }

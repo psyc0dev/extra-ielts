@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { speakText } from "@/lib/tts";
 import { toast } from "sonner";
-import { getVocabularyTest, getDictionaryEntry, type VocabularyWord, type DictionaryEntry, type DictDefinition } from "@/lib/vocabulary-api";
+import { getVocabularyTest, getDictionaryEntry, getSimilarWords, type VocabularyWord, type DictionaryEntry, type DictDefinition } from "@/lib/vocabulary-api";
 import { en } from "@/lib/en";
 
 
@@ -53,6 +53,8 @@ export function Vocabulary() {
   const [answered, setAnswered] = useState(false);
   const [dictEntry, setDictEntry] = useState<DictionaryEntry | null>(null);
   const [dictLoading, setDictLoading] = useState(false);
+  const [similarWords, setSimilarWords] = useState<string[]>([]);
+  const [similarLoading, setSimilarLoading] = useState(false);
 
   const current = words[index];
   const total = words.length;
@@ -99,22 +101,36 @@ export function Vocabulary() {
   };
 
   const handleSelect = useCallback(
-    (option: string) => {
-      if (answered || !current) return;
+    async (option: string) => {
+      if (!current || answered) return;
       setSelected(option);
       setAnswered(true);
 
       const isCorrect = option === current.meaning;
       if (isCorrect) setCorrect((c) => c + 1);
-      else setIncorrect((c) => c + 1);
+      else setIncorrect((i) => i + 1);
 
       setDictLoading(true);
-      getDictionaryEntry(current.word).then((response) => {
-        setDictEntry(response.data);
+      setSimilarLoading(true);
+      
+      // Fetch both dictionary entry and similar words
+      Promise.all([
+        getDictionaryEntry(current.word),
+        getSimilarWords(current.word)
+      ]).then(([dictResponse, similarResponse]) => {
+        setDictEntry(dictResponse.data);
+        if (similarResponse.success && similarResponse.data) {
+          setSimilarWords(similarResponse.data.similarWords);
+        }
         setDictLoading(false);
+        setSimilarLoading(false);
+      }).catch((error) => {
+        console.error('Error fetching word data:', error);
+        setDictLoading(false);
+        setSimilarLoading(false);
       });
     },
-    [answered, current?.meaning, current?.word, getDictionaryEntry],
+    [answered, current?.meaning, current?.word],
   );
 
   const handleReset = useCallback(async () => {
@@ -129,6 +145,7 @@ export function Vocabulary() {
         setCorrect(0);
         setIncorrect(0);
         setDictEntry(null);
+        setSimilarWords([]);
       } else {
         toast.error(en.vocabulary.failedToReset);
       }
@@ -152,6 +169,7 @@ export function Vocabulary() {
     setSelected(null);
     setAnswered(false);
     setDictEntry(null);
+    setSimilarWords([]);
   }, [index, words, handleReset]);
 
   const optionStyle = (option: string) => {
@@ -346,6 +364,49 @@ export function Vocabulary() {
                 ) : (
                   <div className="px-4 py-3">
                     <p className="text-xs text-muted-foreground">{en.vocabulary.noDictionaryEntry}</p>
+                  </div>
+                )}
+
+                {/* Similar Words */}
+                {similarWords.length > 0 && (
+                  <div className="border-t border-neutral-800">
+                    <div className="px-4 py-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <BookOpen className="size-3.5 text-amber-400" />
+                        <span className="text-xs font-medium text-amber-400">Similar words:</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {similarWords.map((word, index) => (
+                          <Badge
+                            key={index}
+                            variant="outline"
+                            className="text-xs px-2 py-0.5 border-amber-500/30 text-amber-400/80 bg-amber-500/5 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                            onClick={() => {
+                              try {
+                                if (navigator.clipboard) {
+                                  navigator.clipboard.writeText(word);
+                                  toast.success(`Copied "${word}" to clipboard`);
+                                } else {
+                                  // Fallback for older browsers
+                                  const textArea = document.createElement('textarea');
+                                  textArea.value = word;
+                                  document.body.appendChild(textArea);
+                                  textArea.select();
+                                  document.execCommand('copy');
+                                  document.body.removeChild(textArea);
+                                  toast.success(`Copied "${word}" to clipboard`);
+                                }
+                              } catch (error) {
+                                console.error('Failed to copy text:', error);
+                                toast.error('Failed to copy to clipboard');
+                              }
+                            }}
+                          >
+                            {word}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
               </motion.div>
