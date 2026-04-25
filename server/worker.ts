@@ -1,5 +1,5 @@
 import { createApp } from './app'
-export { ChatRoomDO } from './lib/ChatRoomDO'
+export { ChatWebSocket } from './lib/ChatWebSocket'
 
 const app = createApp()
 

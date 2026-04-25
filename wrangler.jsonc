@@ -16,14 +16,14 @@
     "bindings": [
       {
         "name": "CHAT_ROOM",
-        "class_name": "ChatRoomDO"
+        "class_name": "ChatWebSocket"
       }
     ]
   },
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": ["ChatRoomDO"]
+      "new_sqlite_classes": ["ChatWebSocket"]
     }
   ],
   "vars": {

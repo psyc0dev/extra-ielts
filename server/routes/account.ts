@@ -8,7 +8,7 @@ import axios from 'axios'
 
 const resetLimiter = rateLimiter({
   windowMs: 15 * 60_000,
-  limit: 5,
+  limit: 10,
   store: new CacheStore(15 * 60_000),
   keyGenerator: (c) => c.req.header('x-forwarded-for') ?? 'unknown',
   message: { error: 'Too many attempts. Please try again later.' },

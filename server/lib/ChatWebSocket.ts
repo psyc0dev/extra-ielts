@@ -1,6 +1,6 @@
 import type { Bindings } from './types'
 
-export class ChatRoomDO {
+export class ChatWebSocket {
   state: DurableObjectState
   env: Bindings
 

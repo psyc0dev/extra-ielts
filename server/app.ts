@@ -32,7 +32,7 @@ export const createApp = () => {
 
   api.use('*', rateLimiter({
     windowMs: 60_000,
-    limit: 60,
+    limit: 120,
     store: new CacheStore(60_000),
     keyGenerator: (c) => c.req.header('x-forwarded-for') ?? 'unknown',
     message: { error: 'Too many requests. Please try again later.' },
