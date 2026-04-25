@@ -116,6 +116,7 @@ function ChatRoom({
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const sentIds = useRef<Set<string>>(new Set());
 
   const loadMessages = async () => {
     try {
@@ -134,9 +135,10 @@ function ChatRoom({
     const token = Cookies.get("accessToken");
     if (!token) return;
 
-    // Use ws:// for localhost, wss:// for production
-    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
+
+    // Derive WS protocol from the API URL, not the page URL (Tauri uses tauri:// protocol)
+    const wsProtocol = baseUrl.startsWith("https://") ? "wss:" : "ws:";
 
     let wsUrl: string;
     if (baseUrl.startsWith("/")) {
@@ -157,6 +159,8 @@ function ChatRoom({
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          // Skip messages we already added via POST response
+          if (sentIds.current.has(data.id)) return;
           setMessages((prev) => {
             if (prev.some(m => m.id === data.id)) return prev;
             return [...prev, data];
@@ -197,6 +201,7 @@ function ChatRoom({
     setSending(true);
     try {
       const res = await sendGroupMessage(group.id, content);
+      sentIds.current.add(res.message.id);
       setMessages((prev) => [...prev, res.message]);
       setInputValue("");
       inputRef.current?.focus();

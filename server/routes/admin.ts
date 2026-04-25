@@ -1,8 +1,7 @@
 import type { Hono } from 'hono'
 import type { AppEnv, Role } from '../lib/types'
 import { CreateUserBodySchema, TestPublishedBodySchema, CreateAssignmentBodySchema, GroupAssignmentBodySchema, GroupNameBodySchema, GroupMemberBodySchema, GroupInviteSchema, InvitationActionSchema, GroupMessageBodySchema } from '../lib/schemas'
-import { createPasswordHash, nowIso, zParse, jsonParse, requireAdmin, requireTeacherOrAdmin, requireAuth, toApiUser, dbGetUser, getJwtSecret } from '../lib/store'
-import { verify } from 'hono/jwt'
+import { createPasswordHash, nowIso, zParse, jsonParse, requireAdmin, requireTeacherOrAdmin, requireAuth, toApiUser } from '../lib/store'
 import { getTestById, getDbTests } from '../lib/tests'
 
 type UserRow = { id: string; username: string; email: string | null; role: string; password_hash: string; avatar_url: string | null }
@@ -413,41 +412,6 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
         isMe: r.user_id === user.id,
       }))
     })
-  })
-
-  // Group Chat — WebSocket connection
-  api.get('/groups/:groupId/ws', async (c) => {
-    const groupId = c.req.param('groupId')
-    
-    if (c.req.header("Upgrade") !== "websocket") {
-      return c.json({ error: "Expected Upgrade: websocket" }, 426)
-    }
-
-    // We verify the token from the query string (since standard WS doesn't send auth headers)
-    const token = c.req.query('token')
-    if (!token) return c.json({ error: 'Unauthorized' }, 401)
-
-    try {
-      const secret = getJwtSecret(c)
-      const payload = await verify(token, secret, 'HS256')
-      const userId = payload.userId as string
-      const user = await dbGetUser(c.env.DB, userId)
-      if (!user) return c.json({ error: 'Unauthorized' }, 401)
-
-      // Verify access
-      const isMember = await c.env.DB.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?').bind(groupId, user.id).first()
-      const canAccess = isMember || user.role === 'teacher' || user.role === 'admin'
-      if (!canAccess) return c.json({ error: 'Not authorized to view this group.' }, 403)
-
-      // Connect to Durable Object
-      const id = c.env.CHAT_ROOM.idFromName(groupId)
-      const obj = c.env.CHAT_ROOM.get(id)
-      
-      // Forward the request to the DO
-      return obj.fetch(c.req.raw)
-    } catch {
-      return c.json({ error: 'Unauthorized' }, 401)
-    }
   })
 
   // Group Chat — send message (members, teachers, and admins)
