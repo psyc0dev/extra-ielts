@@ -133,7 +133,7 @@ export function GroupDetailsPage({
 
   const memberIds = new Set(group.members.map((m) => m.id));
   const pendingUserIds = new Set(pendingInvitations.map((inv) => inv.userId));
-  const eligibleStudents = allUsers.filter((u) => u.role === "student" && !memberIds.has(u.id) && !pendingUserIds.has(u.id));
+  const eligibleUsers = allUsers.filter((u) => !memberIds.has(u.id) && !pendingUserIds.has(u.id));
 
   const handleInvite = async (userId: string) => {
     await adminInviteStudent(group.id, userId);
@@ -152,7 +152,7 @@ export function GroupDetailsPage({
         <div className="flex items-center gap-2">
           <Popover open={inviteOpen} onOpenChange={setInviteOpen}>
             <PopoverTrigger asChild>
-              <Button size="sm" className="h-7 text-xs gap-1" disabled={eligibleStudents.length === 0}>
+              <Button size="sm" className="h-7 text-xs gap-1" disabled={eligibleUsers.length === 0}>
                 <Plus weight="bold" className="size-3" /> {en.admin.groupDetails.inviteStudent}
               </Button>
             </PopoverTrigger>
@@ -162,9 +162,9 @@ export function GroupDetailsPage({
                 <CommandList>
                   <CommandEmpty>{en.admin.groups.noResults}</CommandEmpty>
                   <CommandGroup>
-                    {eligibleStudents.map((u) => (
+                    {eligibleUsers.map((u) => (
                       <CommandItem key={u.id} value={u.username} onSelect={() => handleInvite(u.id)}>
-                        {u.username}
+                        {u.username} <span className="ml-2 text-[10px] text-muted-foreground">({u.role})</span>
                       </CommandItem>
                     ))}
                   </CommandGroup>

@@ -267,7 +267,6 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
 
     const targetUser = await c.env.DB.prepare('SELECT id, role FROM users WHERE id = ?').bind(data.userId).first<{ id: string; role: string }>()
     if (!targetUser) return c.json({ error: 'User not found.' }, 404)
-    if (targetUser.role !== 'student') return c.json({ error: 'Only students can be invited to groups.' }, 403)
 
     const alreadyMember = await c.env.DB.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?').bind(groupId, data.userId).first()
     if (alreadyMember) return c.json({ error: 'User is already a member of this group.' }, 400)

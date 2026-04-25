@@ -135,6 +135,16 @@ function ChatRoom({
     const token = Cookies.get("accessToken");
     if (!token) return;
 
+    let currentUserId: string | null = null;
+    try {
+      const payloadBase64 = token.split(".")[1]?.replace(/-/g, "+").replace(/_/g, "/");
+      if (payloadBase64) {
+        currentUserId = JSON.parse(atob(payloadBase64)).userId ?? null;
+      }
+    } catch {
+      currentUserId = null;
+    }
+
     const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
 
     // Derive WS protocol from the API URL, not the page URL (Tauri uses tauri:// protocol)
@@ -159,6 +169,8 @@ function ChatRoom({
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          // Ignore our own WS echo to avoid duplicate bubbles with optimistic UI
+          if (currentUserId && data.userId === currentUserId) return;
           // Skip messages we already added via POST response
           if (sentIds.current.has(data.id)) return;
           setMessages((prev) => {
