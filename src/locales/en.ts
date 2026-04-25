@@ -799,7 +799,7 @@
       invitedBy: "Invited by",
       invitationStatus: "Status",
       statusPending: "Pending",
-      inviteStudent: "Invite Student",
+      inviteStudent: "Invite",
       invitePlaceholder: "Enter username...",
       inviteSent: "Invitation sent.",
       joinRequestDate: "Requested",

@@ -1,11 +1,8 @@
+@echo on
 
 set ANTHROPIC_BASE_URL=https://agentrouter.org/
 
 set ANTHROPIC_AUTH_TOKEN=sk-08anpalTMTUbeYjVsVbLD3U3xDWiWYeSERwROFER9dCsuLOL
 set ANTHROPIC_API_KEY=sk-08anpalTMTUbeYjVsVbLD3U3xDWiWYeSERwROFER9dCsuLOL
 
-set ANTHROPIC_MODEL=claude-opus-4.6
-
-claude
-
-pause
+set ANTHROPIC_MODEL=claude-haiku-4-5-20251001

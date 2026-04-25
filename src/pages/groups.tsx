@@ -48,67 +48,75 @@ function formatMessageTime(dateStr: string) {
   }
 }
 
-function MessageBubble({
-  message,
-  isConsecutive,
-  isLastInGroup,
-  isFirstInGroup,
+function MessageCluster({
+  cluster,
+  onImageLoad,
 }: {
-  message: GroupMessage;
-  isConsecutive: boolean;
-  isLastInGroup: boolean;
-  isFirstInGroup: boolean;
+  cluster: {
+    isMe: boolean;
+    userId: string;
+    username: string;
+    avatarUrl: string | null;
+    messages: GroupMessage[];
+  };
+  onImageLoad?: () => void;
 }) {
-  const showName = isFirstInGroup;
-  const hasImage = !!message.imageUrl;
+  const isMe = cluster.isMe;
 
   return (
-    <div className={`flex ${message.isMe ? "justify-end" : "justify-start"} ${isConsecutive ? "mt-0.5" : "mt-2"}`}>
-      <div className={`flex gap-2 max-w-[80%] ${message.isMe ? "flex-row-reverse" : "flex-row"} items-end`}>
+    <div className={`flex w-full ${isMe ? "justify-end" : "justify-start"} mt-2 first:mt-0`}>
+      <div className={`flex gap-2 max-w-[80%] ${isMe ? "flex-row-reverse" : "flex-row"} items-stretch`}>
         {/* Avatar column — sticky bottom for Telegram effect */}
-        <div className="size-8 shrink-0 self-end sticky bottom-0">
-          {isLastInGroup ? (
+        <div className="w-8 shrink-0 flex flex-col justify-end">
+          <div className="sticky bottom-0 pb-1 z-10">
             <Avatar className="size-8">
-              <AvatarImage src={message.avatarUrl ?? undefined} />
+              <AvatarImage src={cluster.avatarUrl ?? undefined} />
               <AvatarFallback className="bg-neutral-700 text-neutral-200 text-xs font-medium">
-                {message.username.slice(0, 2).toUpperCase()}
+                {cluster.username.slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
-          ) : (
-            <div className="size-8" />
-          )}
+          </div>
         </div>
 
-        <div className={`flex flex-col ${message.isMe ? "items-end" : "items-start"}`}>
-          {showName && (
-            <span className={`text-[11px] font-medium mb-0.5 px-1 ${message.isMe ? "text-blue-400" : "text-blue-400/80"}`}>
-              {message.username}
-            </span>
-          )}
+        {/* Messages column */}
+        <div className={`flex flex-col flex-1 min-w-0 ${isMe ? "items-end" : "items-start"}`}>
+          <span className={`text-[11px] font-medium mb-0.5 px-1 ${isMe ? "text-blue-400" : "text-blue-400/80"}`}>
+            {cluster.username}
+          </span>
+          
+          {cluster.messages.map((message, mIdx) => {
+            const hasImage = !!message.imageUrl;
 
-          <div
-            className={`relative px-3 py-1.5 text-sm leading-snug ${
-              message.isMe
-                ? "bg-[#2B5278] text-white rounded-2xl rounded-br-sm"
-                : "bg-[#182533] text-neutral-100 rounded-2xl rounded-bl-sm"
-            } ${hasImage ? "p-1" : ""}`}
-          >
-            {hasImage && (
-              <img
-                src={message.imageUrl!}
-                alt=""
-                className="rounded-xl max-w-[280px] max-h-[280px] object-cover"
-                loading="lazy"
-              />
-            )}
-            {message.content && (
-              <span className={hasImage ? "block mt-1 px-2 py-0.5" : ""}>{message.content}</span>
-            )}
+            return (
+              <div
+                key={message.id}
+                className={`relative px-3 py-1.5 text-sm leading-snug ${
+                  mIdx > 0 ? "mt-0.5" : ""
+                } ${
+                  isMe
+                    ? "bg-[#2B5278] text-white rounded-2xl rounded-br-sm"
+                    : "bg-[#182533] text-neutral-100 rounded-2xl rounded-bl-sm"
+                } ${hasImage ? "p-1" : ""}`}
+              >
+                {hasImage && (
+                  <img
+                    src={message.imageUrl!}
+                    alt=""
+                    className="rounded-xl max-w-[280px] max-h-[280px] object-cover"
+                    loading="lazy"
+                    onLoad={onImageLoad}
+                  />
+                )}
+                {message.content && (
+                  <span className={hasImage ? "block mt-1 px-2 py-0.5" : ""}>{message.content}</span>
+                )}
 
-            <span className={`inline-block text-[10px] opacity-50 ml-2 translate-y-0.5 ${message.isMe ? "text-blue-100" : "text-neutral-400"}`}>
-              {formatMessageTime(message.createdAt)}
-            </span>
-          </div>
+                <span className={`inline-block text-[10px] opacity-50 ml-2 translate-y-0.5 ${isMe ? "text-blue-100" : "text-neutral-400"}`}>
+                  {formatMessageTime(message.createdAt)}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -237,10 +245,12 @@ function ChatRoom({
 
   const scrollToBottom = () => {
     requestAnimationFrame(() => {
-      const viewport = scrollRef.current?.querySelector("[data-radix-scroll-area-viewport]");
-      if (viewport) {
-        viewport.scrollTop = viewport.scrollHeight;
-      }
+      requestAnimationFrame(() => {
+        const viewport = scrollRef.current?.querySelector("[data-radix-scroll-area-viewport]");
+        if (viewport) {
+          viewport.scrollTop = viewport.scrollHeight;
+        }
+      });
     });
   };
 
@@ -309,20 +319,41 @@ function ChatRoom({
   };
 
   const groupedMessages = useMemo(() => {
-    const groups: { date: string; messages: GroupMessage[] }[] = [];
-    let currentGroup: { date: string; messages: GroupMessage[] } | null = null;
+    const dates: { date: string; clusters: { id: string; isMe: boolean; userId: string; username: string; avatarUrl: string | null; messages: GroupMessage[] }[] }[] = [];
 
     messages.forEach((msg) => {
       const date = new Date(msg.createdAt).toDateString();
-      if (!currentGroup || currentGroup.date !== date) {
-        if (currentGroup) groups.push(currentGroup);
-        currentGroup = { date, messages: [msg] };
+      let currentDate = dates[dates.length - 1];
+      if (!currentDate || currentDate.date !== date) {
+        currentDate = { date, clusters: [] };
+        dates.push(currentDate);
+      }
+
+      let currentCluster = currentDate.clusters[currentDate.clusters.length - 1];
+      const isSameUser = currentCluster && currentCluster.userId === msg.userId;
+      
+      let isConsecutive = false;
+      if (isSameUser) {
+        const lastMsg = currentCluster.messages[currentCluster.messages.length - 1];
+        if (new Date(msg.createdAt).getTime() - new Date(lastMsg.createdAt).getTime() < 60000) {
+          isConsecutive = true;
+        }
+      }
+
+      if (isConsecutive) {
+        currentCluster.messages.push(msg);
       } else {
-        currentGroup.messages.push(msg);
+        currentDate.clusters.push({
+          id: msg.id,
+          isMe: msg.isMe,
+          userId: msg.userId,
+          username: msg.username,
+          avatarUrl: msg.avatarUrl,
+          messages: [msg],
+        });
       }
     });
-    if (currentGroup) groups.push(currentGroup);
-    return groups;
+    return dates;
   }, [messages]);
 
   return (
@@ -404,29 +435,13 @@ function ChatRoom({
                       })()}
                     </Badge>
                   </div>
-                  {group.messages.map((msg, msgIdx) => {
-                    const isConsecutive =
-                      msgIdx > 0 &&
-                      group.messages[msgIdx - 1].userId === msg.userId &&
-                      new Date(msg.createdAt).getTime() -
-                        new Date(group.messages[msgIdx - 1].createdAt).getTime() <
-                        60000;
-                    const isFirstInGroup =
-                      msgIdx === 0 ||
-                      group.messages[msgIdx - 1].userId !== msg.userId;
-                    const isLastInGroup =
-                      msgIdx === group.messages.length - 1 ||
-                      group.messages[msgIdx + 1].userId !== msg.userId;
-                    return (
-                      <MessageBubble
-                        key={msg.id}
-                        message={msg}
-                        isConsecutive={isConsecutive}
-                        isFirstInGroup={isFirstInGroup}
-                        isLastInGroup={isLastInGroup}
-                      />
-                    );
-                  })}
+                  {group.clusters.map((cluster) => (
+                    <MessageCluster
+                      key={cluster.id}
+                      cluster={cluster}
+                      onImageLoad={scrollToBottom}
+                    />
+                  ))}
                 </div>
               ))}
             </div>
@@ -533,6 +548,11 @@ export function Groups() {
       .catch(() => toast.error(en.groups.list.loadError))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    const el = document.querySelector('.overflow-auto') as HTMLElement | null;
+    if (el) el.scrollTop = 0;
+  }, [selectedGroup]);
 
   return (
     <AnimatePresence mode="wait">

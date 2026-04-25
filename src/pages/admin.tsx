@@ -83,6 +83,11 @@ export function Admin() {
     loadAll().catch((err) => toast.error(err.message));
   }, [loadAll]);
 
+  useEffect(() => {
+    const el = document.querySelector('.overflow-auto') as HTMLElement | null;
+    if (el) el.scrollTop = 0;
+  }, [section]);
+
   const testMap = useMemo(
     () => new Map(tests.map((test) => [test.id, test.title])),
     [tests]
