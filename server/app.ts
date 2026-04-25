@@ -11,6 +11,7 @@ import { registerTestRoutes } from './routes/tests'
 import { registerWritingRoutes } from './routes/writing'
 import { registerAccountRoutes } from './routes/account'
 import { registerVocabularyRoutes } from './routes/vocabulary'
+import { registerWSRoutes } from './routes/ws'
 import { CacheStore, dbGetUser, getJwtSecret } from './lib/store'
 import { verify } from 'hono/jwt'
 
@@ -46,6 +47,7 @@ export const createApp = () => {
   registerWritingRoutes(api)
   registerAccountRoutes(api)
   registerVocabularyRoutes(api)
+  registerWSRoutes(api)
   registerAdminRoutes(api)
 
   api.notFound((c) => c.json({ error: 'API route not found.' }, 404))

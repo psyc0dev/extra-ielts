@@ -16,6 +16,8 @@ import {
   User,
   Image as ImageIcon,
   X,
+  Circle,
+  SmileyXEyes,
 } from "@phosphor-icons/react";
 import {
   listMyGroups,
@@ -27,6 +29,8 @@ import {
 } from "@/lib/api";
 import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import { useAuth } from "@/hooks/use-auth";
+import { useWebSocket } from "@/hooks/use-websocket";
+import { TypingIndicator, MessageReactions, MemberList, ReadReceipts, EmojiPicker } from "@/components/websocket-ui";
 import { toast } from "sonner";
 import Cookies from "js-cookie";
 import en from "@/locales/en";
@@ -139,10 +143,17 @@ function ChatRoom({
   const [sending, setSending] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [liveMembers, setLiveMembers] = useState<Array<{ userId: string; username: string; isOnline: boolean; avatarUrl: string | null }>>([]);
+  const [messageReactions, setMessageReactions] = useState<Map<string, Map<string, Array<{ userId: string; username: string; emoji: string }>>>>(new Map());
+  const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
+  const [showMemberList, setShowMemberList] = useState(false);
+  const [typingTimeout, setTypingTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const sentIds = useRef<Set<string>>(new Set());
+
+  const ws = useWebSocket(group.id);
 
   const handleLeaveGroup = async () => {
     if (leaving) return;
@@ -172,76 +183,66 @@ function ChatRoom({
     }
   };
 
+  // Load initial messages and setup WebSocket listener
   useEffect(() => {
     loadMessages();
 
-    const token = Cookies.get("accessToken");
-    if (!token) return;
-
-    let currentUserId: string | null = null;
-    try {
-      const payloadBase64 = token.split(".")[1]?.replace(/-/g, "+").replace(/_/g, "/");
-      if (payloadBase64) {
-        currentUserId = JSON.parse(atob(payloadBase64)).userId ?? null;
-      }
-    } catch {
-      currentUserId = null;
-    }
-
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
-
-    // Derive WS protocol from the API URL, not the page URL (Tauri uses tauri:// protocol)
-    const wsProtocol = baseUrl.startsWith("https://") ? "wss:" : "ws:";
-
-    let wsUrl: string;
-    if (baseUrl.startsWith("/")) {
-      // Relative path (e.g. "/api") — use current host
-      wsUrl = `${wsProtocol}//${window.location.host}${baseUrl}/groups/${group.id}/ws?token=${token}`;
-    } else {
-      // Absolute URL (e.g. "https://api.example.com/api") — derive WS URL
-      const wsHost = baseUrl.replace(/^https?:\/\//, "");
-      wsUrl = `${wsProtocol}//${wsHost}/groups/${group.id}/ws?token=${token}`;
-    }
-
-    let ws: WebSocket | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const connect = () => {
-      ws = new WebSocket(wsUrl);
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          // Ignore our own WS echo to avoid duplicate bubbles with optimistic UI
-          if (currentUserId && data.userId === currentUserId) return;
-          // Skip messages we already added via POST response
-          if (sentIds.current.has(data.id)) return;
-          setMessages((prev) => {
-            if (prev.some(m => m.id === data.id)) return prev;
-            return [...prev, data];
-          });
-        } catch (err) {
-          console.error("WebSocket message error", err);
+    const unsubscribe = ws.on((message) => {
+      if (message.type === 'message') {
+        // Check if we already have this message
+        if (!sentIds.current.has(message.id) && !messages.some(m => m.id === message.id)) {
+          setMessages((prev) => [...prev, {
+            id: message.id,
+            groupId: message.groupId,
+            userId: message.userId,
+            username: message.username,
+            avatarUrl: message.avatarUrl,
+            content: message.content,
+            imageUrl: message.imageUrl,
+            createdAt: message.timestamp,
+            isMe: false,
+          }]);
         }
-      };
+      } else if (message.type === 'members-count') {
+        setLiveMembers(message.members);
+      } else if (message.type === 'reaction') {
+        setMessageReactions((prev) => {
+          const newReactions = new Map(prev)
+          const messageReactions = newReactions.get(message.messageId) ?? new Map()
+          const emojiReactions = messageReactions.get(message.emoji) ?? []
 
-      ws.onclose = () => {
-        // Reconnect after 3 seconds
-        reconnectTimer = setTimeout(connect, 3000);
-      };
+          if (message.action === 'add') {
+            if (!emojiReactions.some((r: any) => r.userId === message.userId)) {
+              emojiReactions.push({ userId: message.userId, username: message.username, emoji: message.emoji })
+            }
+          } else {
+            const idx = emojiReactions.findIndex((r: any) => r.userId === message.userId)
+            if (idx !== -1) {
+              emojiReactions.splice(idx, 1)
+            }
+          }
 
-      ws.onerror = () => {
-        ws?.close();
-      };
-    };
+          if (emojiReactions.length > 0) {
+            messageReactions.set(message.emoji, emojiReactions)
+          } else {
+            messageReactions.delete(message.emoji)
+          }
 
-    connect();
+          if (messageReactions.size > 0) {
+            newReactions.set(message.messageId, messageReactions)
+          } else {
+            newReactions.delete(message.messageId)
+          }
+
+          return newReactions
+        })
+      }
+    });
 
     return () => {
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      ws?.close();
+      unsubscribe();
     };
-  }, [group.id]);
+  }, [group.id, ws, messages]);
 
   const scrollToBottom = () => {
     requestAnimationFrame(() => {
@@ -272,7 +273,7 @@ function ChatRoom({
     const tempId = `temp-${Date.now()}`;
     setMessages((prev) => [
       ...prev,
-      { id: tempId, groupId: group.id, userId: "me", username: "", avatarUrl: null, content: content || "", imageUrl: image, createdAt: new Date().toISOString(), isMe: true },
+      { id: tempId, groupId: group.id, userId: "me", username: user?.username || "", avatarUrl: user?.avatarUrl ?? null, content: content || "", imageUrl: image, createdAt: new Date().toISOString(), isMe: true },
     ]);
 
     try {
@@ -296,6 +297,24 @@ function ChatRoom({
       e.preventDefault();
       handleSend();
     }
+
+    // Send typing indicator
+    if (typingTimeout) clearTimeout(typingTimeout);
+    ws.send({ type: 'typing', userId: user?.id || '', username: user?.username || '', groupId: group.id, isTyping: true });
+    setTypingTimeout(setTimeout(() => {
+      ws.send({ type: 'typing', userId: user?.id || '', username: user?.username || '', groupId: group.id, isTyping: false });
+    }, 2000));
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+
+    // Send typing indicator
+    if (typingTimeout) clearTimeout(typingTimeout);
+    ws.send({ type: 'typing', userId: user?.id || '', username: user?.username || '', groupId: group.id, isTyping: true });
+    setTypingTimeout(setTimeout(() => {
+      ws.send({ type: 'typing', userId: user?.id || '', username: user?.username || '', groupId: group.id, isTyping: false });
+    }, 2000));
   };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -331,7 +350,7 @@ function ChatRoom({
 
       let currentCluster = currentDate.clusters[currentDate.clusters.length - 1];
       const isSameUser = currentCluster && currentCluster.userId === msg.userId;
-      
+
       let isConsecutive = false;
       if (isSameUser) {
         const lastMsg = currentCluster.messages[currentCluster.messages.length - 1];
@@ -356,6 +375,30 @@ function ChatRoom({
     return dates;
   }, [messages]);
 
+  const onlineCount = liveMembers.filter(m => m.isOnline).length;
+
+  const handleAddReaction = (messageId: string, emoji: string) => {
+    ws.send({
+      type: 'reaction',
+      messageId,
+      userId: user?.id || '',
+      username: user?.username || '',
+      emoji,
+      action: 'add',
+    });
+  };
+
+  const handleRemoveReaction = (messageId: string, emoji: string) => {
+    ws.send({
+      type: 'reaction',
+      messageId,
+      userId: user?.id || '',
+      username: user?.username || '',
+      emoji,
+      action: 'remove',
+    });
+  };
+
   return (
     <div className="relative flex h-full min-h-full flex-col overflow-hidden bg-neutral-900">
       <CardHeader className="z-10 flex flex-row items-center gap-3 border-b border-neutral-800 bg-neutral-900 px-4 py-3 shrink-0">
@@ -364,11 +407,26 @@ function ChatRoom({
         </Button>
         <div className="flex-1 min-w-0">
           <CardTitle className="text-sm font-semibold truncate">{group.name}</CardTitle>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Users weight="bold" className="size-3" />
-            {en.groups.chat.memberCount(group.memberCount)}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <Circle weight="fill" className="size-2 text-green-500" />
+              <span>{onlineCount} online</span>
+            </div>
+            <span>•</span>
+            <div className="flex items-center gap-1">
+              <Users weight="bold" className="size-3" />
+              <span>{liveMembers.length} total</span>
+            </div>
           </div>
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 text-xs"
+          onClick={() => setShowMemberList(!showMemberList)}
+        >
+          <Users weight="bold" className="size-4" />
+        </Button>
         {user?.role === "student" && (
           <Button
             variant="ghost"
@@ -383,7 +441,9 @@ function ChatRoom({
       </CardHeader>
 
       <CardContent className="relative flex-1 flex flex-col p-0 overflow-hidden">
-        <ScrollArea className="flex-1 px-4 pt-3 pb-2" ref={scrollRef}>
+        <div className="flex-1 flex gap-4">
+          <div className="flex-1 flex flex-col">
+            <ScrollArea className="flex-1 px-4 pt-3 pb-2" ref={scrollRef}>
           {loading ? (
             <div className="flex flex-col gap-1.5 p-4">
               {Array.from({ length: 8 }).map((_, i) => {
@@ -446,11 +506,15 @@ function ChatRoom({
               ))}
             </div>
           )}
-        </ScrollArea>
+            </ScrollArea>
 
-        <Separator className="bg-neutral-800" />
+            {ws.typingUsers.length > 0 && (
+              <TypingIndicator typingUsers={ws.typingUsers} />
+            )}
 
-        <div className="z-10 shrink-0 border-t border-neutral-800 bg-neutral-900 px-3 py-3">
+            <Separator className="bg-neutral-800" />
+
+            <div className="z-10 shrink-0 border-t border-neutral-800 bg-neutral-900 px-3 py-3">
           {pendingImage && (
             <div className="relative mb-2 inline-block">
               <img src={pendingImage} alt="" className="h-20 rounded-lg object-cover" />
@@ -482,7 +546,7 @@ function ChatRoom({
             <Input
               ref={inputRef}
               value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               placeholder={en.groups.chat.inputPlaceholder}
               disabled={sending}
@@ -497,6 +561,15 @@ function ChatRoom({
               <PaperPlaneRight weight="fill" className={`size-[18px] transition-transform duration-200 ${(inputValue.trim() || pendingImage) ? "translate-x-[1px] -translate-y-[1px]" : ""}`} />
             </Button>
           </div>
+            </div>
+          </div>
+
+          {showMemberList && (
+            <div className="w-64 border-l border-neutral-800 bg-neutral-950 p-4 overflow-y-auto">
+              <h2 className="text-sm font-semibold mb-4">Members</h2>
+              <MemberList members={liveMembers} />
+            </div>
+          )}
         </div>
       </CardContent>
     </div>

@@ -1,5 +1,6 @@
 src-tauri/target
 server/dev.db
+.claude
 bun.lock
 .git.bak
 commit.bat
