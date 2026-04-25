@@ -1,23 +1,74 @@
 import type { Hono } from 'hono'
 import type { AppEnv } from '../lib/types'
+import { verify } from 'hono/jwt'
 import { requireAuth } from '../lib/store'
 import { globalWSManager, type WSMessage } from '../lib/ws-manager'
 import { sanitizeMessage, sanitizeUsername, sanitizeEmoji } from '../lib/sanitize'
 import { messageLimiter, typingLimiter, reactionLimiter, readReceiptLimiter } from '../lib/rate-limiter'
 
 export const registerWSRoutes = (api: Hono<AppEnv>) => {
-  // WebSocket connection endpoint
-  api.get('/ws/groups/:groupId', requireAuth, async (c) => {
+  // WebSocket connection endpoint - handle auth manually since WebSocket doesn't support custom headers
+  api.get('/ws/groups/:groupId', async (c) => {
     const groupId = c.req.param('groupId')
-    const user = c.get('user')
-    const userId = user.id
-    const username = sanitizeUsername(user.username)
-    const avatarUrl = user.avatarUrl ?? null
 
     const upgrade = c.req.header('upgrade')
     if (!upgrade?.toLowerCase().includes('websocket')) {
       return c.text('Expected Upgrade: websocket', 426)
     }
+
+    // Extract JWT from Authorization header or cookies
+    let token = null
+    const authHeader = c.req.header('Authorization')
+    if (authHeader?.toLowerCase().startsWith('bearer ')) {
+      token = authHeader.slice(7).trim()
+    }
+    if (!token) {
+      // Try to get from cookie
+      const cookieHeader = c.req.header('Cookie')
+      if (cookieHeader) {
+        const cookies = cookieHeader.split(';').map(c => c.trim())
+        for (const cookie of cookies) {
+          if (cookie.startsWith('accessToken=')) {
+            token = cookie.slice('accessToken='.length)
+            break
+          }
+        }
+      }
+    }
+
+    if (!token) {
+      return c.text('Unauthorized', 401)
+    }
+
+    // Verify token
+    let user
+    try {
+      const secret = (c.env as any).JWT_SECRET || 'default_secret_for_development'
+      const payload = await verify(token, secret, 'HS256')
+      const userId = payload.userId as string
+
+      // Get user from database
+      const userRow = await c.env.DB.prepare(
+        'SELECT id, username, email, role, avatar_url FROM users WHERE id = ? LIMIT 1'
+      ).bind(userId).first<any>()
+
+      if (!userRow) {
+        return c.text('Unauthorized', 401)
+      }
+
+      user = {
+        id: userRow.id,
+        username: userRow.username,
+        avatarUrl: userRow.avatar_url
+      }
+    } catch (e) {
+      console.error('Auth error:', e)
+      return c.text('Unauthorized', 401)
+    }
+
+    const userId = user.id
+    const username = sanitizeUsername(user.username)
+    const avatarUrl = user.avatarUrl ?? null
 
     // Verify user is member of group
     const groupMember = await c.env.DB.prepare(
@@ -155,7 +206,7 @@ export const registerWSRoutes = (api: Hono<AppEnv>) => {
           globalWSManager.broadcast(groupId, readMsg)
         }
       } catch (e) {
-        // Invalid message format - ignore
+        console.error('WebSocket message error:', e)
       }
     })
 
@@ -240,5 +291,18 @@ export const registerWSRoutes = (api: Hono<AppEnv>) => {
     const members = globalWSManager.getGroupMembers(groupId)
 
     return c.json({ count, members })
+  })
+
+  // WebSocket connection test endpoint
+  api.get('/ws/test', requireAuth, async (c) => {
+    const user = c.get('user')
+    console.log('[WS] Test endpoint called by user:', user.id)
+    return c.json({
+      ok: true,
+      message: 'WebSocket test endpoint working',
+      userId: user.id,
+      username: user.username,
+      timestamp: new Date().toISOString()
+    })
   })
 }

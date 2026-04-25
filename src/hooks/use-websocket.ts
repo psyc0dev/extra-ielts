@@ -29,9 +29,6 @@ export function useWebSocket(groupId: string | null) {
   const connect = useCallback(() => {
     if (!groupId || wsRef.current?.readyState === WebSocket.OPEN) return
 
-    const token = localStorage.getItem('accessToken')
-    if (!token) return
-
     const apiBase = import.meta.env.VITE_API_BASE_URL || `${window.location.origin}/api`
     const protocol = apiBase.startsWith('https://') ? 'wss:' : 'ws:'
 
@@ -43,10 +40,13 @@ export function useWebSocket(groupId: string | null) {
       wsUrl = `${protocol}//${host}/ws/groups/${groupId}`
     }
 
+    console.log('[WS] Connecting to:', wsUrl)
+
     try {
       const ws = new WebSocket(wsUrl)
 
       ws.onopen = () => {
+        console.log('[WS] ✅ Connected successfully')
         setIsConnected(true)
         reconnectAttemptsRef.current = 0
       }
@@ -54,6 +54,7 @@ export function useWebSocket(groupId: string | null) {
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data) as WSMessage
+          console.log('[WS] 📨 Received:', message.type)
 
           if (message.type === 'members-count') {
             setMemberCount(message.count)
@@ -64,15 +65,17 @@ export function useWebSocket(groupId: string | null) {
 
           handlersRef.current.forEach(handler => handler(message))
         } catch (e) {
-          console.error('Failed to parse WebSocket message:', e)
+          console.error('[WS] ❌ Failed to parse message:', e)
         }
       }
 
       ws.onclose = () => {
+        console.log('[WS] 🔌 Disconnected')
         setIsConnected(false)
         wsRef.current = null
 
         const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000)
+        console.log('[WS] ⏳ Reconnecting in', delay, 'ms')
         reconnectTimeoutRef.current = setTimeout(() => {
           reconnectAttemptsRef.current++
           connect()
@@ -80,13 +83,13 @@ export function useWebSocket(groupId: string | null) {
       }
 
       ws.onerror = (error) => {
-        console.error('WebSocket error:', error)
+        console.error('[WS] ❌ WebSocket error:', error)
         setIsConnected(false)
       }
 
       wsRef.current = ws
     } catch (e) {
-      console.error('Failed to create WebSocket:', e)
+      console.error('[WS] ❌ Failed to create connection:', e)
       setIsConnected(false)
     }
   }, [groupId])
@@ -107,7 +110,10 @@ export function useWebSocket(groupId: string | null) {
 
   const send = useCallback((message: any) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
+      console.log('[WS] 📤 Sending:', message.type)
       wsRef.current.send(JSON.stringify(message))
+    } else {
+      console.warn('[WS] ❌ Not connected. State:', wsRef.current?.readyState)
     }
   }, [])
 

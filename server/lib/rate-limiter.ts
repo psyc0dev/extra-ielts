@@ -53,10 +53,10 @@ export class RateLimiter {
 }
 
 // Create global rate limiters for different event types
-export const messageLimiter = new RateLimiter(10, 1000) // 10 messages per second
-export const typingLimiter = new RateLimiter(3, 500) // 3 typing events per 500ms
-export const reactionLimiter = new RateLimiter(20, 1000) // 20 reactions per second
-export const readReceiptLimiter = new RateLimiter(30, 1000) // 30 read receipts per second
+export const messageLimiter = new RateLimiter(100, 1000) // 100 messages per second
+export const typingLimiter = new RateLimiter(50, 1000) // 50 typing events per second
+export const reactionLimiter = new RateLimiter(100, 1000) // 100 reactions per second
+export const readReceiptLimiter = new RateLimiter(100, 1000) // 100 read receipts per second
 
 // Cleanup rate limiters periodically
 setInterval(() => {
