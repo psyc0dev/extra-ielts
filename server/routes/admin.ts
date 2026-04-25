@@ -353,11 +353,21 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     return c.json({ ok: true, status: newStatus })
   })
 
-  // Student-facing: list groups the user is a member of
+  // List groups: students see member groups, teachers/admins see all groups
   api.get('/groups', requireAuth, async (c) => {
     const user = c.get('user')
-    const memberOf = await c.env.DB.prepare('SELECT group_id FROM group_members WHERE user_id = ?').bind(user.id).all<{ group_id: string }>()
-    const groupIds = (memberOf.results ?? []).map((r) => r.group_id)
+
+    let groupIds: string[]
+    if (user.role === 'teacher' || user.role === 'admin') {
+      // Teachers/admins can see all groups
+      const allGroups = await c.env.DB.prepare('SELECT id FROM groups').all<{ id: string }>()
+      groupIds = (allGroups.results ?? []).map((r) => r.id)
+    } else {
+      // Students only see groups they're members of
+      const memberOf = await c.env.DB.prepare('SELECT group_id FROM group_members WHERE user_id = ?').bind(user.id).all<{ group_id: string }>()
+      groupIds = (memberOf.results ?? []).map((r) => r.group_id)
+    }
+
     if (groupIds.length === 0) return c.json({ groups: [] })
 
     const groups = await Promise.all(groupIds.map(async (gid) => {
@@ -369,16 +379,17 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     return c.json({ groups: groups.filter(Boolean) })
   })
 
-  // Group Chat — list messages (members only)
+  // Group Chat — list messages (members, teachers, and admins)
   type MessageRow = { id: string; group_id: string; user_id: string; content: string; created_at: string }
 
   api.get('/groups/:groupId/messages', requireAuth, async (c) => {
     const user = c.get('user')
     const groupId = c.req.param('groupId')
 
-    // Verify user is a member of the group
+    // Verify user is a member of the group OR is a teacher/admin
     const isMember = await c.env.DB.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?').bind(groupId, user.id).first()
-    if (!isMember) return c.json({ error: 'Not a member of this group.' }, 403)
+    const canAccess = isMember || user.role === 'teacher' || user.role === 'admin'
+    if (!canAccess) return c.json({ error: 'Not authorized to view this group.' }, 403)
 
     const rows = await c.env.DB.prepare('SELECT * FROM group_messages WHERE group_id = ? ORDER BY created_at ASC').bind(groupId).all<MessageRow>()
 
@@ -403,14 +414,15 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     })
   })
 
-  // Group Chat — send message (members only)
+  // Group Chat — send message (members, teachers, and admins)
   api.post('/groups/:groupId/messages', requireAuth, async (c) => {
     const user = c.get('user')
     const groupId = c.req.param('groupId')
 
-    // Verify user is a member of the group
+    // Verify user is a member of the group OR is a teacher/admin
     const isMember = await c.env.DB.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?').bind(groupId, user.id).first()
-    if (!isMember) return c.json({ error: 'Not a member of this group.' }, 403)
+    const canAccess = isMember || user.role === 'teacher' || user.role === 'admin'
+    if (!canAccess) return c.json({ error: 'Not authorized to post in this group.' }, 403)
 
     const { data, error } = await zParse(GroupMessageBodySchema, c)
     if (error) return error
