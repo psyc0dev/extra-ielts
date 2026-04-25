@@ -29,15 +29,22 @@ export function useWebSocket(groupId: string | null) {
   const connect = useCallback(() => {
     if (!groupId || wsRef.current?.readyState === WebSocket.OPEN) return
 
+    // Get token from localStorage
+    const token = localStorage.getItem('accessToken')
+    if (!token) {
+      console.warn('[WS] No token available')
+      return
+    }
+
     const apiBase = import.meta.env.VITE_API_BASE_URL || `${window.location.origin}/api`
     const protocol = apiBase.startsWith('https://') ? 'wss:' : 'ws:'
 
     let wsUrl: string
     if (apiBase.startsWith('/')) {
-      wsUrl = `${protocol}//${window.location.host}${apiBase}/ws/groups/${groupId}`
+      wsUrl = `${protocol}//${window.location.host}${apiBase}/groups/${groupId}/ws?token=${encodeURIComponent(token)}`
     } else {
       const host = new URL(apiBase, window.location.origin).host
-      wsUrl = `${protocol}//${host}/ws/groups/${groupId}`
+      wsUrl = `${protocol}//${host}/api/groups/${groupId}/ws?token=${encodeURIComponent(token)}`
     }
 
     console.log('[WS] Connecting to:', wsUrl)

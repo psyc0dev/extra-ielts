@@ -45,9 +45,10 @@ export class ChatRoomDO {
 
     this.state.acceptWebSocket(server)
 
-    const userId = url.searchParams.get('userId')
-    const username = url.searchParams.get('username') || 'Unknown'
-    const avatarUrl = url.searchParams.get('avatarUrl')
+    // User info is passed via custom header from app.ts auth handler
+    const userId = request.headers.get('x-user-id')
+    const username = request.headers.get('x-username') || 'Unknown'
+    const avatarUrl = request.headers.get('x-avatar-url')
     this.groupId = this.state.id.toString()
 
     if (userId) {

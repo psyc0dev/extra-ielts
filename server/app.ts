@@ -77,7 +77,16 @@ export const createApp = () => {
 
       const id = c.env.CHAT_ROOM.idFromName(groupId)
       const obj = c.env.CHAT_ROOM.get(id)
-      return obj.fetch(c.req.raw)
+
+      // Create a new request with user info in headers
+      const wsRequest = new Request(c.req.raw, {
+        headers: new Headers(c.req.raw.headers),
+      })
+      wsRequest.headers.set('x-user-id', user.id)
+      wsRequest.headers.set('x-username', user.username)
+      wsRequest.headers.set('x-avatar-url', user.avatar_url || '')
+
+      return obj.fetch(wsRequest)
     } catch {
       return c.json({ error: 'Unauthorized' }, 401)
     }
