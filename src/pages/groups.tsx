@@ -19,10 +19,12 @@ import {
   listMyGroups,
   listGroupMessages,
   sendGroupMessage,
+  leaveGroup,
   type MyGroup,
   type GroupMessage,
 } from "@/lib/api";
 import { useDelayedLoading } from "@/hooks/use-delayed-loading";
+import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import Cookies from "js-cookie";
 import en from "@/locales/en";
@@ -106,17 +108,38 @@ function MessageBubble({
 function ChatRoom({
   group,
   onBack,
+  onLeftGroup,
 }: {
   group: MyGroup;
   onBack: () => void;
+  onLeftGroup: (groupId: string) => void;
 }) {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<GroupMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const sentIds = useRef<Set<string>>(new Set());
+
+  const handleLeaveGroup = async () => {
+    if (leaving) return;
+    const ok = window.confirm("Leave this group?");
+    if (!ok) return;
+
+    setLeaving(true);
+    try {
+      await leaveGroup(group.id);
+      toast.success("You left the group.");
+      onLeftGroup(group.id);
+    } catch {
+      toast.error("Failed to leave group.");
+    } finally {
+      setLeaving(false);
+    }
+  };
 
   const loadMessages = async () => {
     try {
@@ -274,6 +297,17 @@ function ChatRoom({
             {en.groups.chat.memberCount(group.memberCount)}
           </div>
         </div>
+        {user?.role === "student" && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs text-red-400 hover:text-red-300"
+            onClick={handleLeaveGroup}
+            disabled={leaving}
+          >
+            Leave
+          </Button>
+        )}
       </CardHeader>
 
       <CardContent className="relative flex-1 flex flex-col p-0 overflow-hidden">
@@ -446,6 +480,10 @@ export function Groups() {
           <ChatRoom
             group={selectedGroup}
             onBack={() => setSelectedGroup(null)}
+            onLeftGroup={(groupId) => {
+              setGroups((prev) => prev.filter((g) => g.id !== groupId));
+              setSelectedGroup(null);
+            }}
           />
         </motion.div>
       ) : (

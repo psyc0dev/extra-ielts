@@ -434,8 +434,14 @@ export async function listGroupMessages(groupId: string) {
 
 export async function sendGroupMessage(groupId: string, content: string) {
   return apiFetch<{ message: GroupMessage }>(`/groups/${groupId}/messages`, {
-    method: "POST",
+    method: 'POST',
     body: JSON.stringify({ content }),
+  });
+}
+
+export async function leaveGroup(groupId: string) {
+  return apiFetch<{ ok: boolean }>(`/groups/${groupId}/leave`, {
+    method: 'POST',
   });
 }
 

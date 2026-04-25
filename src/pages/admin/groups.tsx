@@ -82,12 +82,14 @@ export function GroupsSection({ groups, users, tests, query, onQueryChange, isAd
 
 export function GroupDetailsPage({
   group,
+  currentUserId,
   onBack,
   onViewUser,
   onMemberRemoved,
   allUsers,
 }: {
   group: Group;
+  currentUserId: string | null;
   onBack: () => void;
   onViewUser: (userId: string) => void;
   onMemberRemoved: (groupId: string, userId: string) => void;
@@ -133,7 +135,9 @@ export function GroupDetailsPage({
 
   const memberIds = new Set(group.members.map((m) => m.id));
   const pendingUserIds = new Set(pendingInvitations.map((inv) => inv.userId));
-  const eligibleUsers = allUsers.filter((u) => !memberIds.has(u.id) && !pendingUserIds.has(u.id));
+  const eligibleUsers = allUsers.filter(
+    (u) => u.id !== currentUserId && !memberIds.has(u.id) && !pendingUserIds.has(u.id)
+  );
 
   const handleInvite = async (userId: string) => {
     await adminInviteStudent(group.id, userId);
@@ -159,7 +163,7 @@ export function GroupDetailsPage({
             <PopoverContent className="w-56 p-0 border-neutral-800 bg-neutral-950" align="end">
               <Command>
                 <CommandInput placeholder={en.admin.groupDetails.inviteStudent} />
-                <CommandList>
+                <CommandList className="max-h-64 overflow-y-auto">
                   <CommandEmpty>{en.admin.groups.noResults}</CommandEmpty>
                   <CommandGroup>
                     {eligibleUsers.map((u) => (

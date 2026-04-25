@@ -155,7 +155,10 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
 
   // Groups — teachers can manage
   api.get('/admin/groups', requireAuth, requireTeacherOrAdmin, async (c) => {
-    const groups = await c.env.DB.prepare('SELECT id, name, created_at FROM groups ORDER BY created_at').all<{ id: string; name: string; created_at: string }>()
+    const user = c.get('user')
+    const groups = user.role === 'admin'
+      ? await c.env.DB.prepare('SELECT id, name, created_at FROM groups ORDER BY created_at').all<{ id: string; name: string; created_at: string }>()
+      : await c.env.DB.prepare('SELECT id, name, created_at FROM groups WHERE owner_user_id = ? ORDER BY created_at').bind(user.id).all<{ id: string; name: string; created_at: string }>()
     const result = await Promise.all((groups.results ?? []).map(async (g) => {
       const members = await c.env.DB.prepare(
         'SELECT u.id, u.username, u.email FROM group_members gm JOIN users u ON u.id = gm.user_id WHERE gm.group_id = ?'
@@ -166,18 +169,22 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
   })
 
   api.post('/admin/groups', requireAuth, requireTeacherOrAdmin, async (c) => {
+    const user = c.get('user')
     const { data, error } = await zParse(GroupNameBodySchema, c)
     if (error) return error
     const id = crypto.randomUUID()
-    await c.env.DB.prepare('INSERT INTO groups (id, name, created_at) VALUES (?, ?, ?)').bind(id, data.name, nowIso()).run()
+    await c.env.DB.prepare('INSERT INTO groups (id, name, owner_user_id, created_at) VALUES (?, ?, ?, ?)').bind(id, data.name, user.id, nowIso()).run()
     return c.json({ group: { id, name: data.name } }, 201)
   })
 
-  // Delete group — admin only
-  api.delete('/admin/groups/:groupId', requireAuth, requireAdmin, async (c) => {
+  // Delete group — owner or admin
+  api.delete('/admin/groups/:groupId', requireAuth, requireTeacherOrAdmin, async (c) => {
+    const user = c.get('user')
     const groupId = c.req.param('groupId')
-    const exists = await c.env.DB.prepare('SELECT 1 FROM groups WHERE id = ?').bind(groupId).first()
-    if (!exists) return c.json({ error: 'Group not found.' }, 404)
+    const group = await c.env.DB.prepare('SELECT owner_user_id FROM groups WHERE id = ?').bind(groupId).first<{ owner_user_id: string | null }>()
+    if (!group) return c.json({ error: 'Group not found.' }, 404)
+    const canManage = user.role === 'admin' || group.owner_user_id === user.id
+    if (!canManage) return c.json({ error: 'Only the group owner can manage this group.' }, 403)
     await c.env.DB.prepare('DELETE FROM groups WHERE id = ?').bind(groupId).run()
     return c.json({ ok: true }, 200)
   })
@@ -196,16 +203,32 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
   })
 
   api.delete('/admin/groups/:groupId/members/:userId', requireAuth, requireTeacherOrAdmin, async (c) => {
+    const user = c.get('user')
+    const groupId = c.req.param('groupId')
+    const targetUserId = c.req.param('userId')
+    const group = await c.env.DB.prepare('SELECT owner_user_id FROM groups WHERE id = ?').bind(groupId).first<{ owner_user_id: string | null }>()
+    if (!group) return c.json({ error: 'Group not found.' }, 404)
+    const canManage = user.role === 'admin' || group.owner_user_id === user.id
+    if (!canManage) return c.json({ error: 'Only the group owner can manage this group.' }, 403)
+
+    const targetUser = await c.env.DB.prepare('SELECT role FROM users WHERE id = ?').bind(targetUserId).first<{ role: string }>()
+    if (!targetUser) return c.json({ error: 'User not found.' }, 404)
+    if (user.role !== 'admin' && targetUser.role !== 'student') {
+      return c.json({ error: 'Group owners can only remove students.' }, 403)
+    }
+
     await c.env.DB.prepare('DELETE FROM group_members WHERE group_id = ? AND user_id = ?')
-      .bind(c.req.param('groupId'), c.req.param('userId')).run()
+      .bind(groupId, targetUserId).run()
     return c.json({ ok: true }, 200)
   })
 
   api.post('/admin/groups/:groupId/assignments', requireAuth, requireTeacherOrAdmin, async (c) => {
     const user = c.get('user')
     const groupId = c.req.param('groupId')
-    const group = await c.env.DB.prepare('SELECT 1 FROM groups WHERE id = ?').bind(groupId).first()
+    const group = await c.env.DB.prepare('SELECT owner_user_id FROM groups WHERE id = ?').bind(groupId).first<{ owner_user_id: string | null }>()
     if (!group) return c.json({ error: 'Group not found.' }, 404)
+    const canManage = user.role === 'admin' || group.owner_user_id === user.id
+    if (!canManage) return c.json({ error: 'Only the group owner can manage this group.' }, 403)
     const { data, error } = await zParse(GroupAssignmentBodySchema, c)
     if (error) return error
     const test = await getTestById(c.env.DB, data.testId)
@@ -259,8 +282,10 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
   api.post('/admin/groups/:groupId/invitations', requireAuth, requireTeacherOrAdmin, async (c) => {
     const inviter = c.get('user')
     const groupId = c.req.param('groupId')
-    const group = await c.env.DB.prepare('SELECT 1 FROM groups WHERE id = ?').bind(groupId).first()
+    const group = await c.env.DB.prepare('SELECT owner_user_id FROM groups WHERE id = ?').bind(groupId).first<{ owner_user_id: string | null }>()
     if (!group) return c.json({ error: 'Group not found.' }, 404)
+    const canManage = inviter.role === 'admin' || group.owner_user_id === inviter.id
+    if (!canManage) return c.json({ error: 'Only the group owner can manage this group.' }, 403)
 
     const { data, error } = await zParse(GroupInviteSchema, c)
     if (error) return error
@@ -281,9 +306,12 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
   })
 
   api.get('/admin/groups/:groupId/invitations', requireAuth, requireTeacherOrAdmin, async (c) => {
+    const user = c.get('user')
     const groupId = c.req.param('groupId')
-    const group = await c.env.DB.prepare('SELECT 1 FROM groups WHERE id = ?').bind(groupId).first()
+    const group = await c.env.DB.prepare('SELECT owner_user_id FROM groups WHERE id = ?').bind(groupId).first<{ owner_user_id: string | null }>()
     if (!group) return c.json({ error: 'Group not found.' }, 404)
+    const canManage = user.role === 'admin' || group.owner_user_id === user.id
+    if (!canManage) return c.json({ error: 'Only the group owner can manage this group.' }, 403)
 
     const rows = await c.env.DB.prepare("SELECT * FROM group_invitations WHERE group_id = ? ORDER BY created_at DESC").bind(groupId).all<InvitationRow>()
     const userIds = [...new Set((rows.results ?? []).flatMap((r) => [r.user_id, r.invited_by]))]
@@ -351,6 +379,19 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     }
 
     return c.json({ ok: true, status: newStatus })
+  })
+
+  // Student-facing: leave a group
+  api.post('/groups/:groupId/leave', requireAuth, async (c) => {
+    const user = c.get('user')
+    if (user.role !== 'student') return c.json({ error: 'Only students can leave groups.' }, 403)
+
+    const groupId = c.req.param('groupId')
+    const isMember = await c.env.DB.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?').bind(groupId, user.id).first()
+    if (!isMember) return c.json({ error: 'You are not a member of this group.' }, 400)
+
+    await c.env.DB.prepare('DELETE FROM group_members WHERE group_id = ? AND user_id = ?').bind(groupId, user.id).run()
+    return c.json({ ok: true }, 200)
   })
 
   // List groups: students see member groups, teachers/admins see all groups

@@ -297,6 +297,7 @@ export function Admin() {
           {section === "group-details" && selectedGroup && (
             <GroupDetailsPage
               group={selectedGroup}
+              currentUserId={user?.id ?? null}
               onBack={() => {
                 setSection("groups");
                 setSelectedGroup(null);
