@@ -11,7 +11,6 @@ import { registerTestRoutes } from './routes/tests'
 import { registerWritingRoutes } from './routes/writing'
 import { registerAccountRoutes } from './routes/account'
 import { registerVocabularyRoutes } from './routes/vocabulary'
-import { registerWSRoutes } from './routes/ws'
 import { CacheStore, dbGetUser, getJwtSecret } from './lib/store'
 import { verify } from 'hono/jwt'
 
@@ -47,7 +46,6 @@ export const createApp = () => {
   registerWritingRoutes(api)
   registerAccountRoutes(api)
   registerVocabularyRoutes(api)
-  registerWSRoutes(api)
   registerAdminRoutes(api)
 
   api.notFound((c) => c.json({ error: 'API route not found.' }, 404))
@@ -77,16 +75,7 @@ export const createApp = () => {
 
       const id = c.env.CHAT_ROOM.idFromName(groupId)
       const obj = c.env.CHAT_ROOM.get(id)
-
-      // Create a new request with user info in headers
-      const wsRequest = new Request(c.req.raw, {
-        headers: new Headers(c.req.raw.headers),
-      })
-      wsRequest.headers.set('x-user-id', user.id)
-      wsRequest.headers.set('x-username', user.username)
-      wsRequest.headers.set('x-avatar-url', user.avatar_url || '')
-
-      return obj.fetch(wsRequest)
+      return obj.fetch(c.req.raw)
     } catch {
       return c.json({ error: 'Unauthorized' }, 401)
     }
