@@ -55,7 +55,7 @@ function MessageBubble({
   isLastInGroup: boolean;
   isFirstInGroup: boolean;
 }) {
-  // Telegram style: name on first message, avatar on last message of a block
+
   const showAvatar = isLastInGroup;
   const showName = isFirstInGroup;
 
@@ -199,13 +199,26 @@ function ChatRoom({
     if (!content || sending) return;
 
     setSending(true);
+    setInputValue("");
+    inputRef.current?.focus();
+
+    // Optimistic insert — add message immediately with a temp ID
+    const tempId = `temp-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      { id: tempId, groupId: group.id, userId: "me", username: "", avatarUrl: null, content, createdAt: new Date().toISOString(), isMe: true },
+    ]);
+
     try {
       const res = await sendGroupMessage(group.id, content);
       sentIds.current.add(res.message.id);
-      setMessages((prev) => [...prev, res.message]);
-      setInputValue("");
-      inputRef.current?.focus();
+      // Replace temp message with the real one from the server
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? res.message : m))
+      );
     } catch {
+      // Remove the optimistic message on failure
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
       toast.error(en.groups.chat.sendError);
     } finally {
       setSending(false);
@@ -254,15 +267,28 @@ function ChatRoom({
       <CardContent className="relative flex-1 flex flex-col p-0 overflow-hidden">
         <ScrollArea className="flex-1 px-4 pt-3 pb-2" ref={scrollRef}>
           {loading ? (
-            <div className="flex flex-col gap-4 p-4">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div
-                  key={i}
-                  className={`flex ${i % 2 === 0 ? "justify-start" : "justify-end"}`}
-                >
-                  <Skeleton className="h-10 w-48 rounded-xl" />
-                </div>
-              ))}
+            <div className="flex flex-col gap-1.5 p-4">
+              {Array.from({ length: 8 }).map((_, i) => {
+                const isMe = i % 3 === 2;
+                const showAvatar = i === 2 || i === 5 || i === 7;
+                return (
+                  <div key={i} className={`flex ${isMe ? "justify-end" : "justify-start"} ${i > 0 && (i % 3 === 0) ? "mt-2" : "mt-0.5"}`}>
+                    <div className={`flex gap-2 ${isMe ? "flex-row-reverse" : "flex-row"} items-end`}>
+                      <div className="size-8 shrink-0">
+                        {showAvatar ? (
+                          <Skeleton className="size-8 rounded-full" />
+                        ) : (
+                          <div className="size-8" />
+                        )}
+                      </div>
+                      <div className={`flex flex-col gap-1 ${isMe ? "items-end" : "items-start"}`}>
+                        {i % 3 === 0 && <Skeleton className="h-3 w-16 rounded" />}
+                        <Skeleton className={`h-8 rounded-2xl ${isMe ? "rounded-br-sm" : "rounded-bl-sm"}`} style={{ width: `${120 + (i * 17) % 100}px` }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center p-8">
@@ -271,7 +297,7 @@ function ChatRoom({
               <p className="text-xs text-muted-foreground/60 mt-1">{en.groups.chat.emptySub}</p>
             </div>
           ) : (
-            <div className="mx-auto flex w-full max-w-4xl flex-col gap-1 px-1">
+            <div className="mx-auto flex w-full flex-col gap-1 px-1">
               {groupedMessages.map((group) => (
                 <div key={group.date} className="flex flex-col first:[&]:mt-0 mt-4">
                   <div className="flex items-center justify-center mb-2">
@@ -279,7 +305,16 @@ function ChatRoom({
                       variant="outline"
                       className="text-[10px] border-neutral-800 bg-neutral-950"
                     >
-                      {new Date(group.date).toLocaleDateString([], { month: "long", day: "numeric" })}
+                      {(() => {
+                        const d = new Date(group.date)
+                        const now = new Date()
+                        const isToday = d.toDateString() === now.toDateString()
+                        const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1)
+                        const isYesterday = d.toDateString() === yesterday.toDateString()
+                        if (isToday) return "Today"
+                        if (isYesterday) return "Yesterday"
+                        return d.toLocaleDateString([], { month: "long", day: "numeric" })
+                      })()}
                     </Badge>
                   </div>
                   {group.messages.map((msg, msgIdx) => {
@@ -314,7 +349,7 @@ function ChatRoom({
         <Separator className="bg-neutral-800" />
 
         <div className="z-10 shrink-0 border-t border-neutral-800 bg-neutral-900 px-3 py-3">
-          <div className="mx-auto flex w-full max-w-4xl items-center gap-2">
+          <div className="flex w-full items-center gap-2">
             <Input
               ref={inputRef}
               value={inputValue}
@@ -326,11 +361,11 @@ function ChatRoom({
             />
             <Button
               size="sm"
-              className="h-11 w-11 rounded-full p-0"
+              className={`h-11 w-11 rounded-full p-0 transition-all duration-200 ${inputValue.trim() ? "bg-blue-500 hover:bg-blue-600" : "bg-neutral-700"}`}
               disabled={!inputValue.trim() || sending}
               onClick={handleSend}
             >
-              <PaperPlaneRight weight="bold" className="size-4" />
+              <PaperPlaneRight weight="fill" className={`size-[18px] transition-transform duration-200 ${inputValue.trim() ? "translate-x-[1px] -translate-y-[1px]" : ""}`} />
             </Button>
           </div>
         </div>
@@ -385,68 +420,82 @@ export function Groups() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (selectedGroup) {
-    return (
-      <div className="h-full min-h-full">
-        <ChatRoom
-          group={selectedGroup}
-          onBack={() => setSelectedGroup(null)}
-        />
-      </div>
-    );
-  }
-
   return (
-    <div className="p-5 flex flex-col gap-4 font-body">
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-      >
-        <Card className="border-neutral-800 bg-neutral-900">
-          <CardHeader className="px-4 pt-4 pb-3">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Users weight="bold" className="size-4" />
-              {en.groups.list.title}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            {sk ? (
-              <div className="flex flex-col gap-3">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <Skeleton key={i} className="h-16 rounded-xl" />
-                ))}
-              </div>
-            ) : groups.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Users weight="duotone" className="size-12 text-muted-foreground/30 mb-3" />
-                <p className="text-sm text-muted-foreground">{en.groups.list.empty}</p>
-                <p className="text-xs text-muted-foreground/60 mt-1 max-w-xs">
-                  {en.groups.list.emptySub}
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                <AnimatePresence>
-                  {groups.map((group, i) => (
-                    <motion.div
-                      key={group.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                    >
-                      <GroupListItem
-                        group={group}
-                        onClick={() => setSelectedGroup(group)}
-                      />
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
-    </div>
+    <AnimatePresence mode="wait">
+      {selectedGroup ? (
+        <motion.div
+          key="chat"
+          initial={{ opacity: 0, x: 40 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 40 }}
+          transition={{ duration: 0.2, ease: "easeInOut" }}
+          className="h-full min-h-full"
+        >
+          <ChatRoom
+            group={selectedGroup}
+            onBack={() => setSelectedGroup(null)}
+          />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="list"
+          initial={{ opacity: 0, x: -40 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -40 }}
+          transition={{ duration: 0.2, ease: "easeInOut" }}
+          className="p-5 flex flex-col gap-4 font-body"
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Card className="border-neutral-800 bg-neutral-900">
+              <CardHeader className="px-4 pt-4 pb-3">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Users weight="bold" className="size-4" />
+                  {en.groups.list.title}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-4">
+                {sk ? (
+                  <div className="flex flex-col gap-3">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <Skeleton key={i} className="h-16 rounded-xl" />
+                    ))}
+                  </div>
+                ) : groups.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Users weight="duotone" className="size-12 text-muted-foreground/30 mb-3" />
+                    <p className="text-sm text-muted-foreground">{en.groups.list.empty}</p>
+                    <p className="text-xs text-muted-foreground/60 mt-1 max-w-xs">
+                      {en.groups.list.emptySub}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    <AnimatePresence>
+                      {groups.map((group, i) => (
+                        <motion.div
+                          key={group.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: i * 0.05 }}
+                        >
+                          <GroupListItem
+                            group={group}
+                            onClick={() => setSelectedGroup(group)}
+                          />
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

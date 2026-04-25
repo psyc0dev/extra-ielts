@@ -52,6 +52,7 @@ export function Admin() {
   const [groupQuery, setGroupQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<ApiUser | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [returnSection, setReturnSection] = useState<AdminSection>("users");
 
   const loadAll = useCallback(async () => {
     if (isAdmin) {
@@ -238,7 +239,7 @@ export function Admin() {
               query={userQuery}
               onQueryChange={setUserQuery}
               loading={sk}
-              onViewUser={(target) => { setSelectedUser(target); setSection("user-details"); }}
+              onViewUser={(target) => { setSelectedUser(target); setReturnSection("users"); setSection("user-details"); }}
             />
           )}
 
@@ -287,7 +288,7 @@ export function Admin() {
               user={selectedUser}
               testMap={testMap}
               onBack={() => {
-                setSection("users");
+                setSection(returnSection);
                 setSelectedUser(null);
               }}
             />
@@ -304,6 +305,7 @@ export function Admin() {
                 const user = users.find((u) => u.id === userId);
                 if (!user) return;
                 setSelectedUser(user);
+                setReturnSection("groups");
                 setSection("user-details");
               }}
               onMemberRemoved={(groupId, userId) => setGroups((prev) => prev.map((g) => g.id === groupId ? { ...g, members: g.members.filter((m) => m.id !== userId) } : g))}

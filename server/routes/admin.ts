@@ -267,6 +267,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
 
     const targetUser = await c.env.DB.prepare('SELECT id, role FROM users WHERE id = ?').bind(data.userId).first<{ id: string; role: string }>()
     if (!targetUser) return c.json({ error: 'User not found.' }, 404)
+    if (targetUser.role !== 'student') return c.json({ error: 'Only students can be invited to groups.' }, 403)
 
     const alreadyMember = await c.env.DB.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?').bind(groupId, data.userId).first()
     if (alreadyMember) return c.json({ error: 'User is already a member of this group.' }, 400)
@@ -374,7 +375,10 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
       const g = await c.env.DB.prepare('SELECT id, name, created_at FROM groups WHERE id = ?').bind(gid).first<{ id: string; name: string; created_at: string }>()
       if (!g) return null
       const count = await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM group_members WHERE group_id = ?').bind(gid).first<{ cnt: number }>()
-      return { id: g.id, name: g.name, createdAt: g.created_at, memberCount: count?.cnt ?? 0 }
+      // Teachers/admins aren't in group_members but can access the group — include them
+      const isMember = await c.env.DB.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?').bind(gid, user.id).first()
+      const memberCount = (count?.cnt ?? 0) + (isMember ? 0 : 1)
+      return { id: g.id, name: g.name, createdAt: g.created_at, memberCount }
     }))
     return c.json({ groups: groups.filter(Boolean) })
   })
