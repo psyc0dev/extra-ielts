@@ -189,17 +189,9 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     return c.json({ ok: true }, 200)
   })
 
-  // Direct member add — admin only (teachers must use join request flow)
+  // Direct member add is disabled — use invitation flow
   api.post('/admin/groups/:groupId/members', requireAuth, requireAdmin, async (c) => {
-    const groupId = c.req.param('groupId')
-    const group = await c.env.DB.prepare('SELECT 1 FROM groups WHERE id = ?').bind(groupId).first()
-    if (!group) return c.json({ error: 'Group not found.' }, 404)
-    const { data, error } = await zParse(GroupMemberBodySchema, c)
-    if (error) return error
-    const user = await c.env.DB.prepare('SELECT 1 FROM users WHERE id = ?').bind(data.userId).first()
-    if (!user) return c.json({ error: 'User not found.' }, 404)
-    await c.env.DB.prepare('INSERT OR IGNORE INTO group_members (group_id, user_id) VALUES (?, ?)').bind(groupId, data.userId).run()
-    return c.json({ ok: true }, 201)
+    return c.json({ error: 'Direct member add is disabled. Use group invitations.' }, 403)
   })
 
   api.delete('/admin/groups/:groupId/members/:userId', requireAuth, requireTeacherOrAdmin, async (c) => {
