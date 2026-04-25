@@ -177,6 +177,7 @@ export type Store = {
 
 export type Bindings = {
   DB: D1Database
+  CHAT_ROOM: DurableObjectNamespace
   CORS_ORIGIN?: string
   JWT_SECRET: string
   EVALUATOR_URL?: string

@@ -24,6 +24,7 @@ import {
 } from "@/lib/api";
 import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import { toast } from "sonner";
+import Cookies from "js-cookie";
 import en from "@/locales/en";
 
 function formatMessageTime(dateStr: string) {
@@ -46,47 +47,59 @@ function formatMessageTime(dateStr: string) {
 function MessageBubble({
   message,
   isConsecutive,
+  isLastInGroup,
+  isFirstInGroup,
 }: {
   message: GroupMessage;
   isConsecutive: boolean;
+  isLastInGroup: boolean;
+  isFirstInGroup: boolean;
 }) {
+  // Telegram style: name on first message, avatar on last message of a block
+  const showAvatar = isLastInGroup;
+  const showName = isFirstInGroup;
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.2 }}
-      className={`flex ${message.isMe ? "justify-end" : "justify-start"}`}
-    >
-      <div className={`flex gap-2 max-w-[80%] ${message.isMe ? "flex-row-reverse" : "flex-row"}`}>
-        {!message.isMe && (
-          <Avatar className="size-8 shrink-0">
-            <AvatarImage src={message.avatarUrl ?? undefined} />
-            <AvatarFallback className="bg-neutral-800 text-xs">
-              {message.username.slice(0, 2).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-        )}
+    <div className={`flex ${message.isMe ? "justify-end" : "justify-start"} ${isConsecutive ? "mt-0.5" : "mt-2"}`}>
+      <div className={`flex gap-2 max-w-[80%] ${message.isMe ? "flex-row-reverse" : "flex-row"} items-end`}>
+        <div className="size-8 shrink-0 self-end">
+          {showAvatar ? (
+            <Avatar className="size-8">
+              <AvatarImage src={message.avatarUrl ?? undefined} />
+              <AvatarFallback className="bg-neutral-700 text-neutral-200 text-xs font-medium">
+                {message.username.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          ) : (
+            /* Spacer to keep messages aligned when avatar is hidden */
+            <div className="size-8" />
+          )}
+        </div>
+
         <div className={`flex flex-col ${message.isMe ? "items-end" : "items-start"}`}>
-          {!message.isMe && !isConsecutive && (
-            <span className="text-[10px] text-muted-foreground mb-0.5 ml-1">
+          {showName && (
+            <span className={`text-[11px] font-medium mb-0.5 px-1 ${message.isMe ? "text-blue-400" : "text-blue-400/80"}`}>
               {message.username}
             </span>
           )}
+
           <div
-            className={`px-3 py-2 rounded-2xl text-sm ${
+            className={`relative px-3 py-1.5 text-sm leading-snug ${
               message.isMe
-                ? "bg-blue-600 text-white rounded-br-md"
-                : "bg-neutral-800 text-neutral-100 rounded-bl-md"
+                ? "bg-[#2B5278] text-white rounded-2xl rounded-br-sm"
+                : "bg-[#182533] text-neutral-100 rounded-2xl rounded-bl-sm"
             }`}
           >
-            {message.content}
+            <span>{message.content}</span>
+
+            {/* Timestamp inline for Telegram style */}
+            <span className={`inline-block text-[10px] opacity-50 ml-2 translate-y-0.5 ${message.isMe ? "text-blue-100" : "text-neutral-400"}`}>
+              {formatMessageTime(message.createdAt)}
+            </span>
           </div>
-          <span className="text-[10px] text-muted-foreground mt-0.5 mx-1">
-            {formatMessageTime(message.createdAt)}
-          </span>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -117,8 +130,58 @@ function ChatRoom({
 
   useEffect(() => {
     loadMessages();
-    const interval = setInterval(loadMessages, 5000);
-    return () => clearInterval(interval);
+
+    const token = Cookies.get("accessToken");
+    if (!token) return;
+
+    // Use ws:// for localhost, wss:// for production
+    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
+
+    let wsUrl: string;
+    if (baseUrl.startsWith("/")) {
+      // Relative path (e.g. "/api") — use current host
+      wsUrl = `${wsProtocol}//${window.location.host}${baseUrl}/groups/${group.id}/ws?token=${token}`;
+    } else {
+      // Absolute URL (e.g. "https://api.example.com/api") — derive WS URL
+      const wsHost = baseUrl.replace(/^https?:\/\//, "");
+      wsUrl = `${wsProtocol}//${wsHost}/groups/${group.id}/ws?token=${token}`;
+    }
+
+    let ws: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const connect = () => {
+      ws = new WebSocket(wsUrl);
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          setMessages((prev) => {
+            if (prev.some(m => m.id === data.id)) return prev;
+            return [...prev, data];
+          });
+        } catch (err) {
+          console.error("WebSocket message error", err);
+        }
+      };
+
+      ws.onclose = () => {
+        // Reconnect after 3 seconds
+        reconnectTimer = setTimeout(connect, 3000);
+      };
+
+      ws.onerror = () => {
+        ws?.close();
+      };
+    };
+
+    connect();
+
+    return () => {
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      ws?.close();
+    };
   }, [group.id]);
 
   useEffect(() => {
@@ -169,8 +232,8 @@ function ChatRoom({
   }, [messages]);
 
   return (
-    <Card className="border-neutral-800 bg-neutral-900 flex flex-col h-[calc(100vh-140px)]">
-      <CardHeader className="flex flex-row items-center gap-3 px-4 py-3 shrink-0 border-b border-neutral-800">
+    <div className="relative flex h-full min-h-full flex-col overflow-hidden bg-neutral-900">
+      <CardHeader className="z-10 flex flex-row items-center gap-3 border-b border-neutral-800 bg-neutral-900 px-4 py-3 shrink-0">
         <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onBack}>
           <ArrowLeft weight="bold" className="size-4" />
         </Button>
@@ -183,8 +246,8 @@ function ChatRoom({
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
-        <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+      <CardContent className="relative flex-1 flex flex-col p-0 overflow-hidden">
+        <ScrollArea className="flex-1 px-4 pt-3 pb-2" ref={scrollRef}>
           {loading ? (
             <div className="flex flex-col gap-4 p-4">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -203,27 +266,40 @@ function ChatRoom({
               <p className="text-xs text-muted-foreground/60 mt-1">{en.groups.chat.emptySub}</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-6">
-              {groupedMessages.map((group, groupIdx) => (
-                <div key={group.date} className="flex flex-col gap-3">
-                  <div className="flex items-center justify-center">
-                    <Badge variant="outline" className="text-[10px] border-neutral-800 bg-neutral-950">
+            <div className="mx-auto flex w-full max-w-4xl flex-col gap-1 px-1">
+              {groupedMessages.map((group) => (
+                <div key={group.date} className="flex flex-col first:[&]:mt-0 mt-4">
+                  <div className="flex items-center justify-center mb-2">
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] border-neutral-800 bg-neutral-950"
+                    >
                       {new Date(group.date).toLocaleDateString([], { month: "long", day: "numeric" })}
                     </Badge>
                   </div>
-                  {group.messages.map((msg, msgIdx) => (
-                    <MessageBubble
-                      key={msg.id}
-                      message={msg}
-                      isConsecutive={
-                        msgIdx > 0 &&
-                        group.messages[msgIdx - 1].userId === msg.userId &&
-                        new Date(msg.createdAt).getTime() -
-                          new Date(group.messages[msgIdx - 1].createdAt).getTime() <
-                          60000
-                      }
-                    />
-                  ))}
+                  {group.messages.map((msg, msgIdx) => {
+                    const isConsecutive =
+                      msgIdx > 0 &&
+                      group.messages[msgIdx - 1].userId === msg.userId &&
+                      new Date(msg.createdAt).getTime() -
+                        new Date(group.messages[msgIdx - 1].createdAt).getTime() <
+                        60000;
+                    const isFirstInGroup =
+                      msgIdx === 0 ||
+                      group.messages[msgIdx - 1].userId !== msg.userId;
+                    const isLastInGroup =
+                      msgIdx === group.messages.length - 1 ||
+                      group.messages[msgIdx + 1].userId !== msg.userId;
+                    return (
+                      <MessageBubble
+                        key={msg.id}
+                        message={msg}
+                        isConsecutive={isConsecutive}
+                        isFirstInGroup={isFirstInGroup}
+                        isLastInGroup={isLastInGroup}
+                      />
+                    );
+                  })}
                 </div>
               ))}
             </div>
@@ -232,27 +308,29 @@ function ChatRoom({
 
         <Separator className="bg-neutral-800" />
 
-        <div className="p-3 flex items-center gap-2 shrink-0">
-          <Input
-            ref={inputRef}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={en.groups.chat.inputPlaceholder}
-            disabled={sending}
-            className="flex-1 bg-neutral-950 border-neutral-800 text-sm h-10"
-          />
-          <Button
-            size="sm"
-            className="h-10 px-3"
-            disabled={!inputValue.trim() || sending}
-            onClick={handleSend}
-          >
-            <PaperPlaneRight weight="bold" className="size-4" />
-          </Button>
+        <div className="z-10 shrink-0 border-t border-neutral-800 bg-neutral-900 px-3 py-3">
+          <div className="mx-auto flex w-full max-w-4xl items-center gap-2">
+            <Input
+              ref={inputRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={en.groups.chat.inputPlaceholder}
+              disabled={sending}
+              className="h-11 flex-1 rounded-full border-neutral-800 bg-neutral-950 px-4 text-sm"
+            />
+            <Button
+              size="sm"
+              className="h-11 w-11 rounded-full p-0"
+              disabled={!inputValue.trim() || sending}
+              onClick={handleSend}
+            >
+              <PaperPlaneRight weight="bold" className="size-4" />
+            </Button>
+          </div>
         </div>
       </CardContent>
-    </Card>
+    </div>
   );
 }
 
@@ -304,10 +382,12 @@ export function Groups() {
 
   if (selectedGroup) {
     return (
-      <ChatRoom
-        group={selectedGroup}
-        onBack={() => setSelectedGroup(null)}
-      />
+      <div className="h-full min-h-full">
+        <ChatRoom
+          group={selectedGroup}
+          onBack={() => setSelectedGroup(null)}
+        />
+      </div>
     );
   }
 

@@ -12,6 +12,20 @@
       "migrations_dir": "./server/migrations"
     }
   ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CHAT_ROOM",
+        "class_name": "ChatRoomDO"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["ChatRoomDO"]
+    }
+  ],
   "vars": {
     "CORS_ORIGIN": "tauri://localhost,https://tauri.localhost,http://localhost:1420",
     "EVALUATOR_URL": "https://extra-corporation-extraai.hf.space",
