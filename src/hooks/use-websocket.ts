@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { getToken } from '@/lib/api'
 
 export type WSMessage =
   | { type: 'user-joined'; userId: string; username: string; groupId: string; timestamp: string }
@@ -29,8 +30,8 @@ export function useWebSocket(groupId: string | null) {
   const connect = useCallback(() => {
     if (!groupId || wsRef.current?.readyState === WebSocket.OPEN) return
 
-    // Get token from localStorage
-    const token = localStorage.getItem('accessToken')
+    // Get token from cookies
+    const token = getToken()
     if (!token) {
       console.warn('[WS] No token available')
       return
