@@ -1,6 +1,6 @@
 import type { Hono } from 'hono'
 import type { AppEnv, Role } from '../lib/types'
-import { CreateUserBodySchema, TestPublishedBodySchema, CreateAssignmentBodySchema, GroupAssignmentBodySchema, GroupNameBodySchema, GroupMemberBodySchema, GroupInviteSchema, InvitationActionSchema } from '../lib/schemas'
+import { CreateUserBodySchema, TestPublishedBodySchema, CreateAssignmentBodySchema, GroupAssignmentBodySchema, GroupNameBodySchema, GroupMemberBodySchema, GroupInviteSchema, InvitationActionSchema, GroupMessageBodySchema } from '../lib/schemas'
 import { createPasswordHash, nowIso, zParse, jsonParse, requireAdmin, requireTeacherOrAdmin, requireAuth, toApiUser } from '../lib/store'
 import { getTestById, getDbTests } from '../lib/tests'
 
@@ -367,5 +367,70 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
       return { id: g.id, name: g.name, createdAt: g.created_at, memberCount: count?.cnt ?? 0 }
     }))
     return c.json({ groups: groups.filter(Boolean) })
+  })
+
+  // Group Chat — list messages (members only)
+  type MessageRow = { id: string; group_id: string; user_id: string; content: string; created_at: string }
+
+  api.get('/groups/:groupId/messages', requireAuth, async (c) => {
+    const user = c.get('user')
+    const groupId = c.req.param('groupId')
+
+    // Verify user is a member of the group
+    const isMember = await c.env.DB.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?').bind(groupId, user.id).first()
+    if (!isMember) return c.json({ error: 'Not a member of this group.' }, 403)
+
+    const rows = await c.env.DB.prepare('SELECT * FROM group_messages WHERE group_id = ? ORDER BY created_at ASC').bind(groupId).all<MessageRow>()
+
+    const userIds = [...new Set((rows.results ?? []).map((r) => r.user_id))]
+    const userMap = new Map<string, { username: string; avatarUrl: string | null }>()
+    await Promise.all(userIds.map(async (uid) => {
+      const u = await c.env.DB.prepare('SELECT id, username, avatar_url FROM users WHERE id = ?').bind(uid).first<{ id: string; username: string; avatar_url: string | null }>()
+      if (u) userMap.set(u.id, { username: u.username, avatarUrl: u.avatar_url })
+    }))
+
+    return c.json({
+      messages: (rows.results ?? []).map((r) => ({
+        id: r.id,
+        groupId: r.group_id,
+        userId: r.user_id,
+        username: userMap.get(r.user_id)?.username ?? 'Unknown',
+        avatarUrl: userMap.get(r.user_id)?.avatarUrl ?? null,
+        content: r.content,
+        createdAt: r.created_at,
+        isMe: r.user_id === user.id,
+      }))
+    })
+  })
+
+  // Group Chat — send message (members only)
+  api.post('/groups/:groupId/messages', requireAuth, async (c) => {
+    const user = c.get('user')
+    const groupId = c.req.param('groupId')
+
+    // Verify user is a member of the group
+    const isMember = await c.env.DB.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?').bind(groupId, user.id).first()
+    if (!isMember) return c.json({ error: 'Not a member of this group.' }, 403)
+
+    const { data, error } = await zParse(GroupMessageBodySchema, c)
+    if (error) return error
+
+    const id = crypto.randomUUID()
+    const createdAt = nowIso()
+    await c.env.DB.prepare('INSERT INTO group_messages (id, group_id, user_id, content, created_at) VALUES (?, ?, ?, ?, ?)')
+      .bind(id, groupId, user.id, data.content, createdAt).run()
+
+    return c.json({
+      message: {
+        id,
+        groupId,
+        userId: user.id,
+        username: user.username,
+        avatarUrl: user.avatarUrl,
+        content: data.content,
+        createdAt,
+        isMe: true,
+      }
+    }, 201)
   })
 }

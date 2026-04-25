@@ -2,7 +2,7 @@ import { createContext, useContext, useState } from "react";
 import { toast } from "sonner";
 import en from "@/locales/en";
 
-type Page = "Dashboard" | "Tests" | "Homework" | "Settings" | "Admin" | "Writing" | "Vocabulary";
+type Page = "Dashboard" | "Tests" | "Homework" | "Settings" | "Admin" | "Writing" | "Vocabulary" | "Groups";
 
 export const NavContext = createContext<{
   page: Page;

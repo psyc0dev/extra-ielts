@@ -20,11 +20,12 @@ CREATE TABLE IF NOT EXISTS users_new (
   email TEXT UNIQUE,
   role TEXT NOT NULL CHECK (role IN ('admin', 'teacher', 'student')),
   password_hash TEXT NOT NULL,
+  avatar_url TEXT,
   created_at TEXT NOT NULL
 );
 
-INSERT INTO users_new (id, username, email, role, password_hash, created_at)
-SELECT id, username, email, role, password_hash, created_at FROM users;
+INSERT INTO users_new (id, username, email, role, password_hash, avatar_url, created_at)
+SELECT id, username, email, role, password_hash, avatar_url, created_at FROM users;
 
 DROP TABLE users;
 ALTER TABLE users_new RENAME TO users;

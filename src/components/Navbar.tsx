@@ -1,4 +1,4 @@
-﻿import { House, BookOpen, Notebook, Gear, ShieldCheck, PencilLine, TextAa } from "@phosphor-icons/react";
+﻿import { House, BookOpen, Notebook, Gear, ShieldCheck, PencilLine, TextAa, Users } from "@phosphor-icons/react";
 import {
   Sidebar,
   SidebarContent,
@@ -25,6 +25,7 @@ export default function Navbar() {
     { id: "Dashboard", title: en.nav.dashboard, icon: House },
     { id: "Tests", title: en.nav.tests, icon: BookOpen },
     { id: "Homework", title: en.nav.homework, icon: Notebook },
+    { id: "Groups", title: en.nav.groups, icon: Users },
     { id: "Writing", title: en.nav.writing, icon: PencilLine },
     { id: "Vocabulary", title: en.nav.vocabulary, icon: TextAa },
   ] as const;

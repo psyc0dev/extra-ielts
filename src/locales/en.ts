@@ -14,6 +14,7 @@
     brand: "extra",
     logoAlt: "logo",
     vocabulary: "Vocabulary",
+    groups: "Groups",
   },
 
   app: {
@@ -461,6 +462,24 @@
     maximize: "Maximize",
     close: "Close",
     closeSubmitting: "Close (submitting test)",
+  },
+
+  groups: {
+    list: {
+      title: "My Groups",
+      memberCount: (n: number) => `${n} member${n !== 1 ? "s" : ""}`,
+      empty: "No groups yet",
+      emptySub: "Join a group to collaborate with classmates and teachers. Ask your teacher for an invitation.",
+      loadError: "Failed to load groups",
+    },
+    chat: {
+      memberCount: (n: number) => `${n} member${n !== 1 ? "s" : ""}`,
+      empty: "No messages yet",
+      emptySub: "Start the conversation! Send a message to your group.",
+      inputPlaceholder: "Type a message...",
+      loadError: "Failed to load messages",
+      sendError: "Failed to send message",
+    },
   },
 
   writing: {

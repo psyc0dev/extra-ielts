@@ -147,6 +147,17 @@ export type MyGroup = {
   memberCount: number;
 };
 
+export type GroupMessage = {
+  id: string;
+  groupId: string;
+  userId: string;
+  username: string;
+  avatarUrl: string | null;
+  content: string;
+  createdAt: string;
+  isMe: boolean;
+};
+
 export type StudentStatsBucket = {
   completed: number;
   total: number;
@@ -415,6 +426,17 @@ export async function respondToInvitation(invitationId: string, action: "accept"
 
 export async function listMyGroups() {
   return apiFetch<{ groups: MyGroup[] }>('/groups');
+}
+
+export async function listGroupMessages(groupId: string) {
+  return apiFetch<{ messages: GroupMessage[] }>(`/groups/${groupId}/messages`);
+}
+
+export async function sendGroupMessage(groupId: string, content: string) {
+  return apiFetch<{ message: GroupMessage }>(`/groups/${groupId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ content }),
+  });
 }
 
 export async function requestPasswordReset(email: string) {

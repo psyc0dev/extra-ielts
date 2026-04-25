@@ -96,6 +96,10 @@ export const InvitationActionSchema = z.object({
   action: z.enum(['accept', 'decline']),
 })
 
+export const GroupMessageBodySchema = z.object({
+  content: z.string().min(1).max(2000),
+})
+
 export const AnswerBodySchema = z.object({
   questionId: z.string().min(1).max(100),
   response: z.union([z.string().max(500), z.array(z.string().max(200)).max(20), z.null()]).optional(),

@@ -5,3 +5,4 @@ export { Settings } from "./settings";
 export { Admin } from "./admin";
 export { Writing } from "./writing";
 export { Vocabulary } from "./vocabulary";
+export { Groups } from "./groups";
