@@ -416,7 +416,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
   })
 
   // Group Chat — list messages (members, teachers, and admins)
-  type MessageRow = { id: string; group_id: string; user_id: string; content: string; created_at: string }
+  type MessageRow = { id: string; group_id: string; user_id: string; content: string; image_url: string | null; created_at: string }
 
   api.get('/groups/:groupId/messages', requireAuth, async (c) => {
     const user = c.get('user')
@@ -444,6 +444,7 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
         username: userMap.get(r.user_id)?.username ?? 'Unknown',
         avatarUrl: userMap.get(r.user_id)?.avatarUrl ?? null,
         content: r.content,
+        imageUrl: r.image_url ?? null,
         createdAt: r.created_at,
         isMe: r.user_id === user.id,
       }))
@@ -465,8 +466,9 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
 
     const id = crypto.randomUUID()
     const createdAt = nowIso()
-    await c.env.DB.prepare('INSERT INTO group_messages (id, group_id, user_id, content, created_at) VALUES (?, ?, ?, ?, ?)')
-      .bind(id, groupId, user.id, data.content, createdAt).run()
+    const imageUrl = data.imageUrl ?? null
+    await c.env.DB.prepare('INSERT INTO group_messages (id, group_id, user_id, content, image_url, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(id, groupId, user.id, data.content, imageUrl, createdAt).run()
 
     const messageObj = {
       id,
@@ -475,8 +477,9 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
       username: user.username,
       avatarUrl: user.avatarUrl,
       content: data.content,
+      imageUrl,
       createdAt,
-      isMe: false // This will be set on frontend, but for broadcast we send false
+      isMe: false
     }
 
     // Broadcast to Durable Object

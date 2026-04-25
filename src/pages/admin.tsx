@@ -278,7 +278,6 @@ export function Admin() {
               }}
               onGroupCreated={(g) => setGroups((prev) => [g, ...prev])}
               onGroupDeleted={(id) => setGroups((prev) => prev.filter((g) => g.id !== id))}
-              onMemberAdded={(groupId, user) => setGroups((prev) => prev.map((g) => g.id === groupId ? { ...g, members: [...g.members, user] } : g))}
               onMemberRemoved={(groupId, userId) => setGroups((prev) => prev.map((g) => g.id === groupId ? { ...g, members: g.members.filter((m) => m.id !== userId) } : g))}
             />
           )}

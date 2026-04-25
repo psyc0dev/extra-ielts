@@ -154,6 +154,7 @@ export type GroupMessage = {
   username: string;
   avatarUrl: string | null;
   content: string;
+  imageUrl: string | null;
   createdAt: string;
   isMe: boolean;
 };
@@ -432,10 +433,10 @@ export async function listGroupMessages(groupId: string) {
   return apiFetch<{ messages: GroupMessage[] }>(`/groups/${groupId}/messages`);
 }
 
-export async function sendGroupMessage(groupId: string, content: string) {
+export async function sendGroupMessage(groupId: string, content: string, imageUrl?: string) {
   return apiFetch<{ message: GroupMessage }>(`/groups/${groupId}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, imageUrl }),
   });
 }
 

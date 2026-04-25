@@ -16,7 +16,6 @@ import { Plus, Trash, UserMinus, Users, CaretDown } from "@phosphor-icons/react"
 import {
   adminCreateGroup,
   adminDeleteGroup,
-  adminAddGroupMember,
   adminRemoveGroupMember,
   adminAssignToGroup,
   adminGetStudentStats,
@@ -33,7 +32,7 @@ import { TestSelect } from "./tests";
 import { buildDueAt, formatDateLabel } from "./lib";
 import en from "@/locales/en";
 
-export function GroupsSection({ groups, users, tests, query, onQueryChange, isAdmin, onViewGroup, onGroupCreated, onGroupDeleted, onMemberAdded, onMemberRemoved }: {
+export function GroupsSection({ groups, users, tests, query, onQueryChange, isAdmin, onViewGroup, onGroupCreated, onGroupDeleted, onMemberRemoved }: {
   groups: Group[];
   users: ApiUser[];
   tests: TestSummary[];
@@ -43,7 +42,6 @@ export function GroupsSection({ groups, users, tests, query, onQueryChange, isAd
   onViewGroup: (group: Group) => void;
   onGroupCreated: (g: Group) => void;
   onGroupDeleted: (id: string) => void;
-  onMemberAdded: (groupId: string, user: { id: string; username: string; email: string | null }) => void;
   onMemberRemoved: (groupId: string, userId: string) => void;
 }) {
   const visibleGroups = (() => {
@@ -72,7 +70,6 @@ export function GroupsSection({ groups, users, tests, query, onQueryChange, isAd
           onViewGroup={onViewGroup}
           onGroupCreated={onGroupCreated}
           onGroupDeleted={onGroupDeleted}
-          onMemberAdded={onMemberAdded}
           onMemberRemoved={onMemberRemoved}
         />
       </CardContent>
@@ -270,7 +267,6 @@ function GroupsPanel({
   onViewGroup,
   onGroupCreated,
   onGroupDeleted,
-  onMemberAdded,
   onMemberRemoved,
 }: {
   groups: Group[];
@@ -280,7 +276,6 @@ function GroupsPanel({
   onViewGroup: (group: Group) => void;
   onGroupCreated: (g: Group) => void;
   onGroupDeleted: (id: string) => void;
-  onMemberAdded: (groupId: string, user: { id: string; username: string; email: string | null }) => void;
   onMemberRemoved: (groupId: string, userId: string) => void;
 }) {
   return (
@@ -316,11 +311,6 @@ function GroupsPanel({
               onGroupDeleted(group.id);
               toast.success(en.admin.groups.delete);
             }}
-            onAddMember={async (userId) => {
-              await adminAddGroupMember(group.id, userId);
-              const user = users.find((u) => u.id === userId)!;
-              onMemberAdded(group.id, { id: user.id, username: user.username, email: user.email ?? null });
-            }}
             onRemoveMember={async (userId) => {
               await adminRemoveGroupMember(group.id, userId);
               onMemberRemoved(group.id, userId);
@@ -339,7 +329,6 @@ function GroupCard({
   isAdmin,
   onView,
   onDelete,
-  onAddMember,
   onRemoveMember,
 }: {
   group: Group;
@@ -348,10 +337,8 @@ function GroupCard({
   isAdmin: boolean;
   onView: () => void;
   onDelete: () => Promise<void>;
-  onAddMember: (userId: string) => Promise<void>;
   onRemoveMember: (userId: string) => Promise<void>;
 }) {
-  const nonMembers = users.filter((u) => u.role === "student" && !group.members.some((m) => m.id === u.id));
 
   return (
     <Card className="border-neutral-800 bg-neutral-900">
@@ -393,46 +380,11 @@ function GroupCard({
             ))}
           </div>
         )}
-        {isAdmin && nonMembers.length > 0 && (
-          <AddMemberSelect nonMembers={nonMembers} onAdd={onAddMember} />
-        )}
       </CardContent>
     </Card>
   );
 }
 
-function AddMemberSelect({ nonMembers, onAdd }: { nonMembers: ApiUser[]; onAdd: (userId: string) => Promise<void> }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-7 text-xs border-neutral-700 bg-neutral-800 w-56 justify-start font-normal">
-          <Plus weight="bold" className="size-3 mr-1 shrink-0" /> {en.admin.groups.addStudent}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-56 p-0 border-neutral-700 bg-neutral-900" align="start">
-        <Command className="bg-neutral-900">
-          <CommandInput placeholder={en.admin.groups.search} className="h-7 py-1 text-xs" />
-          <CommandList className="max-h-48">
-            <CommandEmpty className="text-xs py-3 text-center px-2">{en.admin.groups.noStudents}</CommandEmpty>
-            <CommandGroup>
-              {nonMembers.map((u) => (
-                <CommandItem
-                  key={u.id}
-                  value={u.username}
-                  className="text-xs"
-                  onSelect={async () => { setOpen(false); await onAdd(u.id); }}
-                >
-                  {u.username}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
 
 export function CreateGroupDialog({ onCreate }: { onCreate: (name: string) => Promise<void> }) {
   const [open, setOpen] = useState(false);

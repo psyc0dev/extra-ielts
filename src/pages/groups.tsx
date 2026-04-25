@@ -14,6 +14,8 @@ import {
   PaperPlaneRight,
   ChatCircle,
   User,
+  Image as ImageIcon,
+  X,
 } from "@phosphor-icons/react";
 import {
   listMyGroups,
@@ -57,15 +59,15 @@ function MessageBubble({
   isLastInGroup: boolean;
   isFirstInGroup: boolean;
 }) {
-
-  const showAvatar = isLastInGroup;
   const showName = isFirstInGroup;
+  const hasImage = !!message.imageUrl;
 
   return (
     <div className={`flex ${message.isMe ? "justify-end" : "justify-start"} ${isConsecutive ? "mt-0.5" : "mt-2"}`}>
       <div className={`flex gap-2 max-w-[80%] ${message.isMe ? "flex-row-reverse" : "flex-row"} items-end`}>
-        <div className="size-8 shrink-0 self-end">
-          {showAvatar ? (
+        {/* Avatar column — sticky bottom for Telegram effect */}
+        <div className="size-8 shrink-0 self-end sticky bottom-0">
+          {isLastInGroup ? (
             <Avatar className="size-8">
               <AvatarImage src={message.avatarUrl ?? undefined} />
               <AvatarFallback className="bg-neutral-700 text-neutral-200 text-xs font-medium">
@@ -73,7 +75,6 @@ function MessageBubble({
               </AvatarFallback>
             </Avatar>
           ) : (
-            /* Spacer to keep messages aligned when avatar is hidden */
             <div className="size-8" />
           )}
         </div>
@@ -90,11 +91,20 @@ function MessageBubble({
               message.isMe
                 ? "bg-[#2B5278] text-white rounded-2xl rounded-br-sm"
                 : "bg-[#182533] text-neutral-100 rounded-2xl rounded-bl-sm"
-            }`}
+            } ${hasImage ? "p-1" : ""}`}
           >
-            <span>{message.content}</span>
+            {hasImage && (
+              <img
+                src={message.imageUrl!}
+                alt=""
+                className="rounded-xl max-w-[280px] max-h-[280px] object-cover"
+                loading="lazy"
+              />
+            )}
+            {message.content && (
+              <span className={hasImage ? "block mt-1 px-2 py-0.5" : ""}>{message.content}</span>
+            )}
 
-            {/* Timestamp inline for Telegram style */}
             <span className={`inline-block text-[10px] opacity-50 ml-2 translate-y-0.5 ${message.isMe ? "text-blue-100" : "text-neutral-400"}`}>
               {formatMessageTime(message.createdAt)}
             </span>
@@ -120,8 +130,10 @@ function ChatRoom({
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const sentIds = useRef<Set<string>>(new Set());
 
   const handleLeaveGroup = async () => {
@@ -223,29 +235,38 @@ function ChatRoom({
     };
   }, [group.id]);
 
+  const scrollToBottom = () => {
+    requestAnimationFrame(() => {
+      const viewport = scrollRef.current?.querySelector("[data-radix-scroll-area-viewport]");
+      if (viewport) {
+        viewport.scrollTop = viewport.scrollHeight;
+      }
+    });
+  };
+
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    scrollToBottom();
   }, [messages]);
 
   const handleSend = async () => {
     const content = inputValue.trim();
-    if (!content || sending) return;
+    const image = pendingImage;
+    if ((!content && !image) || sending) return;
 
     setSending(true);
     setInputValue("");
+    setPendingImage(null);
     inputRef.current?.focus();
 
     // Optimistic insert — add message immediately with a temp ID
     const tempId = `temp-${Date.now()}`;
     setMessages((prev) => [
       ...prev,
-      { id: tempId, groupId: group.id, userId: "me", username: "", avatarUrl: null, content, createdAt: new Date().toISOString(), isMe: true },
+      { id: tempId, groupId: group.id, userId: "me", username: "", avatarUrl: null, content: content || "", imageUrl: image, createdAt: new Date().toISOString(), isMe: true },
     ]);
 
     try {
-      const res = await sendGroupMessage(group.id, content);
+      const res = await sendGroupMessage(group.id, content || "", image || undefined);
       sentIds.current.add(res.message.id);
       // Replace temp message with the real one from the server
       setMessages((prev) =>
@@ -265,6 +286,26 @@ function ChatRoom({
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type)) {
+      toast.error("Only PNG, JPEG, WebP, and GIF images are allowed.");
+      return;
+    }
+    if (file.size > 1 * 1024 * 1024) {
+      toast.error("Image must be under 1MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setPendingImage(ev.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+    // Reset so the same file can be re-selected
+    e.target.value = "";
   };
 
   const groupedMessages = useMemo(() => {
@@ -395,7 +436,34 @@ function ChatRoom({
         <Separator className="bg-neutral-800" />
 
         <div className="z-10 shrink-0 border-t border-neutral-800 bg-neutral-900 px-3 py-3">
+          {pendingImage && (
+            <div className="relative mb-2 inline-block">
+              <img src={pendingImage} alt="" className="h-20 rounded-lg object-cover" />
+              <button
+                onClick={() => setPendingImage(null)}
+                className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-neutral-800 border border-neutral-700 flex items-center justify-center hover:bg-red-900 transition-colors"
+              >
+                <X weight="bold" className="size-3" />
+              </button>
+            </div>
+          )}
           <div className="flex w-full items-center gap-2">
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="hidden"
+              onChange={handleImageSelect}
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-11 w-11 rounded-full p-0 text-neutral-400 hover:text-white"
+              onClick={() => imageInputRef.current?.click()}
+              disabled={sending}
+            >
+              <ImageIcon weight="bold" className="size-5" />
+            </Button>
             <Input
               ref={inputRef}
               value={inputValue}
@@ -407,11 +475,11 @@ function ChatRoom({
             />
             <Button
               size="sm"
-              className={`h-11 w-11 rounded-full p-0 transition-all duration-200 ${inputValue.trim() ? "bg-blue-500 hover:bg-blue-600" : "bg-neutral-700"}`}
-              disabled={!inputValue.trim() || sending}
+              className={`h-11 w-11 rounded-full p-0 transition-all duration-200 ${(inputValue.trim() || pendingImage) ? "bg-blue-500 hover:bg-blue-600" : "bg-neutral-700"}`}
+              disabled={(!inputValue.trim() && !pendingImage) || sending}
               onClick={handleSend}
             >
-              <PaperPlaneRight weight="fill" className={`size-[18px] transition-transform duration-200 ${inputValue.trim() ? "translate-x-[1px] -translate-y-[1px]" : ""}`} />
+              <PaperPlaneRight weight="fill" className={`size-[18px] transition-transform duration-200 ${(inputValue.trim() || pendingImage) ? "translate-x-[1px] -translate-y-[1px]" : ""}`} />
             </Button>
           </div>
         </div>
