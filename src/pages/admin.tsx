@@ -5,7 +5,6 @@ import {
   adminCreateUser,
   adminCreateGroup,
   adminListUsers,
-  adminListStudents,
   adminListTests,
   adminListAssignments,
   adminListGroups,
@@ -67,16 +66,15 @@ export function Admin() {
       setHomeworkAssignments(homeworkRes.assignments);
       setGroups(groupsRes.groups);
     } else {
-      const [testsRes, homeworkRes, groupsRes, studentsRes] = await Promise.all([
+      const [testsRes, homeworkRes, groupsRes] = await Promise.all([
         adminListTests(),
         adminListAssignments("homework"),
         adminListGroups(),
-        adminListStudents(),
       ]);
       setTests(testsRes.tests);
       setHomeworkAssignments(homeworkRes.assignments);
       setGroups(groupsRes.groups);
-      setUsers(studentsRes.users);
+      setUsers([]);
     }
     setLoading(false);
   }, [isAdmin]);
@@ -309,7 +307,6 @@ export function Admin() {
                 setSection("user-details");
               }}
               onMemberRemoved={(groupId, userId) => setGroups((prev) => prev.map((g) => g.id === groupId ? { ...g, members: g.members.filter((m) => m.id !== userId) } : g))}
-              allUsers={users}
             />
           )}
 

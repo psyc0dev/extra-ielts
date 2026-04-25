@@ -305,8 +305,8 @@ export async function adminListUsers() {
   return apiFetch<{ users: ApiUser[] }>("/admin/users");
 }
 
-export async function adminListStudents() {
-  return apiFetch<{ users: ApiUser[] }>("/admin/students");
+export async function adminLookupUser(username: string) {
+  return apiFetch<{ user: ApiUser }>(`/admin/users/lookup?username=${encodeURIComponent(username)}`);
 }
 
 export async function adminCreateUser(payload: { username: string; email?: string; password: string; role: "admin" | "teacher" | "student" }) {
@@ -407,10 +407,10 @@ export async function adminListInvitations(groupId: string) {
   return apiFetch<{ invitations: Invitation[] }>(`/admin/groups/${groupId}/invitations`);
 }
 
-export async function adminInviteStudent(groupId: string, userId: string) {
-  return apiFetch<{ invitation: { id: string; groupId: string; userId: string; status: string } }>(`/admin/groups/${groupId}/invitations`, {
+export async function adminInviteStudent(groupId: string, username: string) {
+  return apiFetch<{ invitation: { id: string; groupId: string; userId: string; username: string; status: string } }>(`/admin/groups/${groupId}/invitations`, {
     method: "POST",
-    body: JSON.stringify({ userId }),
+    body: JSON.stringify({ username }),
   });
 }
 

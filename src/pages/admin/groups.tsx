@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Calendar } from "@/components/ui/calendar";
@@ -83,19 +82,18 @@ export function GroupDetailsPage({
   onBack,
   onViewUser,
   onMemberRemoved,
-  allUsers,
 }: {
   group: Group;
   currentUserId: string | null;
   onBack: () => void;
   onViewUser: (userId: string) => void;
   onMemberRemoved: (groupId: string, userId: string) => void;
-  allUsers: ApiUser[];
 }) {
   const [statsByUser, setStatsByUser] = useState<Record<string, StudentStats | null>>({});
   const [loading, setLoading] = useState(false);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
-  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteUsername, setInviteUsername] = useState("");
+  const [inviteBusy, setInviteBusy] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -130,17 +128,20 @@ export function GroupDetailsPage({
 
   const pendingInvitations = invitations.filter((r) => r.status === "pending");
 
-  const memberIds = new Set(group.members.map((m) => m.id));
-  const pendingUserIds = new Set(pendingInvitations.map((inv) => inv.userId));
-  const eligibleUsers = allUsers.filter(
-    (u) => u.id !== currentUserId && !memberIds.has(u.id) && !pendingUserIds.has(u.id)
-  );
-
-  const handleInvite = async (userId: string) => {
-    await adminInviteStudent(group.id, userId);
-    setInviteOpen(false);
-    const res = await adminListInvitations(group.id);
-    setInvitations(res.invitations);
+  const handleInvite = async () => {
+    if (!inviteUsername.trim()) return;
+    setInviteBusy(true);
+    try {
+      await adminInviteStudent(group.id, inviteUsername.trim());
+      setInviteUsername("");
+      const res = await adminListInvitations(group.id);
+      setInvitations(res.invitations);
+      toast.success(en.admin.groupDetails.inviteSent);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to invite");
+    } finally {
+      setInviteBusy(false);
+    }
   };
 
   return (
@@ -151,28 +152,18 @@ export function GroupDetailsPage({
           <div className="text-xs text-muted-foreground mt-1">{en.admin.groupDetails.membersCount(group.name, group.members.length)}</div>
         </div>
         <div className="flex items-center gap-2">
-          <Popover open={inviteOpen} onOpenChange={setInviteOpen}>
-            <PopoverTrigger asChild>
-              <Button size="sm" className="h-7 text-xs gap-1" disabled={eligibleUsers.length === 0}>
-                <Plus weight="bold" className="size-3" /> {en.admin.groupDetails.inviteStudent}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-56 p-0 border-neutral-800 bg-neutral-950" align="end">
-              <Command>
-                <CommandInput placeholder={en.admin.groupDetails.inviteStudent} />
-                <CommandList className="max-h-64 overflow-y-auto">
-                  <CommandEmpty>{en.admin.groups.noResults}</CommandEmpty>
-                  <CommandGroup>
-                    {eligibleUsers.map((u) => (
-                      <CommandItem key={u.id} value={u.username} onSelect={() => handleInvite(u.id)}>
-                        {u.username} <span className="ml-2 text-[10px] text-muted-foreground">({u.role})</span>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+          <div className="flex items-center gap-1.5">
+            <Input
+              value={inviteUsername}
+              onChange={(e) => setInviteUsername(e.target.value)}
+              placeholder={en.admin.groupDetails.invitePlaceholder}
+              className="h-7 w-40 text-xs"
+              onKeyDown={(e) => { if (e.key === 'Enter') handleInvite(); }}
+            />
+            <Button size="sm" className="h-7 text-xs gap-1" disabled={!inviteUsername.trim() || inviteBusy} onClick={handleInvite}>
+              <Plus weight="bold" className="size-3" /> {en.admin.groupDetails.inviteStudent}
+            </Button>
+          </div>
           <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onBack}>
             {en.admin.groupDetails.backButton}
           </Button>

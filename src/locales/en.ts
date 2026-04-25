@@ -752,6 +752,9 @@
       searchGroup: "Search group...",
       noStudent: "No student found.",
       noGroup: "No group found.",
+      enterUsername: "Enter username...",
+      lookup: "Find",
+      userNotFound: "User not found.",
     },
     groups: {
       title: "Groups",
@@ -797,6 +800,8 @@
       invitationStatus: "Status",
       statusPending: "Pending",
       inviteStudent: "Invite Student",
+      invitePlaceholder: "Enter username...",
+      inviteSent: "Invitation sent.",
       joinRequestDate: "Requested",
       approve: "Approve",
       deny: "Deny",

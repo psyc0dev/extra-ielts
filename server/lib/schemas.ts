@@ -89,7 +89,7 @@ export const GroupMemberBodySchema = z.object({
 })
 
 export const GroupInviteSchema = z.object({
-  userId: z.string().min(1),
+  username: z.string().min(1),
 })
 
 export const InvitationActionSchema = z.object({

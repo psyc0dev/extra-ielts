@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Calendar } from "@/components/ui/calendar";
 import { Plus, CaretDown } from "@phosphor-icons/react";
-import { adminCreateAssignment, adminAssignToGroup, type AdminAssignment, type ApiUser, type TestSummary, type Group } from "@/lib/api";
+import { adminCreateAssignment, adminAssignToGroup, adminLookupUser, type AdminAssignment, type ApiUser, type TestSummary, type Group } from "@/lib/api";
 import { toast } from "sonner";
 import { TestSelect } from "./tests";
 import { buildDueAt, formatDateLabel } from "./lib";
@@ -94,10 +94,28 @@ export function CreateAssignmentDialog({
   const [testId, setTestId] = useState("");
   const [assignMode, setAssignMode] = useState<"student" | "group">("student");
   const [assignedTo, setAssignedTo] = useState("");
+  const [studentUsername, setStudentUsername] = useState("");
+  const [studentLookup, setStudentLookup] = useState<ApiUser | null>(null);
+  const [studentLookupBusy, setStudentLookupBusy] = useState(false);
   const [sectionKinds, setSectionKinds] = useState<("listening" | "reading")[]>(["listening", "reading"]);
   const [dueDate, setDueDate] = useState<Date>();
   const [dueTime, setDueTime] = useState("23:59");
-  const students = users.filter((user) => user.role === "student");
+
+  const handleLookupStudent = async () => {
+    if (!studentUsername.trim()) return;
+    setStudentLookupBusy(true);
+    try {
+      const res = await adminLookupUser(studentUsername.trim());
+      setStudentLookup(res.user);
+      setAssignedTo(res.user.id);
+    } catch {
+      setStudentLookup(null);
+      setAssignedTo("");
+      toast.error(en.admin.assignTo.userNotFound);
+    } finally {
+      setStudentLookupBusy(false);
+    }
+  };
 
   const handleCreate = async () => {
     const dueAt = buildDueAt(dueDate, dueTime);
@@ -160,7 +178,27 @@ export function CreateAssignmentDialog({
                 <TabsTrigger value="group">{en.admin.assignTo.group}</TabsTrigger>
               </TabsList>
               <TabsContent value="student" className="mt-0">
-                <AssignToSelect students={students} value={assignedTo} onChange={setAssignedTo} />
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    value={studentUsername}
+                    onChange={(e) => {
+                      setStudentUsername(e.target.value);
+                      setStudentLookup(null);
+                      setAssignedTo("");
+                    }}
+                    placeholder={en.admin.assignTo.enterUsername}
+                    className="h-8 text-xs"
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleLookupStudent(); }}
+                  />
+                  <Button size="sm" variant="outline" className="h-8 text-xs shrink-0" disabled={!studentUsername.trim() || studentLookupBusy} onClick={handleLookupStudent}>
+                    {en.admin.assignTo.lookup}
+                  </Button>
+                </div>
+                {studentLookup && (
+                  <div className="text-xs text-muted-foreground mt-1.5">
+                    {studentLookup.username} <span className="text-neutral-500">({studentLookup.role})</span>
+                  </div>
+                )}
               </TabsContent>
               <TabsContent value="group" className="mt-0">
                 <AssignToGroupSelect groups={groups} value={assignedTo} onChange={setAssignedTo} />
@@ -226,36 +264,6 @@ export function AssignToGroupSelect({ groups, value, onChange }: { groups: Group
                 <CommandItem key={g.id} value={g.name} className="text-xs flex items-center justify-between" onSelect={() => { onChange(g.id); setOpen(false); }}>
                   <span>{g.name}</span>
                   <span className="text-muted-foreground">({g.members.length})</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-export function AssignToSelect({ students, value, onChange }: { students: ApiUser[]; value: string; onChange: (v: string) => void }) {
-  const [open, setOpen] = useState(false);
-  const selected = students.find((s) => s.id === value);
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" className="w-full justify-between font-normal border-neutral-700 bg-neutral-900">
-          {selected ? selected.username : en.admin.assignTo.selectStudent}
-          <CaretDown className="size-3 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-full p-0 border-neutral-700 bg-neutral-900" align="start">
-        <Command className="bg-neutral-900">
-          <CommandInput placeholder={en.admin.assignTo.searchStudent} className="h-8 text-xs" />
-          <CommandList className="max-h-60">
-            <CommandEmpty className="text-xs py-3 text-center px-2">{en.admin.assignTo.noStudent}</CommandEmpty>
-            <CommandGroup>
-              {students.map((s) => (
-                <CommandItem key={s.id} value={s.username} className="text-xs" onSelect={() => { onChange(s.id); setOpen(false); }}>
-                  {s.username}
                 </CommandItem>
               ))}
             </CommandGroup>

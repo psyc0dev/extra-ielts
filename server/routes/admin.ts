@@ -14,9 +14,12 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     return c.json({ users: (rows.results ?? []).map((r) => toApiUser({ id: r.id, username: r.username, email: r.email, role: r.role as Role, passwordHash: r.password_hash, avatarUrl: r.avatar_url })) })
   })
 
-  api.get('/admin/students', requireAuth, requireTeacherOrAdmin, async (c) => {
-    const rows = await c.env.DB.prepare("SELECT id, username, email, role, avatar_url FROM users WHERE role = 'student' ORDER BY username").all<{ id: string; username: string; email: string | null; role: string; avatar_url: string | null }>()
-    return c.json({ users: (rows.results ?? []).map((r) => ({ id: r.id, username: r.username, email: r.email, role: r.role as Role, avatarUrl: r.avatar_url ?? null })) })
+  api.get('/admin/users/lookup', requireAuth, requireTeacherOrAdmin, async (c) => {
+    const username = c.req.query('username')?.trim()
+    if (!username) return c.json({ error: 'Username query is required.' }, 400)
+    const row = await c.env.DB.prepare('SELECT id, username, email, role, avatar_url FROM users WHERE LOWER(username) = ?').bind(username.toLowerCase()).first<{ id: string; username: string; email: string | null; role: string; avatar_url: string | null }>()
+    if (!row) return c.json({ error: 'User not found.' }, 404)
+    return c.json({ user: { id: row.id, username: row.username, email: row.email, role: row.role as Role, avatarUrl: row.avatar_url ?? null } })
   })
 
   api.post('/admin/users', requireAuth, requireAdmin, async (c) => {
@@ -282,19 +285,25 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     const { data, error } = await zParse(GroupInviteSchema, c)
     if (error) return error
 
-    const targetUser = await c.env.DB.prepare('SELECT id, role FROM users WHERE id = ?').bind(data.userId).first<{ id: string; role: string }>()
+    const targetUser = await c.env.DB.prepare('SELECT id, username, role FROM users WHERE LOWER(username) = ?').bind(data.username.toLowerCase()).first<{ id: string; username: string; role: string }>()
     if (!targetUser) return c.json({ error: 'User not found.' }, 404)
 
-    const alreadyMember = await c.env.DB.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?').bind(groupId, data.userId).first()
+    const alreadyMember = await c.env.DB.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?').bind(groupId, targetUser.id).first()
     if (alreadyMember) return c.json({ error: 'User is already a member of this group.' }, 400)
 
-    const existing = await c.env.DB.prepare("SELECT status FROM group_invitations WHERE group_id = ? AND user_id = ? AND status = 'pending'").bind(groupId, data.userId).first<{ status: string }>()
-    if (existing) return c.json({ error: 'Invitation already pending for this user.' }, 400)
+    const existing = await c.env.DB.prepare("SELECT id, status FROM group_invitations WHERE group_id = ? AND user_id = ? ORDER BY created_at DESC LIMIT 1").bind(groupId, targetUser.id).first<{ id: string; status: string }>()
+    if (existing) {
+      if (existing.status === 'pending') return c.json({ error: 'Invitation already pending for this user.' }, 400)
+      // Re-invite: update the existing declined invitation back to pending
+      await c.env.DB.prepare('UPDATE group_invitations SET status = ?, invited_by = ?, created_at = ? WHERE id = ?')
+        .bind('pending', inviter.id, nowIso(), existing.id).run()
+      return c.json({ invitation: { id: existing.id, groupId, userId: targetUser.id, username: targetUser.username, status: 'pending' } }, 201)
+    }
 
     const id = crypto.randomUUID()
     await c.env.DB.prepare('INSERT INTO group_invitations (id, group_id, user_id, invited_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .bind(id, groupId, data.userId, inviter.id, 'pending', nowIso()).run()
-    return c.json({ invitation: { id, groupId, userId: data.userId, status: 'pending' } }, 201)
+      .bind(id, groupId, targetUser.id, inviter.id, 'pending', nowIso()).run()
+    return c.json({ invitation: { id, groupId, userId: targetUser.id, username: targetUser.username, status: 'pending' } }, 201)
   })
 
   api.get('/admin/groups/:groupId/invitations', requireAuth, requireTeacherOrAdmin, async (c) => {
