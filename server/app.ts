@@ -75,7 +75,12 @@ export const createApp = () => {
 
       const id = c.env.CHAT_ROOM.idFromName(groupId)
       const obj = c.env.CHAT_ROOM.get(id)
-      return obj.fetch(c.req.raw)
+
+      // Forward the request with userId & username as query params for the DO
+      const url = new URL(c.req.url)
+      url.searchParams.set('userId', user.id)
+      url.searchParams.set('username', user.username)
+      return obj.fetch(new Request(url.toString(), c.req.raw))
     } catch {
       return c.json({ error: 'Unauthorized' }, 401)
     }

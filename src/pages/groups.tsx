@@ -139,10 +139,14 @@ function ChatRoom({
   const [sending, setSending] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [onlineUsers, setOnlineUsers] = useState<Map<string, string>>(new Map());
+  const [typingUsers, setTypingUsers] = useState<Map<string, { username: string; timer: ReturnType<typeof setTimeout> }>>(new Map());
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const sentIds = useRef<Set<string>>(new Set());
+  const wsRef = useRef<WebSocket | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleLeaveGroup = async () => {
     if (leaving) return;
@@ -203,29 +207,91 @@ function ChatRoom({
       wsUrl = `${wsProtocol}//${wsHost}/groups/${group.id}/ws?token=${token}`;
     }
 
-    let ws: WebSocket | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
     const connect = () => {
-      ws = new WebSocket(wsUrl);
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
 
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          // Ignore our own WS echo to avoid duplicate bubbles with optimistic UI
-          if (currentUserId && data.userId === currentUserId) return;
-          // Skip messages we already added via POST response
-          if (sentIds.current.has(data.id)) return;
-          setMessages((prev) => {
-            if (prev.some(m => m.id === data.id)) return prev;
-            return [...prev, data];
-          });
+
+          if (data.type === 'online_list') {
+            const map = new Map<string, string>();
+            for (const u of (data.users as { userId: string; username: string }[])) {
+              if (u.userId !== currentUserId) map.set(u.userId, u.username);
+            }
+            setOnlineUsers(map);
+            return;
+          }
+
+          if (data.type === 'user_online') {
+            if (data.userId !== currentUserId) {
+              setOnlineUsers((prev) => { const m = new Map(prev); m.set(data.userId as string, data.username as string); return m; });
+            }
+            return;
+          }
+
+          if (data.type === 'user_offline') {
+            setOnlineUsers((prev) => { const m = new Map(prev); m.delete(data.userId as string); return m; });
+            setTypingUsers((prev) => { const m = new Map(prev); const t = m.get(data.userId as string); if (t) { clearTimeout(t.timer); m.delete(data.userId as string); } return m; });
+            return;
+          }
+
+          if (data.type === 'typing') {
+            if (data.userId !== currentUserId) {
+              const uid = data.userId as string;
+              const uname = data.username as string;
+              setTypingUsers((prev) => {
+                const m = new Map(prev);
+                const existing = m.get(uid);
+                if (existing) clearTimeout(existing.timer);
+                const timer = setTimeout(() => {
+                  setTypingUsers((p) => { const n = new Map(p); n.delete(uid); return n; });
+                }, 4000);
+                m.set(uid, { username: uname, timer });
+                return m;
+              });
+            }
+            return;
+          }
+
+          if (data.type === 'typing_stop') {
+            setTypingUsers((prev) => {
+              const m = new Map(prev);
+              const t = m.get(data.userId as string);
+              if (t) { clearTimeout(t.timer); m.delete(data.userId as string); }
+              return m;
+            });
+            return;
+          }
+
+          if (data.type === 'message') {
+            // Ignore our own WS echo to avoid duplicate bubbles with optimistic UI
+            if (currentUserId && data.userId === currentUserId) return;
+            // Skip messages we already added via POST response
+            if (sentIds.current.has(data.id)) return;
+            setMessages((prev) => {
+              if (prev.some(m => m.id === data.id)) return prev;
+              return [...prev, data as GroupMessage];
+            });
+            // Clear typing for the user who just sent a message
+            setTypingUsers((prev) => {
+              const m = new Map(prev);
+              const t = m.get(data.userId as string);
+              if (t) { clearTimeout(t.timer); m.delete(data.userId as string); }
+              return m;
+            });
+            return;
+          }
         } catch (err) {
           console.error("WebSocket message error", err);
         }
       };
 
       ws.onclose = () => {
+        wsRef.current = null;
         // Reconnect after 3 seconds
         reconnectTimer = setTimeout(connect, 3000);
       };
@@ -239,9 +305,21 @@ function ChatRoom({
 
     return () => {
       if (reconnectTimer) clearTimeout(reconnectTimer);
-      ws?.close();
+      wsRef.current?.close();
+      setOnlineUsers(new Map());
+      setTypingUsers((prev) => {
+        for (const t of prev.values()) clearTimeout(t.timer);
+        return new Map();
+      });
     };
   }, [group.id]);
+
+  // Clean up typing timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    };
+  }, []);
 
   const scrollToBottom = () => {
     requestAnimationFrame(() => {
@@ -258,6 +336,35 @@ function ChatRoom({
     scrollToBottom();
   }, [messages]);
 
+  const sendTypingEvent = () => {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'typing' }));
+    }
+  };
+
+  const sendTypingStopEvent = () => {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'typing_stop' }));
+    }
+  };
+
+  const handleInputChange = (value: string) => {
+    setInputValue(value);
+    if (value.trim()) {
+      sendTypingEvent();
+      // Auto-stop typing after 3s of no input
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        sendTypingStopEvent();
+      }, 3000);
+    } else {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      sendTypingStopEvent();
+    }
+  };
+
   const handleSend = async () => {
     const content = inputValue.trim();
     const image = pendingImage;
@@ -266,6 +373,8 @@ function ChatRoom({
     setSending(true);
     setInputValue("");
     setPendingImage(null);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    sendTypingStopEvent();
     inputRef.current?.focus();
 
     // Optimistic insert — add message immediately with a temp ID
@@ -364,9 +473,17 @@ function ChatRoom({
         </Button>
         <div className="flex-1 min-w-0">
           <CardTitle className="text-sm font-semibold truncate">{group.name}</CardTitle>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Users weight="bold" className="size-3" />
-            {en.groups.chat.memberCount(group.memberCount)}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Users weight="bold" className="size-3" />
+              {en.groups.chat.memberCount(group.memberCount)}
+            </span>
+            {onlineUsers.size > 0 && (
+              <span className="flex items-center gap-1">
+                <span className="size-1.5 rounded-full bg-green-500" />
+                {onlineUsers.size} online
+              </span>
+            )}
           </div>
         </div>
         {user?.role === "student" && (
@@ -479,15 +596,27 @@ function ChatRoom({
             >
               <ImageIcon weight="bold" className="size-5" />
             </Button>
-            <Input
-              ref={inputRef}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={en.groups.chat.inputPlaceholder}
-              disabled={sending}
-              className="h-11 flex-1 rounded-full border-neutral-800 bg-neutral-950 px-4 text-sm"
-            />
+            <div className="flex-1 min-w-0">
+              <Input
+                ref={inputRef}
+                value={inputValue}
+                onChange={(e) => handleInputChange(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={en.groups.chat.inputPlaceholder}
+                disabled={sending}
+                className="h-11 w-full rounded-full border-neutral-800 bg-neutral-950 px-4 text-sm"
+              />
+              {typingUsers.size > 0 && (
+                <div className="flex items-center gap-1 px-4 pt-1">
+                  <span className="text-[11px] text-blue-400/80 animate-pulse">
+                    {Array.from(typingUsers.values())
+                      .map((u) => u.username)
+                      .join(', ')}
+                    {typingUsers.size === 1 ? ' is' : ' are'} typing…
+                  </span>
+                </div>
+              )}
+            </div>
             <Button
               size="sm"
               className={`h-11 w-11 rounded-full p-0 transition-all duration-200 ${(inputValue.trim() || pendingImage) ? "bg-blue-500 hover:bg-blue-600" : "bg-neutral-700"}`}

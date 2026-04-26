@@ -24,6 +24,10 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["ChatWebSocket"]
+    },
+    {
+      "tag": "v2",
+      "renamed_classes": [{ "from": "ChatRoomDO", "to": "ChatWebSocket" }]
     }
   ],
   "vars": {
