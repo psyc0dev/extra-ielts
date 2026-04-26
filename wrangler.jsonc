@@ -17,6 +17,10 @@
       {
         "name": "CHAT_ROOM",
         "class_name": "ChatWebSocket"
+      },
+      {
+        "name": "APP_PRESENCE",
+        "class_name": "AppPresenceWebSocket"
       }
     ]
   },
@@ -28,6 +32,10 @@
     {
       "tag": "v2",
       "renamed_classes": [{ "from": "ChatRoomDO", "to": "ChatWebSocket" }]
+    },
+    {
+      "tag": "v3",
+      "new_sqlite_classes": ["AppPresenceWebSocket"]
     }
   ],
   "vars": {

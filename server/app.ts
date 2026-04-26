@@ -86,5 +86,32 @@ export const createApp = () => {
     }
   })
 
+  app.get('/api/presence/ws', async (c) => {
+    if (c.req.header('Upgrade') !== 'websocket') {
+      return c.json({ error: 'Expected Upgrade: websocket' }, 426)
+    }
+
+    const token = c.req.query('token')
+    if (!token) return c.json({ error: 'Unauthorized' }, 401)
+
+    try {
+      const secret = getJwtSecret(c)
+      const payload = await verify(token, secret, 'HS256')
+      const userId = payload.userId as string
+      const user = await dbGetUser(c.env.DB, userId)
+      if (!user) return c.json({ error: 'Unauthorized' }, 401)
+
+      const id = c.env.APP_PRESENCE.idFromName('app')
+      const obj = c.env.APP_PRESENCE.get(id)
+
+      const url = new URL(c.req.url)
+      url.searchParams.set('userId', user.id)
+      url.searchParams.set('username', user.username)
+      return obj.fetch(new Request(url.toString(), c.req.raw))
+    } catch {
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
+  })
+
   return app
 }

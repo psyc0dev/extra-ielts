@@ -146,7 +146,17 @@ function ChatRoom({
   const imageInputRef = useRef<HTMLInputElement>(null);
   const sentIds = useRef<Set<string>>(new Set());
   const wsRef = useRef<WebSocket | null>(null);
+  const presenceWsRef = useRef<WebSocket | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const onlineMembersCount = useMemo(() => {
+    if (!group.memberIds?.length) return 0;
+    let count = 0;
+    for (const memberId of group.memberIds) {
+      if (onlineUsers.has(memberId)) count += 1;
+    }
+    return count;
+  }, [group.memberIds, onlineUsers]);
 
   const handleLeaveGroup = async () => {
     if (leaving) return;
@@ -217,26 +227,6 @@ function ChatRoom({
         try {
           const data = JSON.parse(event.data);
 
-          if (data.type === 'online_list') {
-            const map = new Map<string, string>();
-            for (const u of (data.users as { userId: string; username: string }[])) {
-              map.set(u.userId, u.username);
-            }
-            setOnlineUsers(map);
-            return;
-          }
-
-          if (data.type === 'user_online') {
-            setOnlineUsers((prev) => { const m = new Map(prev); m.set(data.userId as string, data.username as string); return m; });
-            return;
-          }
-
-          if (data.type === 'user_offline') {
-            setOnlineUsers((prev) => { const m = new Map(prev); m.delete(data.userId as string); return m; });
-            setTypingUsers((prev) => { const m = new Map(prev); const t = m.get(data.userId as string); if (t) { clearTimeout(t.timer); m.delete(data.userId as string); } return m; });
-            return;
-          }
-
           if (data.type === 'typing') {
             if (data.userId !== currentUserId) {
               const uid = data.userId as string;
@@ -304,13 +294,82 @@ function ChatRoom({
     return () => {
       if (reconnectTimer) clearTimeout(reconnectTimer);
       wsRef.current?.close();
-      setOnlineUsers(new Map());
       setTypingUsers((prev) => {
         for (const t of prev.values()) clearTimeout(t.timer);
         return new Map();
       });
     };
   }, [group.id]);
+
+  useEffect(() => {
+    const token = Cookies.get("accessToken");
+    if (!token) return;
+
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
+    const wsProtocol = baseUrl.startsWith("https://") ? "wss:" : "ws:";
+
+    let wsUrl: string;
+    if (baseUrl.startsWith("/")) {
+      wsUrl = `${wsProtocol}//${window.location.host}${baseUrl}/presence/ws?token=${token}`;
+    } else {
+      const wsHost = baseUrl.replace(/^https?:\/\//, "");
+      wsUrl = `${wsProtocol}//${wsHost}/presence/ws?token=${token}`;
+    }
+
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const connect = () => {
+      const ws = new WebSocket(wsUrl);
+      presenceWsRef.current = ws;
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+
+          if (data.type === 'online_list') {
+            const map = new Map<string, string>();
+            for (const u of (data.users as { userId: string; username: string }[])) {
+              map.set(u.userId, u.username);
+            }
+            setOnlineUsers(map);
+            return;
+          }
+
+          if (data.type === 'user_online') {
+            setOnlineUsers((prev) => {
+              const m = new Map(prev);
+              m.set(data.userId as string, data.username as string);
+              return m;
+            });
+            return;
+          }
+
+          if (data.type === 'user_offline') {
+            setOnlineUsers((prev) => {
+              const m = new Map(prev);
+              m.delete(data.userId as string);
+              return m;
+            });
+            return;
+          }
+        } catch (err) {
+          console.error("Presence WebSocket message error", err);
+        }
+      };
+
+      ws.onclose = () => {
+        reconnectTimer = setTimeout(connect, 1500);
+      };
+    };
+
+    connect();
+
+    return () => {
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      presenceWsRef.current?.close();
+      setOnlineUsers(new Map());
+    };
+  }, []);
 
   // Clean up typing timeout on unmount
   useEffect(() => {
@@ -492,10 +551,10 @@ function ChatRoom({
                 <Users weight="bold" className="size-3" />
                 {en.groups.chat.memberCount(group.memberCount)}
               </span>
-              {onlineUsers.size > 0 && (
+              {onlineMembersCount > 0 && (
                 <span className="flex items-center gap-1 shrink-0">
                   <span className="size-1.5 rounded-full bg-green-500" />
-                  {onlineUsers.size} online
+                  {onlineMembersCount} online
                 </span>
               )}
             </div>

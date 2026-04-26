@@ -145,6 +145,7 @@ export type MyGroup = {
   name: string;
   createdAt: string;
   memberCount: number;
+  memberIds: string[];
 };
 
 export type GroupMessage = {

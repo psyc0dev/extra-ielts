@@ -416,10 +416,13 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
       const g = await c.env.DB.prepare('SELECT id, name, created_at, owner_user_id FROM groups WHERE id = ?').bind(gid).first<{ id: string; name: string; created_at: string; owner_user_id: string | null }>()
       if (!g) return null
       const count = await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM group_members WHERE group_id = ?').bind(gid).first<{ cnt: number }>()
+      const members = await c.env.DB.prepare('SELECT user_id FROM group_members WHERE group_id = ?').bind(gid).all<{ user_id: string }>()
       // Owner is not in group_members but is a member — include them
       const ownerInMembers = g.owner_user_id ? await c.env.DB.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?').bind(gid, g.owner_user_id).first() : null
       const memberCount = (count?.cnt ?? 0) + (ownerInMembers ? 0 : 1)
-      return { id: g.id, name: g.name, createdAt: g.created_at, memberCount }
+      const memberIds = new Set((members.results ?? []).map((m) => m.user_id))
+      if (g.owner_user_id) memberIds.add(g.owner_user_id)
+      return { id: g.id, name: g.name, createdAt: g.created_at, memberCount, memberIds: Array.from(memberIds) }
     }))
     return c.json({ groups: groups.filter(Boolean) })
   })

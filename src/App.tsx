@@ -20,7 +20,7 @@ import Navbar from "./components/Navbar";
 import { TimerWidget } from "./components/TimerWidget";
 import en from "./locales/en";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
-import { getSettings, updateSettings, type UserSettings, type ApiUser } from "@/lib/api";
+import { getSettings, updateSettings, getToken, type UserSettings, type ApiUser } from "@/lib/api";
 import LoadingScreen from "./components/LoadingScreen";
 
 const defaultSettings: UserSettings = {
@@ -32,6 +32,18 @@ const defaultSettings: UserSettings = {
 interface ActiveTest {
   name: string;
   seconds: number;
+}
+
+function buildWebSocketUrl(path: string, token: string) {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
+  const wsProtocol = baseUrl.startsWith("https://") ? "wss:" : "ws:";
+
+  if (baseUrl.startsWith("/")) {
+    return `${wsProtocol}//${window.location.host}${baseUrl}${path}?token=${token}`;
+  }
+
+  const wsHost = baseUrl.replace(/^https?:\/\//, "");
+  return `${wsProtocol}//${wsHost}${path}?token=${token}`;
 }
 
 function PageContent({
@@ -223,6 +235,39 @@ function AppBody() {
   const { user, loading, loginUser, registerUser, logoutUser, refreshUser } = useAuth();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const effectiveToken = getToken();
+    if (!effectiveToken) return;
+
+    const wsUrl = buildWebSocketUrl('/presence/ws', effectiveToken);
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let closed = false;
+    let ws: WebSocket | null = null;
+
+    const connect = () => {
+      ws = new WebSocket(wsUrl);
+
+      ws.onclose = () => {
+        if (closed) return;
+        reconnectTimer = setTimeout(connect, 2000);
+      };
+
+      ws.onerror = () => {
+        ws?.close();
+      };
+    };
+
+    connect();
+
+    return () => {
+      closed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      ws?.close();
+    };
+  }, [user?.id]);
 
   return (
     <>
