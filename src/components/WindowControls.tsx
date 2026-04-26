@@ -2,7 +2,7 @@
 import { type Window } from "@tauri-apps/api/window";
 import { NavContext } from "@/hooks/use-nav";
 import { forceSubmitAttempt } from "@/lib/api";
-import { Minus, Square, Minimize2, X } from "lucide-react";
+import { Maximize, Minimize, Minus, X } from 'lucide-react';
 import en from "@/locales/en";
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -63,14 +63,14 @@ export default function WindowControls({ onFullscreen }: { onFullscreen?: (v: bo
         className="w-8 h-full flex items-center justify-center text-foreground/60 hover:bg-white/15 hover:text-foreground transition-all"
         aria-label={en.windowControls.minimize}
       >
-        <Minus size={14} strokeWidth={1.5} />
+        <Minus size={18} strokeWidth={1.5} />
       </button>
       <button
         onClick={async () => { const next = !isFullscreen; await windowRef.current?.setFullscreen(next); setIsFullscreen(next); onFullscreen?.(next); }}
         className="w-8 h-full flex items-center justify-center text-foreground/60 hover:bg-white/15 hover:text-foreground transition-all"
         aria-label={isFullscreen ? en.windowControls.restore : en.windowControls.maximize}
       >
-        {isFullscreen ? <Minimize2 size={14} strokeWidth={1.5} /> : <Square size={12} strokeWidth={1.5} />}
+        {isFullscreen ? <Minimize size={16} strokeWidth={1.5} /> : <Maximize size={16} strokeWidth={1.5} />}
       </button>
       <button
         onClick={async () => {
@@ -84,7 +84,7 @@ export default function WindowControls({ onFullscreen }: { onFullscreen?: (v: bo
         className={`w-8 h-full flex items-center justify-center text-foreground/60 hover:bg-red-600 hover:text-white transition-all ${isFullscreen ? 'rounded-none' : ''}`}
         aria-label={timerActive ? en.windowControls.closeSubmitting : en.windowControls.close}
       >
-        <X size={14} strokeWidth={1.5} />
+        <X size={18} strokeWidth={1.5} />
       </button>
     </div>
   );
