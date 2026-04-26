@@ -83,17 +83,23 @@ export class ChatWebSocket {
   }
 
   async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean) {
-    const attachment = ws.deserializeAttachment() as WsAttachment | null
-    if (attachment?.userId) {
-      this.broadcast(null, { type: 'user_offline', userId: attachment.userId, username: attachment.username })
-    }
+    this.handleDisconnect(ws)
   }
 
   async webSocketError(ws: WebSocket, error: unknown) {
+    this.handleDisconnect(ws)
+  }
+
+  private handleDisconnect(ws: WebSocket) {
     const attachment = ws.deserializeAttachment() as WsAttachment | null
-    if (attachment?.userId) {
-      this.broadcast(null, { type: 'user_offline', userId: attachment.userId, username: attachment.username })
+    if (!attachment?.userId) return
+    // Only broadcast offline if no other connections remain for this user
+    for (const client of this.state.getWebSockets()) {
+      if (client === ws) continue
+      const other = client.deserializeAttachment() as WsAttachment | null
+      if (other?.userId === attachment.userId) return // still connected
     }
+    this.broadcast(null, { type: 'user_offline', userId: attachment.userId, username: attachment.username })
   }
 
   private getOnlineUsers(): { userId: string; username: string }[] {

@@ -220,16 +220,14 @@ function ChatRoom({
           if (data.type === 'online_list') {
             const map = new Map<string, string>();
             for (const u of (data.users as { userId: string; username: string }[])) {
-              if (u.userId !== currentUserId) map.set(u.userId, u.username);
+              map.set(u.userId, u.username);
             }
             setOnlineUsers(map);
             return;
           }
 
           if (data.type === 'user_online') {
-            if (data.userId !== currentUserId) {
-              setOnlineUsers((prev) => { const m = new Map(prev); m.set(data.userId as string, data.username as string); return m; });
-            }
+            setOnlineUsers((prev) => { const m = new Map(prev); m.set(data.userId as string, data.username as string); return m; });
             return;
           }
 
@@ -473,18 +471,35 @@ function ChatRoom({
         </Button>
         <div className="flex-1 min-w-0">
           <CardTitle className="text-sm font-semibold truncate">{group.name}</CardTitle>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Users weight="bold" className="size-3" />
-              {en.groups.chat.memberCount(group.memberCount)}
-            </span>
-            {onlineUsers.size > 0 && (
-              <span className="flex items-center gap-1">
-                <span className="size-1.5 rounded-full bg-green-500" />
-                {onlineUsers.size} online
+          {typingUsers.size > 0 ? (
+            <div className="flex items-center gap-1 text-xs text-blue-400/80 truncate">
+              {(() => {
+                const names = Array.from(typingUsers.values()).map((u) => u.username);
+                const shown = names.length <= 3
+                  ? names.join(', ')
+                  : `${names.slice(0, 3).join(', ')} and ${names.length - 3} more`;
+                return `${shown}${names.length === 1 ? ' is' : ' are'} typing`;
+              })()}
+              <span className="inline-flex items-center gap-[3px] ml-0.5">
+                <span className="size-1 rounded-full bg-blue-400/80" style={{ animation: 'typing-dot 1.4s ease-in-out infinite', animationDelay: '0ms' }} />
+                <span className="size-1 rounded-full bg-blue-400/80" style={{ animation: 'typing-dot 1.4s ease-in-out infinite', animationDelay: '200ms' }} />
+                <span className="size-1 rounded-full bg-blue-400/80" style={{ animation: 'typing-dot 1.4s ease-in-out infinite', animationDelay: '400ms' }} />
               </span>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground truncate">
+              <span className="flex items-center gap-1 shrink-0">
+                <Users weight="bold" className="size-3" />
+                {en.groups.chat.memberCount(group.memberCount)}
+              </span>
+              {onlineUsers.size > 0 && (
+                <span className="flex items-center gap-1 shrink-0">
+                  <span className="size-1.5 rounded-full bg-green-500" />
+                  {onlineUsers.size} online
+                </span>
+              )}
+            </div>
+          )}
         </div>
         {user?.role === "student" && (
           <Button
@@ -606,16 +621,6 @@ function ChatRoom({
                 disabled={sending}
                 className="h-11 w-full rounded-full border-neutral-800 bg-neutral-950 px-4 text-sm"
               />
-              {typingUsers.size > 0 && (
-                <div className="flex items-center gap-1 px-4 pt-1">
-                  <span className="text-[11px] text-blue-400/80 animate-pulse">
-                    {Array.from(typingUsers.values())
-                      .map((u) => u.username)
-                      .join(', ')}
-                    {typingUsers.size === 1 ? ' is' : ' are'} typing…
-                  </span>
-                </div>
-              )}
             </div>
             <Button
               size="sm"
