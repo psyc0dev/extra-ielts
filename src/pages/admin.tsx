@@ -202,18 +202,6 @@ export function Admin() {
                   }}
                 />
               )}
-              {section === "groups" && (
-                <CreateGroupDialog
-                  onCreate={async (name) => {
-                    const res = await adminCreateGroup(name);
-                    setGroups((prev) => [
-                      { id: res.group.id, name: res.group.name, createdAt: new Date().toISOString(), members: [] },
-                      ...prev,
-                    ]);
-                    toast.success(en.admin.groups.created);
-                  }}
-                />
-              )}
             </div>
           </div>
 
@@ -308,7 +296,7 @@ export function Admin() {
                 const user = users.find((u) => u.id === userId);
                 if (!user) return;
                 setSelectedUser(user);
-                setReturnSection("groups");
+                setReturnSection("group-details");
                 setSection("user-details");
               }}
               onMemberRemoved={(groupId, userId) => setGroups((prev) => prev.map((g) => g.id === groupId ? { ...g, members: g.members.filter((m) => m.id !== userId) } : g))}

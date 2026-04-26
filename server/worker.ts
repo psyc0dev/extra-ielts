@@ -1,6 +1,6 @@
 import { createApp } from './app'
 export { ChatWebSocket } from './lib/ChatWebSocket'
-export { AppPresenceWebSocket } from './lib/AppPresenceWebSocket'
+export { PresenceWebSocket } from './lib/PresenceWebSocket'
 
 const app = createApp()
 

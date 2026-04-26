@@ -2,7 +2,7 @@ import type { Bindings } from './types'
 
 type WsAttachment = { userId: string; username: string }
 
-export class AppPresenceWebSocket {
+export class PresenceWebSocket {
   state: DurableObjectState
   env: Bindings
 
