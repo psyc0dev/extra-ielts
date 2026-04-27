@@ -37,7 +37,7 @@
       "tag": "v3",
       "new_sqlite_classes": ["AppPresenceWebSocket"]
     },
-    {co
+    {
       "tag": "v4",
       "renamed_classes": [{ "from": "AppPresenceWebSocket", "to": "PresenceWebSocket" }]
     }
