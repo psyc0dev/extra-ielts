@@ -20,7 +20,7 @@
       },
       {
         "name": "APP_PRESENCE",
-        "class_name": "AppPresenceWebSocket"
+        "class_name": "PresenceWebSocket"
       }
     ]
   },
@@ -36,6 +36,10 @@
     {
       "tag": "v3",
       "new_sqlite_classes": ["AppPresenceWebSocket"]
+    },
+    {co
+      "tag": "v4",
+      "renamed_classes": [{ "from": "AppPresenceWebSocket", "to": "PresenceWebSocket" }]
     }
   ],
   "vars": {
