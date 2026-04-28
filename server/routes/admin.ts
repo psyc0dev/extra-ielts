@@ -428,7 +428,9 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
   })
 
   // Group Chat — list messages (members, teachers, and admins)
-  type MessageRow = { id: string; group_id: string; user_id: string; content: string; image_url: string | null; created_at: string }
+  type MessageRow = { id: string; group_id: string; user_id: string; content: string; image_url: string | null; reply_to_id: string | null; created_at: string }
+  type ReplyRow = { id: string; user_id: string; content: string; image_url: string | null; username: string | null }
+  type SeenRow = { user_id: string; seen_at: string; username: string | null }
 
   api.get('/groups/:groupId/messages', requireAuth, async (c) => {
     const user = c.get('user')
@@ -440,16 +442,52 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     if (!canAccess) return c.json({ error: 'Not authorized to view this group.' }, 403)
 
     const rows = await c.env.DB.prepare('SELECT * FROM group_messages WHERE group_id = ? ORDER BY created_at ASC').bind(groupId).all<MessageRow>()
+    const messageRows = rows.results ?? []
 
-    const userIds = [...new Set((rows.results ?? []).map((r) => r.user_id))]
+    const userIds = [...new Set(messageRows.map((r) => r.user_id))]
     const userMap = new Map<string, { username: string; avatarUrl: string | null }>()
     await Promise.all(userIds.map(async (uid) => {
       const u = await c.env.DB.prepare('SELECT id, username, avatar_url FROM users WHERE id = ?').bind(uid).first<{ id: string; username: string; avatar_url: string | null }>()
       if (u) userMap.set(u.id, { username: u.username, avatarUrl: u.avatar_url })
     }))
 
+    const replyIds = [...new Set(messageRows.map((r) => r.reply_to_id).filter((v): v is string => Boolean(v)))]
+    const replyMap = new Map<string, { id: string; userId: string; username: string; content: string; imageUrl: string | null }>()
+    await Promise.all(replyIds.map(async (rid) => {
+      const reply = await c.env.DB
+        .prepare('SELECT gm.id, gm.user_id, gm.content, gm.image_url, u.username FROM group_messages gm LEFT JOIN users u ON u.id = gm.user_id WHERE gm.id = ? AND gm.group_id = ?')
+        .bind(rid, groupId)
+        .first<ReplyRow>()
+      if (reply) {
+        replyMap.set(rid, {
+          id: reply.id,
+          userId: reply.user_id,
+          username: reply.username ?? 'Unknown',
+          content: reply.content,
+          imageUrl: reply.image_url,
+        })
+      }
+    }))
+
+    const seenMap = new Map<string, { userId: string; username: string; seenAt: string }[]>()
+    await Promise.all(messageRows.map(async (row) => {
+      const seenRows = await c.env.DB
+        .prepare('SELECT s.user_id, s.seen_at, u.username FROM group_message_seen s LEFT JOIN users u ON u.id = s.user_id WHERE s.message_id = ? ORDER BY s.seen_at ASC')
+        .bind(row.id)
+        .all<SeenRow>()
+
+      seenMap.set(
+        row.id,
+        (seenRows.results ?? []).map((s) => ({
+          userId: s.user_id,
+          username: s.username ?? 'Unknown',
+          seenAt: s.seen_at,
+        })),
+      )
+    }))
+
     return c.json({
-      messages: (rows.results ?? []).map((r) => ({
+      messages: messageRows.map((r) => ({
         id: r.id,
         groupId: r.group_id,
         userId: r.user_id,
@@ -457,6 +495,8 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
         avatarUrl: userMap.get(r.user_id)?.avatarUrl ?? null,
         content: r.content,
         imageUrl: r.image_url ?? null,
+        replyTo: r.reply_to_id ? (replyMap.get(r.reply_to_id) ?? null) : null,
+        seenBy: seenMap.get(r.id) ?? [],
         createdAt: r.created_at,
         isMe: r.user_id === user.id,
       }))
@@ -479,8 +519,27 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     const id = crypto.randomUUID()
     const createdAt = nowIso()
     const imageUrl = data.imageUrl ?? null
-    await c.env.DB.prepare('INSERT INTO group_messages (id, group_id, user_id, content, image_url, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .bind(id, groupId, user.id, data.content, imageUrl, createdAt).run()
+    const replyToId = data.replyToId ?? null
+
+    let replyTo: { id: string; userId: string; username: string; content: string; imageUrl: string | null } | null = null
+    if (replyToId) {
+      const reply = await c.env.DB
+        .prepare('SELECT gm.id, gm.user_id, gm.content, gm.image_url, u.username FROM group_messages gm LEFT JOIN users u ON u.id = gm.user_id WHERE gm.id = ? AND gm.group_id = ?')
+        .bind(replyToId, groupId)
+        .first<ReplyRow>()
+      if (!reply) return c.json({ error: 'Reply target not found.' }, 400)
+
+      replyTo = {
+        id: reply.id,
+        userId: reply.user_id,
+        username: reply.username ?? 'Unknown',
+        content: reply.content,
+        imageUrl: reply.image_url,
+      }
+    }
+
+    await c.env.DB.prepare('INSERT INTO group_messages (id, group_id, user_id, content, image_url, reply_to_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .bind(id, groupId, user.id, data.content, imageUrl, replyToId, createdAt).run()
 
     const messageObj = {
       id,
@@ -490,6 +549,8 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
       avatarUrl: user.avatarUrl,
       content: data.content,
       imageUrl,
+      replyTo,
+      seenBy: [],
       createdAt,
       isMe: false
     }
@@ -510,5 +571,57 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     return c.json({
       message: { ...messageObj, isMe: true }
     }, 201)
+  })
+
+  api.post('/groups/:groupId/messages/:messageId/seen', requireAuth, async (c) => {
+    const user = c.get('user')
+    const groupId = c.req.param('groupId')
+    const messageId = c.req.param('messageId')
+
+    const isMember = await c.env.DB.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?').bind(groupId, user.id).first()
+    const canAccess = isMember || user.role === 'teacher' || user.role === 'admin'
+    if (!canAccess) return c.json({ error: 'Not authorized to view this group.' }, 403)
+
+    const msg = await c.env.DB.prepare('SELECT id, user_id FROM group_messages WHERE id = ? AND group_id = ?').bind(messageId, groupId).first<{ id: string; user_id: string }>()
+    if (!msg) return c.json({ error: 'Message not found.' }, 404)
+
+    if (msg.user_id === user.id) {
+      return c.json({ ok: true, seenAt: null })
+    }
+
+    const existing = await c.env.DB
+      .prepare('SELECT seen_at FROM group_message_seen WHERE message_id = ? AND user_id = ?')
+      .bind(messageId, user.id)
+      .first<{ seen_at: string }>()
+
+    if (existing?.seen_at) {
+      return c.json({ ok: true, seenAt: existing.seen_at })
+    }
+
+    const seenAt = nowIso()
+    await c.env.DB
+      .prepare('INSERT INTO group_message_seen (message_id, user_id, seen_at) VALUES (?, ?, ?)')
+      .bind(messageId, user.id, seenAt)
+      .run()
+
+    try {
+      const doId = c.env.CHAT_ROOM.idFromName(groupId)
+      const obj = c.env.CHAT_ROOM.get(doId)
+      await obj.fetch(new Request('http://internal/broadcast-seen', {
+        method: 'POST',
+        body: JSON.stringify({
+          type: 'message_seen',
+          groupId,
+          messageId,
+          userId: user.id,
+          username: user.username,
+          seenAt,
+        }),
+      }))
+    } catch (e) {
+      console.error('Failed to broadcast seen receipt', e)
+    }
+
+    return c.json({ ok: true, seenAt })
   })
 }

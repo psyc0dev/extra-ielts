@@ -99,6 +99,7 @@ export const InvitationActionSchema = z.object({
 export const GroupMessageBodySchema = z.object({
   content: z.string().max(2000),
   imageUrl: z.string().max(700_000).optional(),
+  replyToId: z.string().min(1).max(100).optional(),
 }).refine((b) => b.content.length > 0 || b.imageUrl, { message: 'Message must have content or an image.' })
 
 export const AnswerBodySchema = z.object({

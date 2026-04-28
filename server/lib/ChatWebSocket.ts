@@ -28,6 +28,20 @@ export class ChatWebSocket {
       return new Response('OK')
     }
 
+    // Internal seen-receipt broadcast endpoint
+    if (request.method === 'POST' && new URL(request.url).pathname === '/broadcast-seen') {
+      const payload = await request.text()
+      const clients = this.state.getWebSockets()
+      for (const client of clients) {
+        try {
+          client.send(payload)
+        } catch {
+          // Client might be disconnected
+        }
+      }
+      return new Response('OK')
+    }
+
     // WebSocket upgrade
     if (request.headers.get('Upgrade') !== 'websocket') {
       return new Response('Expected Upgrade: websocket', { status: 426 })

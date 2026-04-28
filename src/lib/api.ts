@@ -156,6 +156,18 @@ export type GroupMessage = {
   avatarUrl: string | null;
   content: string;
   imageUrl: string | null;
+  replyTo: {
+    id: string;
+    userId: string;
+    username: string;
+    content: string;
+    imageUrl: string | null;
+  } | null;
+  seenBy: {
+    userId: string;
+    username: string;
+    seenAt: string;
+  }[];
   createdAt: string;
   isMe: boolean;
 };
@@ -434,10 +446,16 @@ export async function listGroupMessages(groupId: string) {
   return apiFetch<{ messages: GroupMessage[] }>(`/groups/${groupId}/messages`);
 }
 
-export async function sendGroupMessage(groupId: string, content: string, imageUrl?: string) {
+export async function sendGroupMessage(groupId: string, content: string, imageUrl?: string, replyToId?: string) {
   return apiFetch<{ message: GroupMessage }>(`/groups/${groupId}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ content, imageUrl }),
+    body: JSON.stringify({ content, imageUrl, replyToId }),
+  });
+}
+
+export async function markGroupMessageSeen(groupId: string, messageId: string) {
+  return apiFetch<{ ok: boolean; seenAt: string | null }>(`/groups/${groupId}/messages/${messageId}/seen`, {
+    method: 'POST',
   });
 }
 

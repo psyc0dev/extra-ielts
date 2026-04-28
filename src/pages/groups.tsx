@@ -9,17 +9,29 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
   Users,
   ArrowLeft,
   PaperPlaneRight,
   ChatCircle,
   User,
   Image as ImageIcon,
+  Check,
+  Checks,
+  ArrowBendUpLeft,
+  CopySimple,
+  LinkSimple,
   X,
 } from "@phosphor-icons/react";
 import {
   listMyGroups,
   listGroupMessages,
+  markGroupMessageSeen,
   sendGroupMessage,
   leaveGroup,
   type MyGroup,
@@ -48,9 +60,38 @@ function formatMessageTime(dateStr: string) {
   }
 }
 
+function renderMessageContent(content: string) {
+  const urlRegex = /(https?:\/\/[^\s]+)/gi;
+  const parts = content.split(urlRegex);
+
+  return parts.map((part, idx) => {
+    const isUrl = /^https?:\/\/[^\s]+$/i.test(part);
+    if (!isUrl) return <span key={idx}>{part}</span>;
+
+    return (
+      <a
+        key={idx}
+        href={part}
+        target="_blank"
+        rel="noreferrer"
+        data-message-link="true"
+        className="underline underline-offset-2 break-all hover:opacity-90"
+      >
+        {part}
+      </a>
+    );
+  });
+}
+
 function MessageCluster({
   cluster,
+  currentUserId,
+  highlightedMsgId,
   onImageLoad,
+  onReply,
+  onJumpToMessage,
+  onCopyText,
+  onCopyLink,
 }: {
   cluster: {
     isMe: boolean;
@@ -59,9 +100,16 @@ function MessageCluster({
     avatarUrl: string | null;
     messages: GroupMessage[];
   };
+  currentUserId: string | null;
+  highlightedMsgId: string | null;
   onImageLoad?: () => void;
+  onReply: (message: GroupMessage) => void;
+  onJumpToMessage: (messageId: string) => void;
+  onCopyText: (message: GroupMessage) => void;
+  onCopyLink: (link: string) => void;
 }) {
   const isMe = cluster.isMe;
+  const [contextLink, setContextLink] = useState<string | null>(null);
 
   return (
     <div className={`flex w-full ${isMe ? "justify-end" : "justify-start"} mt-2 first:mt-0`}>
@@ -80,41 +128,107 @@ function MessageCluster({
 
         {/* Messages column */}
         <div className={`flex flex-col flex-1 min-w-0 ${isMe ? "items-end" : "items-start"}`}>
-          <span className={`text-[11px] font-medium mb-0.5 px-1 ${isMe ? "text-blue-400" : "text-blue-400/80"}`}>
-            {cluster.username}
-          </span>
+          <div className="sticky top-0 z-10 pb-0.5">
+            <span className={`text-[11px] font-medium px-1 ${isMe ? "text-blue-400" : "text-blue-400/80"} bg-neutral-900/90 backdrop-blur-sm rounded`}>
+              {cluster.username}
+            </span>
+          </div>
           
           {cluster.messages.map((message, mIdx) => {
             const hasImage = !!message.imageUrl;
+            const msgIsMe = message.isMe;
+            const seenByOthers = message.seenBy.filter((s) => s.userId !== currentUserId);
+            const isSeenByOthers = seenByOthers.length > 0;
 
             return (
-              <div
-                key={message.id}
-                className={`relative px-3 py-1.5 text-sm leading-snug ${
-                  mIdx > 0 ? "mt-0.5" : ""
-                } ${
-                  isMe
-                    ? "bg-[#2B5278] text-white rounded-2xl rounded-br-sm"
-                    : "bg-[#182533] text-neutral-100 rounded-2xl rounded-bl-sm"
-                } ${hasImage ? "p-1" : ""}`}
-              >
-                {hasImage && (
-                  <img
-                    src={message.imageUrl!}
-                    alt=""
-                    className="rounded-xl max-w-[280px] max-h-[280px] object-cover"
-                    loading="lazy"
-                    onLoad={onImageLoad}
-                  />
-                )}
-                {message.content && (
-                  <span className={hasImage ? "block mt-1 px-2 py-0.5" : ""}>{message.content}</span>
-                )}
+              <ContextMenu key={message.id} onOpenChange={(open) => { if (!open) setContextLink(null); }}>
+                <ContextMenuTrigger asChild>
+                  <div
+                    id={`msg-${message.id}`}
+                    onContextMenu={(e) => {
+                      const anchor = (e.target as HTMLElement).closest('a[data-message-link="true"]') as HTMLAnchorElement | null;
+                      setContextLink(anchor?.href ?? null);
+                    }}
+                    className={`relative text-sm leading-snug ${
+                      mIdx > 0 ? "mt-0.5" : ""
+                    } ${
+                      isMe
+                        ? "bg-[#2B5278] text-white rounded-2xl rounded-br-sm"
+                        : "bg-[#182533] text-neutral-100 rounded-2xl rounded-bl-sm"
+                    } ${hasImage ? "p-1" : "px-3 py-1.5"}`}
+                    style={highlightedMsgId === message.id ? {
+                      boxShadow: "0 0 0 2px rgba(96,165,250,0.92), 0 0 20px rgba(96,165,250,0.35)",
+                      filter: "brightness(1.08)",
+                      transform: "scale(1.01)",
+                      transition: "box-shadow 180ms ease, transform 180ms ease, filter 180ms ease",
+                    } : undefined}
+                  >
+                    {message.replyTo && (
+                      <button
+                        type="button"
+                        onClick={() => onJumpToMessage(message.replyTo!.id)}
+                        className={`mb-1 w-full text-left rounded-lg border-l-2 px-2 py-1 text-xs cursor-pointer transition-opacity hover:opacity-90 ${isMe ? "border-blue-200/80 bg-white/10" : "border-blue-400/80 bg-black/20"}`}
+                      >
+                        <div className="font-medium opacity-90">{message.replyTo.username}</div>
+                        <div className="opacity-80 truncate">
+                          {message.replyTo.content || (message.replyTo.imageUrl ? "Photo" : "Message")}
+                        </div>
+                      </button>
+                    )}
+                    
 
-                <span className={`inline-block text-[10px] opacity-50 ml-2 translate-y-0.5 ${isMe ? "text-blue-100" : "text-neutral-400"}`}>
-                  {formatMessageTime(message.createdAt)}
-                </span>
-              </div>
+                    {hasImage && (
+                      <img
+                        src={message.imageUrl!}
+                        alt=""
+                        className="rounded-xl max-w-[280px] max-h-[280px] object-cover"
+                        loading="lazy"
+                        onLoad={onImageLoad}
+                      />
+                    )}
+                    {message.content && (
+                      <span className={`${hasImage ? "block mt-1 px-2 py-0.5" : ""} pr-[4.5rem]`}>{renderMessageContent(message.content)}</span>
+                    )}
+
+                    <span className="absolute bottom-1 right-2 inline-flex items-center gap-0.5 text-[10px] opacity-50 select-none">
+                      <span className={isMe ? "text-blue-100" : "text-neutral-400"}>
+                        {formatMessageTime(message.createdAt)}
+                      </span>
+                      {msgIsMe && (
+                        <span
+                          className="inline-flex items-center align-middle"
+                          title={isSeenByOthers ? `Seen by ${seenByOthers.map((s) => s.username).join(", ")}` : "Sent"}
+                        >
+                          {isSeenByOthers ? (
+                            <Checks weight="bold" className="size-3 text-blue-100" />
+                          ) : (
+                            <Check weight="bold" className="size-3 text-blue-100/70" />
+                          )}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </ContextMenuTrigger>
+                <ContextMenuContent className="w-44">
+                  <ContextMenuItem onSelect={() => onReply(message)}>
+                    <ArrowBendUpLeft className="mr-2 size-4" />
+                    Reply
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    disabled={!message.content.trim()}
+                    onSelect={() => onCopyText(message)}
+                  >
+                    <CopySimple className="mr-2 size-4" />
+                    Copy text
+                  </ContextMenuItem>
+                  {contextLink && (
+                    <ContextMenuItem onSelect={() => onCopyLink(contextLink)}>
+                      <LinkSimple className="mr-2 size-4" />
+                      Copy link
+                    </ContextMenuItem>
+                  )}
+                </ContextMenuContent>
+              </ContextMenu>
             );
           })}
         </div>
@@ -139,15 +253,19 @@ function ChatRoom({
   const [sending, setSending] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<GroupMessage | null>(null);
+  const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<Map<string, string>>(new Map());
   const [typingUsers, setTypingUsers] = useState<Map<string, { username: string; timer: ReturnType<typeof setTimeout> }>>(new Map());
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const sentIds = useRef<Set<string>>(new Set());
+  const seenSentIds = useRef<Set<string>>(new Set());
   const wsRef = useRef<WebSocket | null>(null);
   const presenceWsRef = useRef<WebSocket | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentUserIdRef = useRef<string | null>(null);
 
   const onlineMembersCount = useMemo(() => {
     if (!group.memberIds?.length) return 0;
@@ -197,9 +315,11 @@ function ChatRoom({
       const payloadBase64 = token.split(".")[1]?.replace(/-/g, "+").replace(/_/g, "/");
       if (payloadBase64) {
         currentUserId = JSON.parse(atob(payloadBase64)).userId ?? null;
+        currentUserIdRef.current = currentUserId;
       }
     } catch {
       currentUserId = null;
+      currentUserIdRef.current = null;
     }
 
     const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
@@ -260,9 +380,14 @@ function ChatRoom({
             if (currentUserId && data.userId === currentUserId) return;
             // Skip messages we already added via POST response
             if (sentIds.current.has(data.id)) return;
+            const nextMessage = {
+              ...(data as GroupMessage),
+              replyTo: (data as GroupMessage).replyTo ?? null,
+              seenBy: Array.isArray((data as GroupMessage).seenBy) ? (data as GroupMessage).seenBy : [],
+            };
             setMessages((prev) => {
               if (prev.some(m => m.id === data.id)) return prev;
-              return [...prev, data as GroupMessage];
+              return [...prev, nextMessage];
             });
             // Clear typing for the user who just sent a message
             setTypingUsers((prev) => {
@@ -271,6 +396,22 @@ function ChatRoom({
               if (t) { clearTimeout(t.timer); m.delete(data.userId as string); }
               return m;
             });
+            return;
+          }
+
+          if (data.type === 'message_seen') {
+            const messageId = data.messageId as string;
+            const userId = data.userId as string;
+            const username = data.username as string;
+            const seenAt = data.seenAt as string;
+            setMessages((prev) => prev.map((m) => {
+              if (m.id !== messageId) return m;
+              if (m.seenBy.some((s) => s.userId === userId)) return m;
+              return {
+                ...m,
+                seenBy: [...m.seenBy, { userId, username, seenAt }],
+              };
+            }));
             return;
           }
         } catch (err) {
@@ -371,10 +512,11 @@ function ChatRoom({
     };
   }, []);
 
-  // Clean up typing timeout on unmount
+  // Clean up timeouts on unmount
   useEffect(() => {
     return () => {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
     };
   }, []);
 
@@ -392,6 +534,28 @@ function ChatRoom({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    if (loading) return;
+    const currentUserId = currentUserIdRef.current;
+    if (!currentUserId) return;
+
+    const unseenIncoming = messages.filter((m) =>
+      m.userId !== currentUserId
+      && !m.seenBy.some((s) => s.userId === currentUserId)
+      && !seenSentIds.current.has(m.id),
+    );
+
+    if (unseenIncoming.length === 0) return;
+
+    unseenIncoming.forEach((m) => {
+      seenSentIds.current.add(m.id);
+      markGroupMessageSeen(group.id, m.id)
+        .catch(() => {
+          seenSentIds.current.delete(m.id);
+        });
+    });
+  }, [group.id, loading, messages]);
 
   const sendTypingEvent = () => {
     const ws = wsRef.current;
@@ -425,11 +589,13 @@ function ChatRoom({
   const handleSend = async () => {
     const content = inputValue.trim();
     const image = pendingImage;
+    const replyTarget = replyingTo;
     if ((!content && !image) || sending) return;
 
     setSending(true);
     setInputValue("");
     setPendingImage(null);
+    setReplyingTo(null);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     sendTypingStopEvent();
     inputRef.current?.focus();
@@ -438,11 +604,31 @@ function ChatRoom({
     const tempId = `temp-${Date.now()}`;
     setMessages((prev) => [
       ...prev,
-      { id: tempId, groupId: group.id, userId: "me", username: "", avatarUrl: null, content: content || "", imageUrl: image, createdAt: new Date().toISOString(), isMe: true },
+      {
+        id: tempId,
+        groupId: group.id,
+        userId: "me",
+        username: user?.username ?? "",
+        avatarUrl: user?.avatarUrl ?? null,
+        content: content || "",
+        imageUrl: image,
+        replyTo: replyTarget
+          ? {
+            id: replyTarget.id,
+            userId: replyTarget.userId,
+            username: replyTarget.username,
+            content: replyTarget.content,
+            imageUrl: replyTarget.imageUrl,
+          }
+          : null,
+        seenBy: [],
+        createdAt: new Date().toISOString(),
+        isMe: true,
+      },
     ]);
 
     try {
-      const res = await sendGroupMessage(group.id, content || "", image || undefined);
+      const res = await sendGroupMessage(group.id, content || "", image || undefined, replyTarget?.id);
       sentIds.current.add(res.message.id);
       // Replace temp message with the real one from the server
       setMessages((prev) =>
@@ -451,9 +637,58 @@ function ChatRoom({
     } catch {
       // Remove the optimistic message on failure
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setReplyingTo(replyTarget);
       toast.error(en.groups.chat.sendError);
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleReply = (message: GroupMessage) => {
+    setReplyingTo(message);
+    inputRef.current?.focus();
+  };
+
+  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleJumpToMessage = (messageId: string) => {
+    const target = document.getElementById(`msg-${messageId}`);
+    if (!target) return;
+
+    const viewport = scrollRef.current?.querySelector("[data-radix-scroll-area-viewport]") as HTMLElement | null;
+    if (viewport) {
+      const viewportRect = viewport.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const targetTopInViewport = targetRect.top - viewportRect.top + viewport.scrollTop;
+      const centeredTop = Math.max(0, targetTopInViewport - (viewport.clientHeight / 2) + (targetRect.height / 2));
+      viewport.scrollTo({ top: centeredTop, behavior: "smooth" });
+    } else {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    setHighlightedMsgId(messageId);
+    if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+    highlightTimeoutRef.current = setTimeout(() => {
+      setHighlightedMsgId(null);
+    }, 1100);
+  };
+
+  const handleCopyText = async (message: GroupMessage) => {
+    if (!message.content.trim()) return;
+    try {
+      await navigator.clipboard.writeText(message.content);
+      toast.success("Message text copied.");
+    } catch {
+      toast.error("Failed to copy message text.");
+    }
+  };
+
+  const handleCopyLink = async (link: string) => {
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success("Link copied.");
+    } catch {
+      toast.error("Failed to copy link.");
     }
   };
 
@@ -609,28 +844,17 @@ function ChatRoom({
             <div className="mx-auto flex w-full flex-col gap-1 px-1">
               {groupedMessages.map((group) => (
                 <div key={group.date} className="flex flex-col first:[&]:mt-0 mt-4">
-                  <div className="flex items-center justify-center mb-2">
-                    <Badge
-                      variant="outline"
-                      className="text-[10px] border-neutral-800 bg-neutral-950"
-                    >
-                      {(() => {
-                        const d = new Date(group.date)
-                        const now = new Date()
-                        const isToday = d.toDateString() === now.toDateString()
-                        const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1)
-                        const isYesterday = d.toDateString() === yesterday.toDateString()
-                        if (isToday) return "Today"
-                        if (isYesterday) return "Yesterday"
-                        return d.toLocaleDateString([], { month: "long", day: "numeric" })
-                      })()}
-                    </Badge>
-                  </div>
                   {group.clusters.map((cluster) => (
                     <MessageCluster
                       key={cluster.id}
                       cluster={cluster}
+                      currentUserId={currentUserIdRef.current}
+                      highlightedMsgId={highlightedMsgId}
                       onImageLoad={scrollToBottom}
+                      onReply={handleReply}
+                      onJumpToMessage={handleJumpToMessage}
+                      onCopyText={handleCopyText}
+                      onCopyLink={handleCopyLink}
                     />
                   ))}
                 </div>
@@ -642,6 +866,28 @@ function ChatRoom({
         <Separator className="bg-neutral-800" />
 
         <div className="z-10 shrink-0 border-t border-neutral-800 bg-neutral-900 px-3 py-3">
+          {replyingTo && (
+            <div className="mb-2 rounded-xl border border-neutral-800 bg-neutral-950 px-3 py-2 text-xs">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-medium text-blue-400">Replying to {replyingTo.username}</div>
+                  <button
+                    type="button"
+                    onClick={() => handleJumpToMessage(replyingTo.id)}
+                    className="truncate text-left text-muted-foreground transition-opacity hover:opacity-90"
+                  >
+                    {replyingTo.content || (replyingTo.imageUrl ? "Photo" : "Message")}
+                  </button>
+                </div>
+                <button
+                  onClick={() => setReplyingTo(null)}
+                  className="rounded p-0.5 text-muted-foreground hover:text-white"
+                >
+                  <X weight="bold" className="size-3" />
+                </button>
+              </div>
+            </div>
+          )}
           {pendingImage && (
             <div className="relative mb-2 inline-block">
               <img src={pendingImage} alt="" className="h-20 rounded-lg object-cover" />

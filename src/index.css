@@ -230,3 +230,9 @@ html {
 [data-sonner-toaster][data-x-position=center] [data-sonner-toast][data-mounted=true] {
   transform: translateX(-50%) var(--y) !important;
 }
+
+/* Radix ScrollArea Viewport uses display:grid which breaks position:sticky.
+   Override to block so sticky avatars/usernames work in chat. */
+[data-radix-scroll-area-viewport] {
+  display: block !important;
+}
