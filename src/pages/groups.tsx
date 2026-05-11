@@ -68,12 +68,24 @@ function renderMessageContent(content: string) {
     const isUrl = /^https?:\/\/[^\s]+$/i.test(part);
     if (!isUrl) return <span key={idx}>{part}</span>;
 
+    // Only allow http/https URLs to prevent javascript: XSS
+    let safeHref: string;
+    try {
+      const parsed = new URL(part);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return <span key={idx}>{part}</span>;
+      }
+      safeHref = parsed.href;
+    } catch {
+      return <span key={idx}>{part}</span>;
+    }
+
     return (
       <a
         key={idx}
-        href={part}
+        href={safeHref}
         target="_blank"
-        rel="noreferrer"
+        rel="noopener noreferrer"
         data-message-link="true"
         className="underline underline-offset-2 break-all hover:opacity-90"
       >
@@ -171,7 +183,7 @@ function MessageCluster({
                       >
                         <div className="font-medium opacity-90">{message.replyTo.username}</div>
                         <div className="opacity-80 truncate">
-                          {message.replyTo.content || (message.replyTo.imageUrl ? "Photo" : "Message")}
+                          {message.replyTo.content || (message.replyTo.imageUrl ? en.groups.chat.replyPhoto : en.groups.chat.replyMessage)}
                         </div>
                       </button>
                     )}
@@ -212,19 +224,19 @@ function MessageCluster({
                 <ContextMenuContent className="w-44">
                   <ContextMenuItem onSelect={() => onReply(message)}>
                     <ArrowBendUpLeft className="mr-2 size-4" />
-                    Reply
+                    {en.groups.chat.contextMenu.reply}
                   </ContextMenuItem>
                   <ContextMenuItem
                     disabled={!message.content.trim()}
                     onSelect={() => onCopyText(message)}
                   >
                     <CopySimple className="mr-2 size-4" />
-                    Copy text
+                    {en.groups.chat.contextMenu.copyText}
                   </ContextMenuItem>
                   {contextLink && (
                     <ContextMenuItem onSelect={() => onCopyLink(contextLink)}>
                       <LinkSimple className="mr-2 size-4" />
-                      Copy link
+                      {en.groups.chat.contextMenu.copyLink}
                     </ContextMenuItem>
                   )}
                 </ContextMenuContent>
@@ -278,16 +290,16 @@ function ChatRoom({
 
   const handleLeaveGroup = async () => {
     if (leaving) return;
-    const ok = window.confirm("Leave this group?");
+    const ok = window.confirm(en.groups.chat.leaveConfirm);
     if (!ok) return;
 
     setLeaving(true);
     try {
       await leaveGroup(group.id);
-      toast.success("You left the group.");
+      toast.success(en.groups.chat.leftGroup);
       onLeftGroup(group.id);
     } catch {
-      toast.error("Failed to leave group.");
+      toast.error(en.groups.chat.leaveFailed);
     } finally {
       setLeaving(false);
     }
@@ -677,18 +689,18 @@ function ChatRoom({
     if (!message.content.trim()) return;
     try {
       await navigator.clipboard.writeText(message.content);
-      toast.success("Message text copied.");
+      toast.success(en.groups.chat.copied);
     } catch {
-      toast.error("Failed to copy message text.");
+      toast.error(en.groups.chat.copyFailed);
     }
   };
 
   const handleCopyLink = async (link: string) => {
     try {
       await navigator.clipboard.writeText(link);
-      toast.success("Link copied.");
+      toast.success(en.groups.chat.linkCopied);
     } catch {
-      toast.error("Failed to copy link.");
+      toast.error(en.groups.chat.linkCopyFailed);
     }
   };
 
@@ -703,11 +715,11 @@ function ChatRoom({
     const file = e.target.files?.[0];
     if (!file) return;
     if (!["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type)) {
-      toast.error("Only PNG, JPEG, WebP, and GIF images are allowed.");
+      toast.error(en.groups.chat.imageInvalidType);
       return;
     }
     if (file.size > 1 * 1024 * 1024) {
-      toast.error("Image must be under 1MB.");
+      toast.error(en.groups.chat.imageTooLarge);
       return;
     }
     const reader = new FileReader();
@@ -789,7 +801,7 @@ function ChatRoom({
               {onlineMembersCount > 0 && (
                 <span className="flex items-center gap-1 shrink-0">
                   <span className="size-1.5 rounded-full bg-green-500" />
-                  {onlineMembersCount} online
+                  {en.groups.chat.onlineCount(onlineMembersCount)}
                 </span>
               )}
             </div>
@@ -803,7 +815,7 @@ function ChatRoom({
             onClick={handleLeaveGroup}
             disabled={leaving}
           >
-            Leave
+            {en.groups.chat.leaveGroup}
           </Button>
         )}
       </CardHeader>
@@ -870,13 +882,13 @@ function ChatRoom({
             <div className="mb-2 rounded-xl border border-neutral-800 bg-neutral-950 px-3 py-2 text-xs">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="font-medium text-blue-400">Replying to {replyingTo.username}</div>
+                  <div className="font-medium text-blue-400">{en.groups.chat.replyingTo(replyingTo.username)}</div>
                   <button
                     type="button"
                     onClick={() => handleJumpToMessage(replyingTo.id)}
                     className="truncate text-left text-muted-foreground transition-opacity hover:opacity-90"
                   >
-                    {replyingTo.content || (replyingTo.imageUrl ? "Photo" : "Message")}
+                    {replyingTo.content || (replyingTo.imageUrl ? en.groups.chat.replyPhoto : en.groups.chat.replyMessage)}
                   </button>
                 </div>
                 <button

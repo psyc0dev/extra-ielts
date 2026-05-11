@@ -241,9 +241,9 @@ export function UploadTestButton({ onUpload }: {
     try {
       const text = await file.text();
       const data = JSON.parse(text) as TestDetail;
-      if (!data.title || !Array.isArray(data.sections)) { toast.error("Invalid test JSON."); return; }
+      if (!data.title || !Array.isArray(data.sections)) { toast.error(en.admin.toasts.invalidTestJson); return; }
       await onUpload(data);
-    } catch { toast.error("Failed to parse JSON file."); }
+    } catch { toast.error(en.admin.toasts.parseJsonFailed); }
     e.target.value = "";
   };
   return (

@@ -54,9 +54,19 @@ export interface SimilarWordsResponse {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
+function getAuthHeaders(): HeadersInit {
+  const token = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('accessToken='))
+    ?.split('=')[1];
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export async function getVocabularyTest(): Promise<VocabularyTestResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/vocabulary/test`);
+    const response = await fetch(`${API_BASE_URL}/vocabulary/test`, {
+      headers: getAuthHeaders(),
+    });
     if (!response.ok) {
       throw new Error(`Failed to fetch vocabulary test: ${response.status}`);
     }
@@ -69,7 +79,9 @@ export async function getVocabularyTest(): Promise<VocabularyTestResponse> {
 
 export async function getDictionaryEntry(word: string): Promise<DictionaryResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/vocabulary/dictionary/${encodeURIComponent(word)}`);
+    const response = await fetch(`${API_BASE_URL}/vocabulary/dictionary/${encodeURIComponent(word)}`, {
+      headers: getAuthHeaders(),
+    });
     if (!response.ok) {
       throw new Error(`Failed to fetch dictionary entry: ${response.status}`);
     }
@@ -82,7 +94,9 @@ export async function getDictionaryEntry(word: string): Promise<DictionaryRespon
 
 export async function getSimilarWords(word: string): Promise<SimilarWordsResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/vocabulary/similar/${encodeURIComponent(word)}`);
+    const response = await fetch(`${API_BASE_URL}/vocabulary/similar/${encodeURIComponent(word)}`, {
+      headers: getAuthHeaders(),
+    });
     if (!response.ok) {
       throw new Error(`Failed to fetch similar words: ${response.status}`);
     }

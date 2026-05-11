@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
 import { shuffle } from '../utils/helpers';
+import { requireAuth } from '../lib/store';
+import type { AppEnv } from '../lib/types';
 
-const router = new Hono();
+const router = new Hono<AppEnv>();
 
 interface IeltsWord {
   word: string;
@@ -64,7 +66,7 @@ function extractSynonyms(html: string, word: string): string[] {
 }
 
 // Get a new vocabulary test
-router.get('/test', async (c) => {
+router.get('/test', requireAuth, async (c) => {
   try {
     const words = await fetchWords();
     const shuffled = shuffle(words);
@@ -93,7 +95,7 @@ router.get('/test', async (c) => {
 });
 
 // Get dictionary entry for a word
-router.get('/dictionary/:word', async (c) => {
+router.get('/dictionary/:word', requireAuth, async (c) => {
   const word = c.req.param('word');
   try {
     const res = await fetch(`https://dictionary-api.eliaschen.dev/api/dictionary/en/${encodeURIComponent(word)}`);
@@ -105,7 +107,7 @@ router.get('/dictionary/:word', async (c) => {
 });
 
 // Get similar words for a word
-router.get('/similar/:word', async (c) => {
+router.get('/similar/:word', requireAuth, async (c) => {
   const word = c.req.param('word');
   const synonyms: string[] = [];
 
@@ -135,7 +137,7 @@ router.get('/similar/:word', async (c) => {
   return c.json({ success: true, data: { word, similarWords: unique } });
 });
 
-export function registerVocabularyRoutes(app: any) {
+export function registerVocabularyRoutes(app: Hono<AppEnv>) {
   app.route('/vocabulary', router);
 }
 

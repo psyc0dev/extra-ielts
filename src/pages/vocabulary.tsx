@@ -16,7 +16,7 @@ import { Slider } from "@/components/ui/slider";
 import { speakText } from "@/lib/tts";
 import { toast } from "sonner";
 import { getVocabularyTest, getDictionaryEntry, getSimilarWords, type VocabularyWord, type DictionaryEntry, type DictDefinition } from "@/lib/vocabulary-api";
-import { en } from "@/lib/en";
+import en from "@/locales/en";
 
 
 
@@ -206,7 +206,7 @@ export function Vocabulary() {
         <div className="relative flex items-start justify-between gap-4">
           <div className="flex flex-col gap-1">
             <Badge variant="outline" className="border-indigo-400/40 text-indigo-200 self-start -ml-1.5">
-              Vocabulary
+              {en.vocabulary.badge}
             </Badge>
             <h2 className="text-sm font-display tracking-wide">{en.vocabulary.title}</h2>
             <p className="text-xs text-muted-foreground">
@@ -303,7 +303,7 @@ export function Vocabulary() {
                 {dictLoading ? (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground px-4 py-4">
                     <CircleNotch weight="bold" className="size-4 animate-spin" />
-                    Loading dictionary…
+                    {en.vocabulary.loadingDictionary}
                   </div>
                 ) : dictEntry ? (
                   <div className="flex flex-col divide-y divide-neutral-800">
@@ -372,7 +372,7 @@ export function Vocabulary() {
                     <div className="px-4 py-3">
                       <div className="flex items-center gap-2 mb-2">
                         <BookOpen className="size-3.5 text-amber-400" />
-                        <span className="text-xs font-medium text-amber-400">Similar words:</span>
+                        <span className="text-xs font-medium text-amber-400">{en.vocabulary.similarWords}</span>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
                         {similarWords.map((word, index) => (
@@ -384,7 +384,7 @@ export function Vocabulary() {
                               try {
                                 if (navigator.clipboard) {
                                   navigator.clipboard.writeText(word);
-                                  toast.success(`Copied "${word}" to clipboard`);
+                                  toast.success(en.vocabulary.copied(word));
                                 } else {
                                   // Fallback for older browsers
                                   const textArea = document.createElement('textarea');
@@ -393,11 +393,11 @@ export function Vocabulary() {
                                   textArea.select();
                                   document.execCommand('copy');
                                   document.body.removeChild(textArea);
-                                  toast.success(`Copied "${word}" to clipboard`);
+                                  toast.success(en.vocabulary.copied(word));
                                 }
                               } catch (error) {
                                 console.error('Failed to copy text:', error);
-                                toast.error('Failed to copy to clipboard');
+                                toast.error(en.vocabulary.copyFailed);
                               }
                             }}
                           >

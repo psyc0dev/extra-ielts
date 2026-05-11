@@ -27,9 +27,10 @@ export const registerWritingRoutes = (api: Hono<AppEnv>) => {
       const { data: result, status } = await axios.post(`${url}/evaluate`, { topic: data.topic, essay: data.essay }, { timeout: 60_000 })
       return c.json(result, status as 200)
     } catch (err) {
-      const message = axios.isAxiosError(err)
-        ? (err.response?.data?.error ?? err.message)
-        : 'Evaluation service error.'
+      console.error('[writing] evaluation error:', err)
+      const message = axios.isAxiosError(err) && err.response?.status && err.response.status < 500
+        ? (err.response?.data?.error ?? 'Evaluation failed.')
+        : 'Evaluation service is temporarily unavailable.'
       return c.json({ error: message }, 502)
     }
   })

@@ -514,7 +514,6 @@ export async function evaluateWritingEssay(payload: { topic: string; essay: stri
       data: JSON.stringify(payload),
       headers: {
         "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     });

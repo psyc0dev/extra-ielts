@@ -10,7 +10,7 @@ const resetLimiter = rateLimiter({
   windowMs: 15 * 60_000,
   limit: 10,
   store: new CacheStore(15 * 60_000),
-  keyGenerator: (c) => c.req.header('x-forwarded-for') ?? 'unknown',
+  keyGenerator: (c) => c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? 'unknown',
   message: { error: 'Too many attempts. Please try again later.' },
 })
 
@@ -41,7 +41,7 @@ export const registerAccountRoutes = (api: Hono<AppEnv>) => {
 
     await c.env.DB.prepare('DELETE FROM otp_tokens WHERE expires_at < ?').bind(Date.now()).run()
 
-    const ip = c.req.header('x-forwarded-for') ?? 'unknown'
+    const ip = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? 'unknown'
     const otp = String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000))
     const expiresAt = Date.now() + 15 * 60 * 1000
     await c.env.DB.prepare('INSERT OR REPLACE INTO otp_tokens (otp, user_id, expires_at, ip) VALUES (?, ?, ?, ?)')
@@ -61,15 +61,30 @@ export const registerAccountRoutes = (api: Hono<AppEnv>) => {
     const { data, error } = await zParse(PasswordResetBodySchema, c)
     if (error) return error
 
-    const ip = c.req.header('x-forwarded-for') ?? 'unknown'
+    const ip = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? 'unknown'
+
+    // Check for too many failed OTP attempts from this IP
+    const failedAttempts = await c.env.DB.prepare(
+      'SELECT COUNT(*) as cnt FROM otp_attempts WHERE ip = ? AND attempted_at > ?'
+    ).bind(ip, Date.now() - 15 * 60 * 1000).first<{ cnt: number }>()
+    if (failedAttempts && failedAttempts.cnt >= 5) {
+      return c.json({ error: 'Too many failed attempts. Please request a new code.' }, 429)
+    }
+
     const entry = await c.env.DB.prepare('SELECT user_id, expires_at, ip FROM otp_tokens WHERE otp = ?')
       .bind(data.otp).first<{ user_id: string; expires_at: number; ip: string }>()
-    if (!entry || entry.expires_at < Date.now()) return c.json({ error: 'Invalid or expired code.' }, 400)
-    if (entry.ip !== ip) return c.json({ error: 'Invalid or expired code.' }, 400)
+    if (!entry || entry.expires_at < Date.now() || entry.ip !== ip) {
+      // Log failed attempt
+      await c.env.DB.prepare('INSERT INTO otp_attempts (ip, attempted_at) VALUES (?, ?)')
+        .bind(ip, Date.now()).run()
+      return c.json({ error: 'Invalid or expired code.' }, 400)
+    }
 
     const passwordHash = await createPasswordHash(data.password)
     await c.env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(passwordHash, entry.user_id).run()
-    await c.env.DB.prepare('DELETE FROM otp_tokens WHERE otp = ?').bind(data.otp).run()
+    await c.env.DB.prepare('DELETE FROM otp_tokens WHERE user_id = ?').bind(entry.user_id).run()
+    // Clean up attempt records for this IP
+    await c.env.DB.prepare('DELETE FROM otp_attempts WHERE ip = ?').bind(ip).run()
 
     return c.json({ ok: true }, 200)
   })

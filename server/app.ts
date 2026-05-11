@@ -24,6 +24,7 @@ export const createApp = () => {
   api.use('*', cors({
     origin: (origin, c) => {
       const allowed = getAllowed(c)
+      if (allowed.includes('*')) return origin
       return allowed.includes(origin) ? origin : null
     },
     allowMethods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -34,7 +35,7 @@ export const createApp = () => {
     windowMs: 60_000,
     limit: 120,
     store: new CacheStore(60_000),
-    keyGenerator: (c) => c.req.header('x-forwarded-for') ?? 'unknown',
+    keyGenerator: (c) => c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? 'unknown',
     message: { error: 'Too many requests. Please try again later.' },
   }))
 

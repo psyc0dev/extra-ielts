@@ -114,7 +114,7 @@ export function Writing() {
       const data = await evaluateWritingEssay({ topic, essay });
       if (data.error) throw new Error(data.error);
       setResult(data);
-      toast.success("Evaluation finished.");
+      toast.success(en.writing.toasts.evaluationFinished);
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : en.writing.errors.evaluationFailed);

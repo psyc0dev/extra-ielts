@@ -62,7 +62,7 @@ app.use('*', async (c, next) => {
 const port = Number(process.env.PORT ?? 8787)
 const env = {
   DB: makeD1(sqlite),
-  CORS_ORIGIN: process.env.CORS_ORIGIN ?? '*',
+  CORS_ORIGIN: process.env.CORS_ORIGIN ?? (() => { console.warn('WARNING: CORS_ORIGIN not set, defaulting to *'); return '*' })(),
   JWT_SECRET: process.env.JWT_SECRET ?? (() => { throw new Error('JWT_SECRET required') })(),
   EVALUATOR_URL: process.env.EVALUATOR_URL,
   GENERATOR_URL: process.env.GENERATOR_URL,

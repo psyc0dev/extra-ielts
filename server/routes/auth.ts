@@ -15,7 +15,7 @@ const authLimiter = rateLimiter({
   windowMs: 15 * 60_000,
   limit: 20,
   store: new CacheStore(15 * 60_000),
-  keyGenerator: (c) => c.req.header('x-forwarded-for') ?? 'unknown',
+  keyGenerator: (c) => c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? 'unknown',
   message: { error: 'Too many attempts. Please try again later.' },
 })
 

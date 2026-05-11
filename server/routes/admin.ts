@@ -76,12 +76,29 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
   })
 
   api.post('/admin/tests', requireAuth, requireTeacherOrAdmin, async (c) => {
-    const body = await c.req.json<{ title: string; durationMinutes: number; sections: unknown[] }>()
-    if (!body.title?.trim()) return c.json({ error: 'Title is required.' }, 400)
-    if (typeof body.durationMinutes !== 'number' || body.durationMinutes < 1 || body.durationMinutes > 600) return c.json({ error: 'Invalid duration.' }, 400)
-    if (!Array.isArray(body.sections)) return c.json({ error: 'Sections must be an array.' }, 400)
+    let body: unknown
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid JSON body.' }, 400)
+    }
+    const parsed = body as { title?: string; durationMinutes?: number; sections?: unknown[] }
+    if (!parsed.title?.trim()) return c.json({ error: 'Title is required.' }, 400)
+    if (typeof parsed.durationMinutes !== 'number' || parsed.durationMinutes < 1 || parsed.durationMinutes > 600) return c.json({ error: 'Invalid duration.' }, 400)
+    if (!Array.isArray(parsed.sections)) return c.json({ error: 'Sections must be an array.' }, 400)
+    if (parsed.sections.length > 20) return c.json({ error: 'Too many sections (max 20).' }, 400)
+
+    // Validate section structure
+    for (const section of parsed.sections) {
+      if (typeof section !== 'object' || section === null) return c.json({ error: 'Each section must be an object.' }, 400)
+      const s = section as Record<string, unknown>
+      if (typeof s.kind !== 'string' || !['listening', 'reading'].includes(s.kind)) return c.json({ error: 'Invalid section kind.' }, 400)
+      if (!Array.isArray(s.questions)) return c.json({ error: 'Section questions must be an array.' }, 400)
+      if ((s.questions as unknown[]).length > 100) return c.json({ error: 'Too many questions per section (max 100).' }, 400)
+    }
+
     const id = crypto.randomUUID()
-    const testData = { id, title: String(body.title).trim().slice(0, 200), durationMinutes: body.durationMinutes, sections: body.sections }
+    const testData = { id, title: String(parsed.title).trim().slice(0, 200), durationMinutes: parsed.durationMinutes, sections: parsed.sections }
     await c.env.DB.prepare('INSERT INTO tests (id, published, data_json) VALUES (?, 0, ?)')
       .bind(id, JSON.stringify(testData)).run()
     return c.json({ test: { id } }, 201)
@@ -91,14 +108,36 @@ export const registerAdminRoutes = (api: Hono<AppEnv>) => {
     const testId = c.req.param('testId')
     const existing = await getTestById(c.env.DB, testId)
     if (!existing) return c.json({ error: 'Test not found.' }, 404)
-    const body = await c.req.json<{ title?: string; durationMinutes?: number; sections?: unknown[]; published?: boolean }>()
+    let body: unknown
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid JSON body.' }, 400)
+    }
+    const parsed = body as { title?: string; durationMinutes?: number; sections?: unknown[]; published?: boolean }
+
+    if (parsed.sections !== undefined) {
+      if (!Array.isArray(parsed.sections)) return c.json({ error: 'Sections must be an array.' }, 400)
+      if (parsed.sections.length > 20) return c.json({ error: 'Too many sections (max 20).' }, 400)
+      for (const section of parsed.sections) {
+        if (typeof section !== 'object' || section === null) return c.json({ error: 'Each section must be an object.' }, 400)
+        const s = section as Record<string, unknown>
+        if (typeof s.kind !== 'string' || !['listening', 'reading'].includes(s.kind)) return c.json({ error: 'Invalid section kind.' }, 400)
+        if (!Array.isArray(s.questions)) return c.json({ error: 'Section questions must be an array.' }, 400)
+        if ((s.questions as unknown[]).length > 100) return c.json({ error: 'Too many questions per section (max 100).' }, 400)
+      }
+    }
+    if (parsed.durationMinutes !== undefined && (typeof parsed.durationMinutes !== 'number' || parsed.durationMinutes < 1 || parsed.durationMinutes > 600)) {
+      return c.json({ error: 'Invalid duration.' }, 400)
+    }
+
     const updated = {
       ...existing,
-      title: body.title ?? existing.title,
-      durationMinutes: body.durationMinutes ?? existing.durationMinutes,
-      sections: body.sections ?? existing.sections,
+      title: parsed.title ? String(parsed.title).trim().slice(0, 200) : existing.title,
+      durationMinutes: parsed.durationMinutes ?? existing.durationMinutes,
+      sections: parsed.sections ?? existing.sections,
     }
-    const published = body.published !== undefined ? (body.published ? 1 : 0) : (existing.published ? 1 : 0)
+    const published = parsed.published !== undefined ? (parsed.published ? 1 : 0) : (existing.published ? 1 : 0)
     await c.env.DB.prepare('UPDATE tests SET published = ?, data_json = ? WHERE id = ?')
       .bind(published, JSON.stringify(updated), testId).run()
     return c.json({ ok: true }, 200)

@@ -96,8 +96,11 @@ export const toApiUser = (user: User): ApiUser => ({
   avatarUrl: user.avatarUrl ?? null,
 })
 
-export const getJwtSecret = (c: { env?: { JWT_SECRET?: string } }) =>
-  c.env?.JWT_SECRET ?? 'default_secret_for_development'
+export const getJwtSecret = (c: { env?: { JWT_SECRET?: string } }) => {
+  const secret = c.env?.JWT_SECRET
+  if (!secret) throw new Error('JWT_SECRET environment variable is required')
+  return secret
+}
 
 export const createToken = async (userId: string, secret: string) => {
   return sign({ userId, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 }, secret)
@@ -129,9 +132,9 @@ export const verifyPassword = async (password: string, stored: string) => {
   const [salt, hash] = stored.split(':')
   if (!salt || !hash) return false
   const candidate = await hashPassword(password, salt)
-  let diff = candidate.length ^ hash.length
-  const len = Math.min(candidate.length, hash.length)
-  for (let i = 0; i < len; i++) {
+  if (candidate.length !== hash.length) return false
+  let diff = 0
+  for (let i = 0; i < candidate.length; i++) {
     diff |= candidate.charCodeAt(i) ^ hash.charCodeAt(i)
   }
   return diff === 0
