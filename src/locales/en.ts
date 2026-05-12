@@ -597,6 +597,15 @@
     toasts: {
       evaluationFinished: "Evaluation finished.",
     },
+    history: {
+      title: "Writing History",
+      pastSubmission: "Past Submission",
+      topic: "Topic",
+      essay: "Essay",
+      words: "words",
+      empty: "No writing submissions yet. Evaluate an essay to see it here.",
+      loadFailed: "Failed to load submission",
+    },
   },
 
   testBuilder: {
@@ -670,6 +679,23 @@
     similarWords: "Similar words:",
     copied: (word: string) => `Copied "${word}" to clipboard`,
     copyFailed: "Failed to copy to clipboard",
+    modes: {
+      quiz: "Quiz",
+      flashcards: "Flashcards",
+    },
+    flashcards: {
+      word: "WORD",
+      meaning: "MEANING",
+      tapToReveal: "Tap to reveal meaning",
+      shuffle: "Shuffle",
+      newSet: "New Set",
+      known: "Known",
+      knowIt: "Know it",
+      learning: "Learning",
+      left: "left",
+      shuffled: "Cards shuffled",
+      allReviewed: "All cards reviewed!",
+    },
   },
 
   admin: {

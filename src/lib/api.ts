@@ -532,3 +532,25 @@ export async function startTest(testId: string) {
   });
 }
 
+export type WritingSubmissionSummary = {
+  id: string;
+  topic: string;
+  wordCount: number;
+  overallScore: number | null;
+  overallLabel: string | null;
+  penalty: number;
+  criteria: Record<string, { score: number; label: string; comment: string; sub_scores: Record<string, number> }> | null;
+  createdAt: string;
+};
+
+export async function getWritingHistory() {
+  return apiFetch<{ submissions: WritingSubmissionSummary[] }>("/writing/history");
+}
+
+export async function getWritingSubmission(id: string) {
+  return apiFetch<{
+    submission: WritingSubmissionSummary & { essay: string };
+  }>(`/writing/history/${id}`);
+}
+
+
