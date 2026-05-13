@@ -36,19 +36,32 @@ const authLimiter = rateLimiter({
   message: { error: 'Too many attempts. Please try again later.' },
 })
 
-/** Whether we're running in production (HTTPS) */
-const isSecure = (c: { env?: { CORS_ORIGIN?: string } }) => {
-  const origin = (c as any).env?.CORS_ORIGIN ?? ''
-  return origin.startsWith('https://') || (!origin.includes('localhost') && !origin.includes('127.0.0.1') && origin !== '*')
+/** Whether we're running in production (HTTPS) — checks env via the full Hono context */
+function getCookieOptions(c: any): { secure: boolean; sameSite: 'Strict' | 'Lax' | 'None' } {
+  const origin: string = c.env?.CORS_ORIGIN ?? ''
+  // Cross-origin setups (Tauri app hitting remote API) need sameSite=None + secure
+  if (origin.includes('tauri://') || origin.includes('tauri.localhost')) {
+    return { secure: true, sameSite: 'None' }
+  }
+  // Local dev (HTTP) — no secure flag, use Lax
+  if (origin === '*' || origin.includes('localhost')) {
+    return { secure: false, sameSite: 'Lax' }
+  }
+  // Default production (same-origin HTTPS)
+  return { secure: true, sameSite: 'Lax' }
 }
 
 /** Set short-lived access token cookie (15 min) */
-const setAccessCookie = (c: Parameters<typeof setCookie>[0], token: string) =>
-  setCookie(c, 'accessToken', token, { path: '/', secure: isSecure(c), httpOnly: true, maxAge: 60 * 15, sameSite: 'Lax' })
+const setAccessCookie = (c: Parameters<typeof setCookie>[0], token: string) => {
+  const { secure, sameSite } = getCookieOptions(c)
+  setCookie(c, 'accessToken', token, { path: '/', secure, httpOnly: true, maxAge: 60 * 15, sameSite })
+}
 
 /** Set long-lived refresh token cookie (30 days) */
-const setRefreshCookie = (c: Parameters<typeof setCookie>[0], token: string) =>
-  setCookie(c, 'refreshToken', token, { path: '/api/auth', secure: isSecure(c), httpOnly: true, maxAge: 60 * 60 * 24 * 30, sameSite: 'Lax' })
+const setRefreshCookie = (c: Parameters<typeof setCookie>[0], token: string) => {
+  const { secure, sameSite } = getCookieOptions(c)
+  setCookie(c, 'refreshToken', token, { path: '/api/auth', secure, httpOnly: true, maxAge: 60 * 60 * 24 * 30, sameSite })
+}
 
 export const registerAuthRoutes = (api: Hono<AppEnv>) => {
   api.post('/auth/register', authLimiter, async (c) => {
