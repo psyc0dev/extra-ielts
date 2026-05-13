@@ -36,13 +36,19 @@ const authLimiter = rateLimiter({
   message: { error: 'Too many attempts. Please try again later.' },
 })
 
+/** Whether we're running in production (HTTPS) */
+const isSecure = (c: { env?: { CORS_ORIGIN?: string } }) => {
+  const origin = (c as any).env?.CORS_ORIGIN ?? ''
+  return origin.startsWith('https://') || (!origin.includes('localhost') && !origin.includes('127.0.0.1') && origin !== '*')
+}
+
 /** Set short-lived access token cookie (15 min) */
 const setAccessCookie = (c: Parameters<typeof setCookie>[0], token: string) =>
-  setCookie(c, 'accessToken', token, { path: '/', secure: true, httpOnly: true, maxAge: 60 * 15, sameSite: 'Strict' })
+  setCookie(c, 'accessToken', token, { path: '/', secure: isSecure(c), httpOnly: true, maxAge: 60 * 15, sameSite: 'Lax' })
 
 /** Set long-lived refresh token cookie (30 days) */
 const setRefreshCookie = (c: Parameters<typeof setCookie>[0], token: string) =>
-  setCookie(c, 'refreshToken', token, { path: '/api/auth', secure: true, httpOnly: true, maxAge: 60 * 60 * 24 * 30, sameSite: 'Strict' })
+  setCookie(c, 'refreshToken', token, { path: '/api/auth', secure: isSecure(c), httpOnly: true, maxAge: 60 * 60 * 24 * 30, sameSite: 'Lax' })
 
 export const registerAuthRoutes = (api: Hono<AppEnv>) => {
   api.post('/auth/register', authLimiter, async (c) => {
