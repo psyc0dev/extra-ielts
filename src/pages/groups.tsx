@@ -199,7 +199,7 @@ function MessageCluster({
                       />
                     )}
                     {message.content && (
-                      <span className={`${hasImage ? "block mt-1 px-2 py-0.5" : ""} pr-[4.5rem]`}>{renderMessageContent(message.content)}</span>
+                      <span className={`${hasImage ? "block mt-1 px-2 py-0.5" : ""} pr-[3.8rem]`}>{renderMessageContent(message.content)}</span>
                     )}
 
                     <span className="absolute bottom-1 right-2 inline-flex items-center gap-0.5 text-[10px] opacity-50 select-none">
@@ -868,6 +868,19 @@ function ChatRoom({
             <div className="mx-auto flex w-full flex-col gap-1 px-1">
               {groupedMessages.map((group) => (
                 <div key={group.date} className="flex flex-col first:[&]:mt-0 mt-4">
+                  <div className="flex justify-center my-2">
+                    <span className="text-[11px] text-muted-foreground bg-neutral-800/80 backdrop-blur-sm px-3 py-0.5 rounded-full select-none">
+                      {(() => {
+                        const d = new Date(group.date);
+                        const now = new Date();
+                        if (d.toDateString() === now.toDateString()) return "Today";
+                        const yesterday = new Date(now);
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+                        return d.toLocaleDateString([], { month: "short", day: "numeric", year: d.getFullYear() !== now.getFullYear() ? "numeric" : undefined });
+                      })()}
+                    </span>
+                  </div>
                   {group.clusters.map((cluster) => (
                     <MessageCluster
                       key={cluster.id}
