@@ -186,23 +186,61 @@ export type StudentStats = {
   homework: StudentStatsBucket;
 };
 
-import Cookies from "js-cookie";
 import axios from "axios";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL;
-const TOKEN_KEY = "accessToken";
 
-export function getToken() {
-  return Cookies.get(TOKEN_KEY);
+// Configure axios to always send cookies
+const api = axios.create({
+  baseURL: API_BASE,
+  headers: { "Content-Type": "application/json" },
+  withCredentials: true,
+});
+
+// Track if we're currently refreshing to avoid multiple simultaneous refresh calls
+let isRefreshing = false;
+let refreshPromise: Promise<boolean> | null = null;
+
+/** Attempt to refresh the access token using the refresh token cookie */
+async function refreshAccessToken(): Promise<boolean> {
+  if (isRefreshing && refreshPromise) return refreshPromise;
+  isRefreshing = true;
+  refreshPromise = (async () => {
+    try {
+      await axios.post(`${API_BASE}/auth/refresh`, {}, { withCredentials: true });
+      return true;
+    } catch {
+      return false;
+    } finally {
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
 }
 
-export function setToken(token: string | null) {
-  if (token) {
-    Cookies.set(TOKEN_KEY, token, { expires: 7, path: "/", sameSite: 'strict' });
-  } else {
-    Cookies.remove(TOKEN_KEY, { path: "/" });
+// Response interceptor: auto-refresh on 401
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    // Don't retry refresh endpoint itself or already-retried requests
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes('/auth/refresh') &&
+      !originalRequest.url?.includes('/auth/login') &&
+      !originalRequest.url?.includes('/auth/register')
+    ) {
+      originalRequest._retry = true;
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        return api(originalRequest);
+      }
+    }
+    return Promise.reject(error);
   }
-}
+);
 
 let _isAdmin = false;
 let _isTeacher = false;
@@ -212,15 +250,10 @@ export function setIsTeacher(v: boolean) { _isTeacher = v; }
 export function getIsTeacher() { return _isTeacher; }
 
 async function apiFetch<T>(path: string, options: RequestInit = {}) {
-  const token = getToken();
   try {
-    const { data } = await axios<T>(`${API_BASE}${path}`, {
+    const { data } = await api<T>(path, {
       method: (options.method as string) ?? "GET",
       data: options.body,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
     });
     return data;
   } catch (err) {
@@ -229,15 +262,36 @@ async function apiFetch<T>(path: string, options: RequestInit = {}) {
   }
 }
 
+/** Get a short-lived token for WebSocket connections and download URLs */
+export async function getWsToken(): Promise<string> {
+  const { data } = await api<{ token: string }>('/auth/ws-token');
+  return data.token;
+}
+
+/**
+ * @deprecated Use cookie-based auth. Only kept for backward compat during transition.
+ * Token is no longer stored client-side for regular API calls.
+ */
+export function getToken(): string | undefined {
+  return undefined;
+}
+
+/**
+ * @deprecated No-op. Tokens are managed via HttpOnly cookies now.
+ */
+export function setToken(_token: string | null) {
+  // No-op: tokens are managed server-side via HttpOnly cookies
+}
+
 export async function login(payload: { identifier: string; password: string }) {
-  return apiFetch<{ token: string; user: ApiUser }>("/auth/login", {
+  return apiFetch<{ user: ApiUser }>("/auth/login", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
 export async function register(payload: { username: string; email?: string; password: string }) {
-  return apiFetch<{ token: string; user: ApiUser }>("/auth/register", {
+  return apiFetch<{ user: ApiUser }>("/auth/register", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -303,14 +357,13 @@ export async function submitAttempt(attemptId: string) {
  * Fire-and-forget submission for unload events
  */
 export function forceSubmitAttempt(attemptId: string) {
-  const token = getToken();
   const url = `${API_BASE}/assignments/attempts/${attemptId}`;
   
   axios.patch(url, { status: "completed" }, {
     headers: {
-      Authorization: token ? `Bearer ${token}` : "",
       "Content-Type": "application/json",
     },
+    withCredentials: true,
   }).catch(() => { /* ignore */ });
 }
 
@@ -495,9 +548,8 @@ export async function generateWritingTopic() {
 }
 
 export async function evaluateWritingEssay(payload: { topic: string; essay: string }) {
-  const token = getToken();
   try {
-    const { data } = await axios<{
+    const { data } = await api<{
       word_count: number
       penalty: number
       overall: number
@@ -509,13 +561,9 @@ export async function evaluateWritingEssay(payload: { topic: string; essay: stri
         grammatical_range_and_accuracy: { score: number; label: string; comment: string; sub_scores: { sentence_structure_variety: number; grammar_accuracy: number; punctuation_usage: number } }
         lexical_resource: { score: number; label: string; comment: string; sub_scores: { vocabulary_range: number; lexical_accuracy: number; spelling_and_word_formation: number } }
       }
-    }>(`${API_BASE}/writing/evaluations`, {
+    }>('/writing/evaluations', {
       method: 'POST',
       data: JSON.stringify(payload),
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
     });
     return data;
   } catch (err) {

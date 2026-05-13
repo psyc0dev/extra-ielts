@@ -20,7 +20,7 @@ import Navbar from "./components/Navbar";
 import { TimerWidget } from "./components/TimerWidget";
 import en from "./locales/en";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
-import { getSettings, updateSettings, getToken, type UserSettings, type ApiUser } from "@/lib/api";
+import { getSettings, updateSettings, getWsToken, type UserSettings, type ApiUser } from "@/lib/api";
 import LoadingScreen from "./components/LoadingScreen";
 
 const defaultSettings: UserSettings = {
@@ -239,25 +239,30 @@ function AppBody() {
   useEffect(() => {
     if (!user) return;
 
-    const effectiveToken = getToken();
-    if (!effectiveToken) return;
-
-    const wsUrl = buildWebSocketUrl('/presence/ws', effectiveToken);
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let closed = false;
     let ws: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const connect = () => {
-      ws = new WebSocket(wsUrl);
-
-      ws.onclose = () => {
+    const connect = async () => {
+      try {
+        const effectiveToken = await getWsToken();
         if (closed) return;
-        reconnectTimer = setTimeout(connect, 2000);
-      };
+        const wsUrl = buildWebSocketUrl('/presence/ws', effectiveToken);
+        ws = new WebSocket(wsUrl);
 
-      ws.onerror = () => {
-        ws?.close();
-      };
+        ws.onclose = () => {
+          if (closed) return;
+          reconnectTimer = setTimeout(connect, 2000);
+        };
+
+        ws.onerror = () => {
+          ws?.close();
+        };
+      } catch {
+        if (!closed) {
+          reconnectTimer = setTimeout(connect, 5000);
+        }
+      }
     };
 
     connect();

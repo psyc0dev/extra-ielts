@@ -132,6 +132,7 @@ export type StudentStats = {
 export type User = ApiUser & {
   passwordHash: string
   avatarUrl?: string | null
+  passwordChangedAt?: string | null
 }
 
 export type Assignment = {

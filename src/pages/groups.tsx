@@ -34,13 +34,13 @@ import {
   markGroupMessageSeen,
   sendGroupMessage,
   leaveGroup,
+  getWsToken,
   type MyGroup,
   type GroupMessage,
 } from "@/lib/api";
 import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
-import Cookies from "js-cookie";
 import en from "@/locales/en";
 
 function formatMessageTime(dateStr: string) {
@@ -319,39 +319,42 @@ function ChatRoom({
   useEffect(() => {
     loadMessages();
 
-    const token = Cookies.get("accessToken");
-    if (!token) return;
-
-    let currentUserId: string | null = null;
-    try {
-      const payloadBase64 = token.split(".")[1]?.replace(/-/g, "+").replace(/_/g, "/");
-      if (payloadBase64) {
-        currentUserId = JSON.parse(atob(payloadBase64)).userId ?? null;
-        currentUserIdRef.current = currentUserId;
-      }
-    } catch {
-      currentUserId = null;
-      currentUserIdRef.current = null;
-    }
-
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
-
-    // Derive WS protocol from the API URL, not the page URL (Tauri uses tauri:// protocol)
-    const wsProtocol = baseUrl.startsWith("https://") ? "wss:" : "ws:";
-
-    let wsUrl: string;
-    if (baseUrl.startsWith("/")) {
-      // Relative path (e.g. "/api") — use current host
-      wsUrl = `${wsProtocol}//${window.location.host}${baseUrl}/groups/${group.id}/ws?token=${token}`;
-    } else {
-      // Absolute URL (e.g. "https://api.example.com/api") — derive WS URL
-      const wsHost = baseUrl.replace(/^https?:\/\//, "");
-      wsUrl = `${wsProtocol}//${wsHost}/groups/${group.id}/ws?token=${token}`;
-    }
-
+    let cancelled = false;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const connect = () => {
+    const initWs = async () => {
+      let token: string;
+      try {
+        token = await getWsToken();
+      } catch {
+        if (!cancelled) reconnectTimer = setTimeout(initWs, 5000);
+        return;
+      }
+      if (cancelled) return;
+
+      let currentUserId: string | null = null;
+      try {
+        const payloadBase64 = token.split(".")[1]?.replace(/-/g, "+").replace(/_/g, "/");
+        if (payloadBase64) {
+          currentUserId = JSON.parse(atob(payloadBase64)).userId ?? null;
+          currentUserIdRef.current = currentUserId;
+        }
+      } catch {
+        currentUserId = null;
+        currentUserIdRef.current = null;
+      }
+
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
+      const wsProtocol = baseUrl.startsWith("https://") ? "wss:" : "ws:";
+
+      let wsUrl: string;
+      if (baseUrl.startsWith("/")) {
+        wsUrl = `${wsProtocol}//${window.location.host}${baseUrl}/groups/${group.id}/ws?token=${token}`;
+      } else {
+        const wsHost = baseUrl.replace(/^https?:\/\//, "");
+        wsUrl = `${wsProtocol}//${wsHost}/groups/${group.id}/ws?token=${token}`;
+      }
+
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
@@ -433,8 +436,8 @@ function ChatRoom({
 
       ws.onclose = () => {
         wsRef.current = null;
-        // Reconnect after 3 seconds
-        reconnectTimer = setTimeout(connect, 3000);
+        // Reconnect after 3 seconds (get fresh token)
+        if (!cancelled) reconnectTimer = setTimeout(initWs, 3000);
       };
 
       ws.onerror = () => {
@@ -442,9 +445,10 @@ function ChatRoom({
       };
     };
 
-    connect();
+    initWs();
 
     return () => {
+      cancelled = true;
       if (reconnectTimer) clearTimeout(reconnectTimer);
       wsRef.current?.close();
       setTypingUsers((prev) => {
@@ -455,23 +459,30 @@ function ChatRoom({
   }, [group.id]);
 
   useEffect(() => {
-    const token = Cookies.get("accessToken");
-    if (!token) return;
-
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
-    const wsProtocol = baseUrl.startsWith("https://") ? "wss:" : "ws:";
-
-    let wsUrl: string;
-    if (baseUrl.startsWith("/")) {
-      wsUrl = `${wsProtocol}//${window.location.host}${baseUrl}/presence/ws?token=${token}`;
-    } else {
-      const wsHost = baseUrl.replace(/^https?:\/\//, "");
-      wsUrl = `${wsProtocol}//${wsHost}/presence/ws?token=${token}`;
-    }
-
+    let cancelled = false;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const connect = () => {
+    const initPresenceWs = async () => {
+      let token: string;
+      try {
+        token = await getWsToken();
+      } catch {
+        if (!cancelled) reconnectTimer = setTimeout(initPresenceWs, 5000);
+        return;
+      }
+      if (cancelled) return;
+
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
+      const wsProtocol = baseUrl.startsWith("https://") ? "wss:" : "ws:";
+
+      let wsUrl: string;
+      if (baseUrl.startsWith("/")) {
+        wsUrl = `${wsProtocol}//${window.location.host}${baseUrl}/presence/ws?token=${token}`;
+      } else {
+        const wsHost = baseUrl.replace(/^https?:\/\//, "");
+        wsUrl = `${wsProtocol}//${wsHost}/presence/ws?token=${token}`;
+      }
+
       const ws = new WebSocket(wsUrl);
       presenceWsRef.current = ws;
 
@@ -511,13 +522,14 @@ function ChatRoom({
       };
 
       ws.onclose = () => {
-        reconnectTimer = setTimeout(connect, 1500);
+        if (!cancelled) reconnectTimer = setTimeout(initPresenceWs, 1500);
       };
     };
 
-    connect();
+    initPresenceWs();
 
     return () => {
+      cancelled = true;
       if (reconnectTimer) clearTimeout(reconnectTimer);
       presenceWsRef.current?.close();
       setOnlineUsers(new Map());

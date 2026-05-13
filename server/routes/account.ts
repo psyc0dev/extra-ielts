@@ -3,7 +3,7 @@ import { deleteCookie } from 'hono/cookie'
 import { rateLimiter } from 'hono-rate-limiter'
 import type { AppEnv } from '../lib/types'
 import { PasswordResetRequestBodySchema, PasswordResetBodySchema, AvatarBodySchema } from '../lib/schemas'
-import { createPasswordHash, nowIso, zParse, requireAuth, CacheStore } from '../lib/store'
+import { createPasswordHash, nowIso, zParse, requireAuth, CacheStore, deleteAllRefreshTokens } from '../lib/store'
 import axios from 'axios'
 
 const resetLimiter = rateLimiter({
@@ -81,8 +81,11 @@ export const registerAccountRoutes = (api: Hono<AppEnv>) => {
     }
 
     const passwordHash = await createPasswordHash(data.password)
-    await c.env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(passwordHash, entry.user_id).run()
+    const now = nowIso()
+    await c.env.DB.prepare('UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?').bind(passwordHash, now, entry.user_id).run()
     await c.env.DB.prepare('DELETE FROM otp_tokens WHERE user_id = ?').bind(entry.user_id).run()
+    // Invalidate all refresh tokens so old sessions can't refresh
+    await deleteAllRefreshTokens(c.env.DB, entry.user_id)
     // Clean up attempt records for this IP
     await c.env.DB.prepare('DELETE FROM otp_attempts WHERE ip = ?').bind(ip).run()
 

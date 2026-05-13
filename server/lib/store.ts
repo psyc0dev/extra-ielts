@@ -102,8 +102,67 @@ export const getJwtSecret = (c: { env?: { JWT_SECRET?: string } }) => {
   return secret
 }
 
-export const createToken = async (userId: string, secret: string) => {
-  return sign({ userId, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 }, secret)
+/** Access token: short-lived (15 minutes) */
+export const createAccessToken = async (userId: string, secret: string) => {
+  return sign({ userId, iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 60 * 15 }, secret)
+}
+
+/** @deprecated Use createAccessToken instead */
+export const createToken = createAccessToken
+
+/** Generate a random refresh token string */
+export const generateRefreshToken = () => {
+  const bytes = new Uint8Array(32)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** Hash a refresh token for storage (SHA-256) */
+export const hashRefreshToken = async (token: string): Promise<string> => {
+  const encoded = new TextEncoder().encode(token)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', encoded)
+  return Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** Refresh token expiry: 30 days */
+const REFRESH_TOKEN_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000
+
+/** Store a refresh token in D1 */
+export const storeRefreshToken = async (db: D1Database, userId: string, token: string) => {
+  const id = crypto.randomUUID()
+  const tokenHash = await hashRefreshToken(token)
+  const expiresAt = Date.now() + REFRESH_TOKEN_EXPIRY_MS
+  await db.prepare(
+    'INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?, ?)'
+  ).bind(id, userId, tokenHash, expiresAt, nowIso()).run()
+  return { id, expiresAt }
+}
+
+/** Validate and consume a refresh token (rotate) */
+export const validateRefreshToken = async (db: D1Database, token: string): Promise<{ userId: string } | null> => {
+  const tokenHash = await hashRefreshToken(token)
+  const row = await db.prepare(
+    'SELECT id, user_id, expires_at FROM refresh_tokens WHERE token_hash = ?'
+  ).bind(tokenHash).first<{ id: string; user_id: string; expires_at: number }>()
+  if (!row || row.expires_at < Date.now()) {
+    // If expired, clean it up
+    if (row) await db.prepare('DELETE FROM refresh_tokens WHERE id = ?').bind(row.id).run()
+    return null
+  }
+  // Delete the used token (rotation: old token is consumed)
+  await db.prepare('DELETE FROM refresh_tokens WHERE id = ?').bind(row.id).run()
+  return { userId: row.user_id }
+}
+
+/** Delete all refresh tokens for a user (logout from all devices) */
+export const deleteAllRefreshTokens = async (db: D1Database, userId: string) => {
+  await db.prepare('DELETE FROM refresh_tokens WHERE user_id = ?').bind(userId).run()
+}
+
+/** Delete a specific refresh token by its hash */
+export const deleteRefreshTokenByValue = async (db: D1Database, token: string) => {
+  const tokenHash = await hashRefreshToken(token)
+  await db.prepare('DELETE FROM refresh_tokens WHERE token_hash = ?').bind(tokenHash).run()
 }
 
 const hashPassword = async (password: string, salt: string) => {
@@ -177,8 +236,8 @@ export const jsonParse = <T>(str: string, fallback: T): T => {
 // D1 helpers
 export const dbGetUser = async (db: D1Database, userId: string): Promise<User | null> => {
   const row = await db.prepare(
-    'SELECT id, username, email, role, password_hash, avatar_url FROM users WHERE id = ?'
-  ).bind(userId).first<{ id: string; username: string; email: string | null; role: string; password_hash: string; avatar_url: string | null }>()
+    'SELECT id, username, email, role, password_hash, avatar_url, password_changed_at FROM users WHERE id = ?'
+  ).bind(userId).first<{ id: string; username: string; email: string | null; role: string; password_hash: string; avatar_url: string | null; password_changed_at: string | null }>()
   if (!row) return null
   return {
     id: row.id,
@@ -187,6 +246,7 @@ export const dbGetUser = async (db: D1Database, userId: string): Promise<User | 
     role: row.role as 'admin' | 'teacher' | 'student',
     passwordHash: row.password_hash,
     avatarUrl: row.avatar_url ?? null,
+    passwordChangedAt: row.password_changed_at ?? null,
   }
 }
 
@@ -205,6 +265,15 @@ export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
     const userId = payload.userId as string
     const user = await dbGetUser(c.env.DB, userId)
     if (!user) return c.json({ error: 'Unauthorized' }, 401)
+
+    // Check if token was issued before password change
+    if (user.passwordChangedAt && payload.iat) {
+      const changedAtSec = Math.floor(new Date(user.passwordChangedAt).getTime() / 1000)
+      if ((payload.iat as number) < changedAtSec) {
+        return c.json({ error: 'Unauthorized' }, 401)
+      }
+    }
+
     c.set('user', user)
     c.set('token', token)
     await next()

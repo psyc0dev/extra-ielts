@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Plus, CaretDown } from "@phosphor-icons/react";
-import { adminToggleTestPublished, adminDeleteTest, adminUploadTest, getToken, type TestSummary, type TestDetail } from "@/lib/api";
+import { adminToggleTestPublished, adminDeleteTest, adminUploadTest, type TestSummary, type TestDetail } from "@/lib/api";
 import { toast } from "sonner";
 import { open } from "@tauri-apps/plugin-shell";
 import { TestBuilderDialog } from "@/components/test-builder";
@@ -49,13 +49,8 @@ export function TestsSection({ tests, query, onQueryChange, loading, isAdmin, on
         toast.error(en.admin.toasts.testEmpty);
         return;
       }
-      const token = getToken();
-      if (!token) {
-        toast.error(en.admin.toasts.missingAuth);
-        return;
-      }
       const base = import.meta.env.VITE_API_BASE_URL || window.location.origin;
-      const url = `${base}/admin/tests/${test.id}/download?token=${encodeURIComponent(token)}`;
+      const url = `${base}/admin/tests/${test.id}/download`;
       await open(url);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : en.admin.toasts.downloadFailed);

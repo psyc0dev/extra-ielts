@@ -1,9 +1,26 @@
 import type { Hono } from 'hono'
-import { deleteCookie, setCookie } from 'hono/cookie'
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
+import { sign } from 'hono/jwt'
 import { rateLimiter } from 'hono-rate-limiter'
 import type { AppEnv } from '../lib/types'
 import { LoginBodySchema, RegisterBodySchema } from '../lib/schemas'
-import { createPasswordHash, createToken, nowIso, zParse, requireAuth, toApiUser, verifyPassword, CacheStore } from '../lib/store'
+import {
+  createPasswordHash,
+  createAccessToken,
+  generateRefreshToken,
+  storeRefreshToken,
+  validateRefreshToken,
+  deleteRefreshTokenByValue,
+  deleteAllRefreshTokens,
+  nowIso,
+  zParse,
+  requireAuth,
+  toApiUser,
+  verifyPassword,
+  CacheStore,
+  dbGetUser,
+  getJwtSecret,
+} from '../lib/store'
 
 const getSecret = (c: { env: { JWT_SECRET: string } }) => {
   const s = c.env.JWT_SECRET
@@ -19,8 +36,13 @@ const authLimiter = rateLimiter({
   message: { error: 'Too many attempts. Please try again later.' },
 })
 
-const setAuthCookie = (c: Parameters<typeof setCookie>[0], token: string) =>
-  setCookie(c, 'accessToken', token, { path: '/', secure: true, httpOnly: true, maxAge: 60 * 60 * 24 * 7, sameSite: 'Strict' })
+/** Set short-lived access token cookie (15 min) */
+const setAccessCookie = (c: Parameters<typeof setCookie>[0], token: string) =>
+  setCookie(c, 'accessToken', token, { path: '/', secure: true, httpOnly: true, maxAge: 60 * 15, sameSite: 'Strict' })
+
+/** Set long-lived refresh token cookie (30 days) */
+const setRefreshCookie = (c: Parameters<typeof setCookie>[0], token: string) =>
+  setCookie(c, 'refreshToken', token, { path: '/api/auth', secure: true, httpOnly: true, maxAge: 60 * 60 * 24 * 30, sameSite: 'Strict' })
 
 export const registerAuthRoutes = (api: Hono<AppEnv>) => {
   api.post('/auth/register', authLimiter, async (c) => {
@@ -49,9 +71,13 @@ export const registerAuthRoutes = (api: Hono<AppEnv>) => {
     ).bind(id, username, email, 'student', passwordHash, nowIso()).run()
 
     const secret = getSecret(c)
-    const token = await createToken(id, secret)
-    setAuthCookie(c, token)
-    return c.json({ token, user: { id, username, email, role: 'student', avatarUrl: null } }, 201)
+    const accessToken = await createAccessToken(id, secret)
+    const refreshToken = generateRefreshToken()
+    await storeRefreshToken(c.env.DB, id, refreshToken)
+
+    setAccessCookie(c, accessToken)
+    setRefreshCookie(c, refreshToken)
+    return c.json({ user: { id, username, email, role: 'student', avatarUrl: null } }, 201)
   })
 
   api.post('/auth/login', authLimiter, async (c) => {
@@ -68,13 +94,73 @@ export const registerAuthRoutes = (api: Hono<AppEnv>) => {
     if (!ok) return c.json({ error: 'Invalid credentials.' }, 401)
 
     const secret = getSecret(c)
-    const token = await createToken(row.id, secret)
-    setAuthCookie(c, token)
-    return c.json({ token, user: { id: row.id, username: row.username, email: row.email, role: row.role, avatarUrl: row.avatar_url ?? null } }, 200)
+    const accessToken = await createAccessToken(row.id, secret)
+    const refreshToken = generateRefreshToken()
+    await storeRefreshToken(c.env.DB, row.id, refreshToken)
+
+    setAccessCookie(c, accessToken)
+    setRefreshCookie(c, refreshToken)
+    return c.json({ user: { id: row.id, username: row.username, email: row.email, role: row.role, avatarUrl: row.avatar_url ?? null } }, 200)
   })
 
-  api.post('/auth/logout', requireAuth, (c) => {
+  api.post('/auth/refresh', async (c) => {
+    const refreshToken = getCookie(c, 'refreshToken')
+    if (!refreshToken) return c.json({ error: 'No refresh token.' }, 401)
+
+    const result = await validateRefreshToken(c.env.DB, refreshToken)
+    if (!result) {
+      deleteCookie(c, 'refreshToken', { path: '/api/auth' })
+      deleteCookie(c, 'accessToken', { path: '/' })
+      return c.json({ error: 'Invalid or expired refresh token.' }, 401)
+    }
+
+    // Verify user still exists and check passwordChangedAt
+    const user = await dbGetUser(c.env.DB, result.userId)
+    if (!user) {
+      deleteCookie(c, 'refreshToken', { path: '/api/auth' })
+      deleteCookie(c, 'accessToken', { path: '/' })
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
+
+    const secret = getJwtSecret(c)
+    const newAccessToken = await createAccessToken(user.id, secret)
+    const newRefreshToken = generateRefreshToken()
+    await storeRefreshToken(c.env.DB, user.id, newRefreshToken)
+
+    setAccessCookie(c, newAccessToken)
+    setRefreshCookie(c, newRefreshToken)
+    return c.json({ user: toApiUser(user) }, 200)
+  })
+
+  /** Get a short-lived token for WebSocket/download use (requires valid session) */
+  api.get('/auth/ws-token', requireAuth, async (c) => {
+    const user = c.get('user')
+    const secret = getJwtSecret(c)
+    // Issue a very short-lived token (2 min) for WS connection initiation
+    const wsToken = await sign(
+      { userId: user.id, exp: Math.floor(Date.now() / 1000) + 120 },
+      secret
+    )
+    return c.json({ token: wsToken })
+  })
+
+  api.post('/auth/logout', requireAuth, async (c) => {
+    // Delete the refresh token from DB
+    const refreshToken = getCookie(c, 'refreshToken')
+    if (refreshToken) {
+      await deleteRefreshTokenByValue(c.env.DB, refreshToken)
+    }
     deleteCookie(c, 'accessToken', { path: '/' })
+    deleteCookie(c, 'refreshToken', { path: '/api/auth' })
+    return c.json({ ok: true }, 200)
+  })
+
+  /** Logout from all devices — deletes all refresh tokens */
+  api.post('/auth/logout-all', requireAuth, async (c) => {
+    const user = c.get('user')
+    await deleteAllRefreshTokens(c.env.DB, user.id)
+    deleteCookie(c, 'accessToken', { path: '/' })
+    deleteCookie(c, 'refreshToken', { path: '/api/auth' })
     return c.json({ ok: true }, 200)
   })
 
