@@ -1,4 +1,5 @@
 src-tauri/target
+src-tauri/gen/schemas
 server/dev.db
 .claude
 bun.lock
